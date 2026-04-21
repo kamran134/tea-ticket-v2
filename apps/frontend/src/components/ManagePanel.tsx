@@ -58,7 +58,7 @@ export function ManagePanel() {
 
   useEffect(() => {
     if (!authenticated) return;
-    api.getVenues().then(setVenues);
+    api.getVenues(true).then(setVenues);
   }, [authenticated]);
 
   useEffect(() => {
@@ -148,6 +148,15 @@ export function ManagePanel() {
   const copyRegistrationLink = (venueId: string) => {
     const url = `${window.location.origin}/index.html?venue=${venueId}`;
     navigator.clipboard.writeText(url).then(() => alert('Ссылка скопирована!'));
+  };
+
+  const toggleVenueActive = async (id: string, active: boolean) => {
+    try {
+      const updated = await api.toggleVenue(id, active);
+      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Ошибка');
+    }
   };
 
   if (!authenticated) {
@@ -244,19 +253,40 @@ export function ManagePanel() {
 
             <div className="space-y-2">
               {venues.map(v => (
-                <div key={v.id} className="bg-white rounded-xl shadow-sm p-4 flex justify-between items-start">
-                  <div>
-                    <div className="font-semibold text-gray-800">{v.name}</div>
-                    <div className="text-sm text-gray-500">
-                      {new Date(v.date).toLocaleString('ru-RU')}
+                <div key={v.id} className="bg-white rounded-xl shadow-sm p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <div className="font-semibold text-gray-800">{v.name}</div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {v.active ? 'Активно' : 'Скрыто'}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-500 mt-0.5">
+                        {new Date(v.date).toLocaleString('ru-RU')}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 ml-4 shrink-0">
+                      {v.active && (
+                        <button
+                          onClick={() => copyRegistrationLink(v.id)}
+                          className="text-xs text-emerald-700 hover:underline"
+                        >
+                          Скопировать ссылку
+                        </button>
+                      )}
+                      <button
+                        onClick={() => toggleVenueActive(v.id, !v.active)}
+                        className={`text-xs hover:underline ${
+                          v.active ? 'text-gray-400 hover:text-red-500' : 'text-emerald-600'
+                        }`}
+                      >
+                        {v.active ? 'Скрыть' : 'Активировать'}
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => copyRegistrationLink(v.id)}
-                    className="text-xs text-emerald-700 hover:underline ml-4 shrink-0"
-                  >
-                    Скопировать ссылку
-                  </button>
                 </div>
               ))}
             </div>

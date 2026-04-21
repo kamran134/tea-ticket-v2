@@ -27,8 +27,16 @@ export const api = {
     });
   },
 
-  async getVenues(): Promise<Venue[]> {
-    return request('/api/venues');
+  async getVenues(all = false): Promise<Venue[]> {
+    return request(`/api/venues${all ? '?all=true' : ''}`);
+  },
+
+  async toggleVenue(id: string, active: boolean): Promise<Venue> {
+    return request(`/api/venues/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ active }),
+    });
   },
 
   async getZones(venueId: string): Promise<Zone[]> {
