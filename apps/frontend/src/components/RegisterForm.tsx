@@ -57,9 +57,13 @@ export function RegisterForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Регистрация</h1>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-bold text-emerald-800">🍵 Tea Ticket</h1>
+          <p className="text-gray-600 mt-2">Забронируйте место на мероприятие</p>
+        </div>
+      <div className="bg-white rounded-2xl shadow-lg p-6">
 
         {error && (
           <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
@@ -70,7 +74,7 @@ export function RegisterForm() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Мероприятие</label>
               <select
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={venueId}
                 onChange={e => setVenueId(e.target.value)}
                 required
@@ -88,7 +92,7 @@ export function RegisterForm() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Зона</label>
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={zoneId}
               onChange={e => setZoneId(e.target.value)}
               required
@@ -108,7 +112,7 @@ export function RegisterForm() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя</label>
             <input
               type="text"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={name}
               onChange={e => setName(e.target.value)}
               required
@@ -119,7 +123,7 @@ export function RegisterForm() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
             <input
               type="tel"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               required
@@ -134,7 +138,7 @@ export function RegisterForm() {
                   <input
                     type="text"
                     placeholder={`Гость ${i + 1}`}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                     value={g.name}
                     onChange={e => updateGuest(i, e.target.value)}
                     required
@@ -155,13 +159,13 @@ export function RegisterForm() {
             type="button"
             onClick={addGuest}
             disabled={!selectedZone || guests.length >= maxGuests}
-            className="text-sm text-blue-600 hover:underline disabled:opacity-40 disabled:no-underline"
+            className="text-sm text-emerald-700 hover:underline disabled:opacity-40 disabled:no-underline"
           >
             + Добавить гостя
           </button>
 
           {totalPrice > 0 && (
-            <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
+            <div className="p-3 bg-emerald-50 rounded-lg text-sm text-emerald-800">
               Итого: <strong>{totalPrice.toLocaleString('ru-RU')} ₸</strong>{' '}
               ({1 + guests.length} {guests.length === 0 ? 'человек' : 'чел.'})
             </div>
@@ -170,11 +174,12 @@ export function RegisterForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Регистрация...' : 'Зарегистрироваться'}
           </button>
         </form>
+      </div>
       </div>
     </div>
   );

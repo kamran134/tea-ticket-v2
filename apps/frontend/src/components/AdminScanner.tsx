@@ -135,8 +135,8 @@ export function AdminScanner() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-md w-full max-w-sm p-6">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
           <h1 className="text-xl font-bold text-gray-800 mb-4">Вход для администратора</h1>
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
@@ -145,14 +145,14 @@ export function AdminScanner() {
             <input
               type="password"
               placeholder="Пароль"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoFocus
             />
             <button
               type="submit"
-              className="w-full py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
             >
               Войти
             </button>
@@ -188,7 +188,7 @@ export function AdminScanner() {
         <button
           onClick={scanning ? stopScanning : startScanning}
           className={`w-full py-3 rounded-xl font-semibold transition-colors ${
-            scanning ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+            scanning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
           }`}
         >
           {scanning ? 'Остановить сканер' : 'Запустить сканер'}
@@ -225,7 +225,7 @@ export function AdminScanner() {
                           checked={selectedIds.has(m.id)}
                           disabled={m.checkedIn || m.status !== 'CONFIRMED'}
                           onChange={() => toggleMember(m.id)}
-                          className="w-4 h-4 accent-blue-500"
+                          className="w-4 h-4 accent-emerald-500"
                         />
                         <span className={`text-sm ${m.checkedIn ? 'line-through' : ''}`}>
                           {m.name}

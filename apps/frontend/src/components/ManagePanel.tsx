@@ -152,8 +152,8 @@ export function ManagePanel() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-md w-full max-w-sm p-6">
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
           <h1 className="text-xl font-bold text-gray-800 mb-4">Управление</h1>
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
@@ -162,14 +162,14 @@ export function ManagePanel() {
             <input
               type="password"
               placeholder="Пароль"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={password}
               onChange={e => setPassword(e.target.value)}
               autoFocus
             />
             <button
               type="submit"
-              className="w-full py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
             >
               Войти
             </button>
@@ -180,7 +180,7 @@ export function ManagePanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50">
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Управление</h1>
@@ -199,7 +199,7 @@ export function ManagePanel() {
                 onClick={() => setTab(t)}
                 className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                   tab === t
-                    ? 'border-blue-600 text-blue-600'
+                    ? 'border-emerald-600 text-emerald-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -222,21 +222,21 @@ export function ManagePanel() {
               <input
                 type="text"
                 placeholder="Название"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={newVenueName}
                 onChange={e => setNewVenueName(e.target.value)}
                 required
               />
               <input
                 type="datetime-local"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={newVenueDate}
                 onChange={e => setNewVenueDate(e.target.value)}
                 required
               />
               <button
                 type="submit"
-                className="w-full py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
               >
                 Создать
               </button>
@@ -253,7 +253,7 @@ export function ManagePanel() {
                   </div>
                   <button
                     onClick={() => copyRegistrationLink(v.id)}
-                    className="text-xs text-blue-600 hover:underline ml-4 shrink-0"
+                    className="text-xs text-emerald-700 hover:underline ml-4 shrink-0"
                   >
                     Скопировать ссылку
                   </button>
@@ -267,7 +267,7 @@ export function ManagePanel() {
         {tab === 'zones' && (
           <div className="space-y-4">
             <select
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={selectedVenueId}
               onChange={e => setSelectedVenueId(e.target.value)}
             >
@@ -290,7 +290,7 @@ export function ManagePanel() {
                   <input
                     type="text"
                     placeholder="Название зоны"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                     value={editingZone ? editingZone.name : newZone.name}
                     onChange={e =>
                       editingZone
@@ -303,7 +303,7 @@ export function ManagePanel() {
                   <input
                     type="text"
                     placeholder="Номер карты для оплаты"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                     value={editingZone ? editingZone.cardNumber : newZone.cardNumber}
                     onChange={e =>
                       editingZone
@@ -324,7 +324,7 @@ export function ManagePanel() {
                         type="number"
                         placeholder={label}
                         min="0"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                         value={
                           editingZone
                             ? String(editingZone[field as keyof Zone])
@@ -343,7 +343,7 @@ export function ManagePanel() {
                   <div className="flex gap-2">
                     <button
                       type="submit"
-                      className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+                      className="flex-1 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
                     >
                       {editingZone ? 'Сохранить' : 'Добавить'}
                     </button>
@@ -372,7 +372,7 @@ export function ManagePanel() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => setEditingZone(z)}
-                          className="text-sm text-blue-600 hover:underline"
+                          className="text-sm text-emerald-700 hover:underline"
                         >
                           Ред.
                         </button>
@@ -396,7 +396,7 @@ export function ManagePanel() {
           <div className="space-y-4">
             <div className="flex gap-2">
               <select
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={filterVenueId}
                 onChange={e => setFilterVenueId(e.target.value)}
               >
@@ -428,10 +428,10 @@ export function ManagePanel() {
                         {t.phone} · {t.zoneName} · {t.price.toLocaleString('ru-RU')} ₸
                       </div>
                       {t.groupId && (
-                        <div className="text-xs text-blue-600 mt-0.5">Групповой билет</div>
+                        <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
                       )}
                     </div>
-                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full shrink-0">
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full shrink-0">
                       Pending
                     </span>
                   </div>
@@ -441,7 +441,7 @@ export function ManagePanel() {
                       href={t.receiptLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline block"
+                      className="text-sm text-emerald-700 hover:underline block"
                     >
                       Открыть чек →
                     </a>

@@ -13,7 +13,7 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
   BOOKED: 'bg-yellow-100 text-yellow-800',
-  PENDING: 'bg-blue-100 text-blue-800',
+  PENDING: 'bg-amber-100 text-amber-800',
   CONFIRMED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
   EXPIRED: 'bg-gray-100 text-gray-600',
@@ -94,10 +94,10 @@ export function TicketView() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 p-4">
       <div className="max-w-md mx-auto space-y-4">
         {/* Header card */}
-        <div className="bg-white rounded-2xl shadow-md p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-start mb-3">
             <div>
               <h1 className="text-xl font-bold text-gray-800">{ticket.name}</h1>
@@ -174,10 +174,10 @@ export function TicketView() {
 
         {/* PENDING: waiting for admin */}
         {ticket.status === 'PENDING' && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
             <div className="text-4xl mb-2">⏳</div>
-            <h2 className="font-semibold text-blue-900">Чек отправлен</h2>
-            <p className="text-sm text-blue-700 mt-1">
+            <h2 className="font-semibold text-amber-900">Чек отправлен</h2>
+            <p className="text-sm text-amber-700 mt-1">
               Ваш чек проверяется администратором. Обычно это занимает несколько минут.
             </p>
           </div>
@@ -185,7 +185,7 @@ export function TicketView() {
 
         {/* CONFIRMED: QR code */}
         {ticket.status === 'CONFIRMED' && (
-          <div className="bg-white rounded-2xl shadow-md p-6 flex flex-col items-center gap-3">
+          <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center gap-3">
             <div className="text-2xl">✅</div>
             <h2 className="font-semibold text-green-800">Билет подтверждён</h2>
             <div className="p-3 bg-gray-50 rounded-xl">
@@ -219,7 +219,7 @@ export function TicketView() {
 
         {/* Group members */}
         {members.length > 1 && (
-          <div className="bg-white rounded-2xl shadow-md p-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-semibold text-gray-800 mb-3">
               Группа ({members.length} чел.)
             </h3>
