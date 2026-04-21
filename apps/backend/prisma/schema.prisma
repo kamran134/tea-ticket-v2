@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TicketStatus {
+  BOOKED
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+}
+
+model Venue {
+  id        String   @id @default(cuid())
+  name      String
+  date      DateTime
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  zones     Zone[]
+  tickets   Ticket[]
+}
+
+model Zone {
+  id         String   @id @default(cuid())
+  venueId    String
+  name       String
+  price      Float
+  cardNumber String
+  capacity   Int
+  sortOrder  Int      @default(0)
+  venue      Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  tickets    Ticket[]
+}
+
+model Ticket {
+  id          String       @id @default(cuid())
+  name        String
+  phone       String
+  venueId     String
+  zoneId      String
+  zoneName    String
+  cardNumber  String
+  price       Float
+  receiptLink String?
+  status      TicketStatus @default(BOOKED)
+  checkedIn   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  bookedAt    DateTime     @default(now())
+  groupId     String?
+  venue       Venue        @relation(fields: [venueId], references: [id])
+  zone        Zone         @relation(fields: [zoneId], references: [id])
+
+  @@index([groupId])
+  @@index([status])
+  @@index([venueId, status])
+}
