@@ -1,0 +1,33 @@
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+  websecure:
+    address: ":443"
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      email: kazimi.dev@gmail.com
+      storage: /acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "8.8.8.8:53"
+
+providers:
+  docker:
+    exposedByDefault: false
+    network: traefik-public
+
+api:
+  dashboard: false
+
+log:
+  level: INFO
