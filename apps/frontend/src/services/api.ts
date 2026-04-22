@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, RegisterResult, ApiResponse } from '../types';
+import type { Ticket, Venue, Zone, RegisterResult, ApiResponse, Currency } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -43,11 +43,11 @@ export const api = {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },
 
-  async getTicket(id: string): Promise<{ ticket: Ticket; members: Ticket[] | null }> {
+  async getTicket(id: string): Promise<{ ticket: Ticket; members: Ticket[] | null; currency: Currency }> {
     return request(`/api/tickets/${encodeURIComponent(id)}`);
   },
 
-  async getTicketGroup(groupId: string): Promise<{ ticket: Ticket; members: Ticket[] }> {
+  async getTicketGroup(groupId: string): Promise<{ ticket: Ticket; members: Ticket[]; currency: Currency }> {
     return request(`/api/tickets/group/${encodeURIComponent(groupId)}`);
   },
 
@@ -108,11 +108,11 @@ export const api = {
     });
   },
 
-  async createVenue(name: string, date: string): Promise<Venue> {
+  async createVenue(name: string, date: string, currency: Currency): Promise<Venue> {
     return request('/api/venues', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ name, date }),
+      body: JSON.stringify({ name, date, currency }),
     });
   },
 

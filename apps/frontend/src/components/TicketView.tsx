@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
-import type { Ticket, TicketStatus } from '../types';
+import type { Ticket, TicketStatus, Currency } from '../types';
+import { formatPrice } from '../types';
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   BOOKED: 'Ожидает оплаты',
@@ -29,6 +30,7 @@ function formatCountdown(ms: number): string {
 export function TicketView() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [members, setMembers] = useState<Ticket[]>([]);
+  const [currency, setCurrency] = useState<Currency>('₸');
   const [countdown, setCountdown] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -40,8 +42,9 @@ export function TicketView() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (!id) return;
-    api.getTicket(id).then(({ ticket, members }) => {
+    api.getTicket(id).then(({ ticket, members, currency }) => {
       setTicket(ticket);
+      setCurrency(currency);
       if (members) setMembers(members);
     });
   }, []);
@@ -109,9 +112,16 @@ export function TicketView() {
               {STATUS_LABELS[ticket.status]}
             </span>
           </div>
-          <div className="text-sm text-gray-600 space-y-0.5">
+          <div className="text-sm text-gray-600 space-y-0.5 mt-1">
             <div>Телефон: {ticket.phone}</div>
-            <div>Стоимость: {ticket.price.toLocaleString('ru-RU')} ₸</div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
+            <span className="text-sm text-gray-500">
+              {members.length > 1 ? `Итого · ${members.length} чел.` : 'Стоимость'}
+            </span>
+            <span className="text-xl font-bold text-emerald-700">
+              {formatPrice(members.length > 1 ? ticket.price * members.length : ticket.price, currency)}
+            </span>
           </div>
         </div>
 

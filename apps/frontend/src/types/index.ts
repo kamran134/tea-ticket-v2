@@ -1,10 +1,26 @@
 export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED';
 
+export type Currency = '₸' | '₼' | '$' | '₽';
+
+export const CURRENCIES: { value: Currency; label: string }[] = [
+  { value: '₼', label: 'Манат (₼)' },
+  { value: '₸', label: 'Тенге (₸)' },
+  { value: '$', label: 'Доллар ($)' },
+  { value: '₽', label: 'Рубль (₽)' },
+];
+
+export function formatPrice(amount: number, currency: Currency | string): string {
+  const formatted = amount.toLocaleString('ru-RU');
+  if (currency === '$') return `$${formatted}`;
+  return `${formatted} ${currency}`;
+}
+
 export interface Venue {
   id: string;
   name: string;
   date: string;
   active: boolean;
+  currency: Currency;
 }
 
 export interface Zone {

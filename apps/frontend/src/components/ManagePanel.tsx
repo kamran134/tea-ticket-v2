@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, Ticket } from '../types';
+import type { Venue, Zone, Ticket, Currency } from '../types';
+import { CURRENCIES, formatPrice } from '../types';
 
 type Tab = 'venues' | 'zones' | 'tickets';
 
@@ -27,6 +28,7 @@ export function ManagePanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueDate, setNewVenueDate] = useState('');
+  const [newVenueCurrency, setNewVenueCurrency] = useState<Currency>('₼');
 
   // Zones
   const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -81,10 +83,15 @@ export function ManagePanel() {
   const createVenue = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const venue = await api.createVenue(newVenueName.trim(), new Date(newVenueDate).toISOString());
+      const venue = await api.createVenue(
+        newVenueName.trim(),
+        new Date(newVenueDate).toISOString(),
+        newVenueCurrency,
+      );
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
+      setNewVenueCurrency('₼');
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Ошибка');
     }
@@ -146,7 +153,7 @@ export function ManagePanel() {
   };
 
   const copyRegistrationLink = (venueId: string) => {
-    const url = `${window.location.origin}/index.html?venue=${venueId}`;
+    const url = `${window.location.origin}/?venue=${venueId}`;
     navigator.clipboard.writeText(url).then(() => alert('Ссылка скопирована!'));
   };
 
@@ -158,6 +165,11 @@ export function ManagePanel() {
       alert(err instanceof Error ? err.message : 'Ошибка');
     }
   };
+
+  const selectedVenue = venues.find(v => v.id === selectedVenueId);
+  const zoneCurrency = selectedVenue?.currency ?? '₸';
+  const filterVenue = venues.find(v => v.id === filterVenueId);
+  const ticketCurrency = filterVenue?.currency ?? '₸';
 
   if (!authenticated) {
     return (
@@ -243,6 +255,15 @@ export function ManagePanel() {
                 onChange={e => setNewVenueDate(e.target.value)}
                 required
               />
+              <select
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                value={newVenueCurrency}
+                onChange={e => setNewVenueCurrency(e.target.value as Currency)}
+              >
+                {CURRENCIES.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
               <button
                 type="submit"
                 className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
@@ -257,7 +278,7 @@ export function ManagePanel() {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
-                        <div className="font-semibold text-gray-800">{v.name}</div>
+                        <div className="font-semibold text-gray-800">{v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span></div>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
                         }`}>
@@ -345,7 +366,7 @@ export function ManagePanel() {
 
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { field: 'price', label: 'Цена (₸)' },
+                      { field: 'price', label: `Цена (${zoneCurrency})` },
                       { field: 'capacity', label: 'Мест' },
                       { field: 'sortOrder', label: 'Порядок' },
                     ].map(({ field, label }) => (
@@ -395,7 +416,7 @@ export function ManagePanel() {
                       <div>
                         <div className="font-medium text-gray-800">{z.name}</div>
                         <div className="text-sm text-gray-500">
-                          {z.price.toLocaleString('ru-RU')} ₸ ·{' '}
+                          {formatPrice(z.price, zoneCurrency)} ·{' '}
                           {z.available !== undefined ? `${z.available}/` : ''}{z.capacity} мест
                         </div>
                       </div>
@@ -455,7 +476,7 @@ export function ManagePanel() {
                     <div>
                       <div className="font-semibold text-gray-800">{t.name}</div>
                       <div className="text-sm text-gray-500">
-                        {t.phone} · {t.zoneName} · {t.price.toLocaleString('ru-RU')} ₸
+                        {t.phone} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
                       </div>
                       {t.groupId && (
                         <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>

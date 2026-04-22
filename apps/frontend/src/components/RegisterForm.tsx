@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Venue, Zone } from '../types';
+import { formatPrice } from '../types';
 
 export function RegisterForm() {
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -27,6 +28,8 @@ export function RegisterForm() {
     api.getZones(venueId).then(setZones);
   }, [venueId]);
 
+  const selectedVenue = venues.find(v => v.id === venueId);
+  const currency = selectedVenue?.currency ?? '₸';
   const selectedZone = zones.find(z => z.id === zoneId);
   const totalPrice = selectedZone ? selectedZone.price * (1 + guests.length) : 0;
   const maxGuests = selectedZone ? (selectedZone.available ?? 0) - 1 : 0;
@@ -48,7 +51,7 @@ export function RegisterForm() {
         zoneId,
         guests,
       });
-      window.location.href = `/ticket.html?id=${result.id}`;
+      window.location.href = `/ticket?id=${result.id}`;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка при регистрации');
     } finally {
@@ -101,7 +104,7 @@ export function RegisterForm() {
               <option value="">Выберите зону</option>
               {zones.map(z => (
                 <option key={z.id} value={z.id} disabled={(z.available ?? 0) <= 0}>
-                  {z.name} — {z.price.toLocaleString('ru-RU')} ₸
+                  {z.name} — {formatPrice(z.price, currency)}
                   {z.available !== undefined ? ` (мест: ${z.available})` : ''}
                 </option>
               ))}
@@ -165,9 +168,13 @@ export function RegisterForm() {
           </button>
 
           {totalPrice > 0 && (
-            <div className="p-3 bg-emerald-50 rounded-lg text-sm text-emerald-800">
-              Итого: <strong>{totalPrice.toLocaleString('ru-RU')} ₸</strong>{' '}
-              ({1 + guests.length} {guests.length === 0 ? 'человек' : 'чел.'})
+            <div className="p-4 bg-emerald-600 rounded-xl text-white">
+              <div className="flex justify-between items-center">
+                <span className="text-sm opacity-90">
+                  Итого · {1 + guests.length} {guests.length === 0 ? 'человек' : 'чел.'}
+                </span>
+                <span className="text-2xl font-bold">{formatPrice(totalPrice, currency)}</span>
+              </div>
             </div>
           )}
 

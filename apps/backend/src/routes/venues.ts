@@ -19,9 +19,12 @@ venuesRouter.get('/', async (req, res) => {
   }
 });
 
+const ALLOWED_CURRENCIES = ['₸', '₼', '$', '₽'] as const;
+
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
+  currency: z.enum(ALLOWED_CURRENCIES).default('₸'),
 });
 
 venuesRouter.post('/', requireAuth, async (req, res) => {
@@ -31,7 +34,11 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
   }
   try {
     const venue = await prisma.venue.create({
-      data: { name: parsed.data.name, date: new Date(parsed.data.date) },
+      data: {
+        name: parsed.data.name,
+        date: new Date(parsed.data.date),
+        currency: parsed.data.currency,
+      },
     });
     return res.status(201).json({ success: true, data: venue });
   } catch {

@@ -44,7 +44,14 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Group not found' });
     }
     const mainTicket = members.find(m => m.id === req.params.groupId) ?? members[0];
-    return res.json({ success: true, data: { ticket: mainTicket, members } });
+    const venue = await prisma.venue.findUnique({
+      where: { id: mainTicket.venueId },
+      select: { currency: true },
+    });
+    return res.json({
+      success: true,
+      data: { ticket: mainTicket, members, currency: venue?.currency ?? '₸' },
+    });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch group' });
   }
@@ -61,7 +68,14 @@ ticketsRouter.get('/:id', async (req, res) => {
     if (ticket.groupId) {
       members = await prisma.ticket.findMany({ where: { groupId: ticket.groupId } });
     }
-    return res.json({ success: true, data: { ticket, members } });
+    const venue = await prisma.venue.findUnique({
+      where: { id: ticket.venueId },
+      select: { currency: true },
+    });
+    return res.json({
+      success: true,
+      data: { ticket, members, currency: venue?.currency ?? '₸' },
+    });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch ticket' });
   }
