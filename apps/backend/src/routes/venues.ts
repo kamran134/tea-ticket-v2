@@ -24,7 +24,7 @@ const ALLOWED_CURRENCIES = ['₸', '₼', '$', '₽'] as const;
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
-  currency: z.enum(ALLOWED_CURRENCIES).default('₸'),
+  currency: z.enum(ALLOWED_CURRENCIES).default('₼'),
 });
 
 venuesRouter.post('/', requireAuth, async (req, res) => {
@@ -46,15 +46,22 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
   }
 });
 
+const patchVenueSchema = z.object({
+  active: z.boolean().optional(),
+  currency: z.enum(ALLOWED_CURRENCIES).optional(),
+}).refine(d => d.active !== undefined || d.currency !== undefined, {
+  message: 'Provide active or currency',
+});
+
 venuesRouter.patch('/:id', requireAuth, async (req, res) => {
-  const { active } = req.body as { active?: boolean };
-  if (typeof active !== 'boolean') {
-    return res.status(400).json({ success: false, error: 'active must be boolean' });
+  const parsed = patchVenueSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
   try {
     const venue = await prisma.venue.update({
       where: { id: req.params.id },
-      data: { active },
+      data: parsed.data,
     });
     return res.json({ success: true, data: venue });
   } catch {

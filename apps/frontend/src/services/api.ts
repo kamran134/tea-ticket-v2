@@ -39,6 +39,14 @@ export const api = {
     });
   },
 
+  async updateVenueCurrency(id: string, currency: Currency): Promise<Venue> {
+    return request(`/api/venues/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ currency }),
+    });
+  },
+
   async getZones(venueId: string): Promise<Zone[]> {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },

@@ -50,7 +50,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
     });
     return res.json({
       success: true,
-      data: { ticket: mainTicket, members, currency: venue?.currency ?? '₸' },
+      data: { ticket: mainTicket, members, currency: venue?.currency ?? '₼' },
     });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch group' });
@@ -74,7 +74,7 @@ ticketsRouter.get('/:id', async (req, res) => {
     });
     return res.json({
       success: true,
-      data: { ticket, members, currency: venue?.currency ?? '₸' },
+      data: { ticket, members, currency: venue?.currency ?? '₼' },
     });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch ticket' });

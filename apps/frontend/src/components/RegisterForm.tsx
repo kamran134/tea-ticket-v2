@@ -29,7 +29,7 @@ export function RegisterForm() {
   }, [venueId]);
 
   const selectedVenue = venues.find(v => v.id === venueId);
-  const currency = selectedVenue?.currency ?? '₸';
+  const currency = selectedVenue?.currency ?? '₼';
   const selectedZone = zones.find(z => z.id === zoneId);
   const totalPrice = selectedZone ? selectedZone.price * (1 + guests.length) : 0;
   const maxGuests = selectedZone ? (selectedZone.available ?? 0) - 1 : 0;

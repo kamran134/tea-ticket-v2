@@ -20,7 +20,7 @@ model Venue {
   name      String
   date      DateTime
   active    Boolean  @default(true)
-  currency  String   @default("₸")
+  currency  String   @default("₼")
   createdAt DateTime @default(now())
   zones     Zone[]
   tickets   Ticket[]

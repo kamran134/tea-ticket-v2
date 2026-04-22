@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Venue" ADD COLUMN "currency" TEXT NOT NULL DEFAULT '₸';
+ALTER TABLE "Venue" ADD COLUMN "currency" TEXT NOT NULL DEFAULT '₼';

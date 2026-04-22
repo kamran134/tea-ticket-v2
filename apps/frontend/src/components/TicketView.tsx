@@ -30,7 +30,7 @@ function formatCountdown(ms: number): string {
 export function TicketView() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [members, setMembers] = useState<Ticket[]>([]);
-  const [currency, setCurrency] = useState<Currency>('₸');
+  const [currency, setCurrency] = useState<Currency>('₼');
   const [countdown, setCountdown] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');

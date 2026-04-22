@@ -167,9 +167,9 @@ export function ManagePanel() {
   };
 
   const selectedVenue = venues.find(v => v.id === selectedVenueId);
-  const zoneCurrency = selectedVenue?.currency ?? '₸';
+  const zoneCurrency = selectedVenue?.currency ?? '₼';
   const filterVenue = venues.find(v => v.id === filterVenueId);
-  const ticketCurrency = filterVenue?.currency ?? '₸';
+  const ticketCurrency = filterVenue?.currency ?? '₼';
 
   if (!authenticated) {
     return (
@@ -330,6 +330,27 @@ export function ManagePanel() {
 
             {selectedVenueId && (
               <>
+                <div className="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between">
+                  <span className="text-sm text-gray-600">Валюта мероприятия</span>
+                  <select
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                    value={zoneCurrency}
+                    onChange={async e => {
+                      const c = e.target.value as Currency;
+                      try {
+                        const updated = await api.updateVenueCurrency(selectedVenueId, c);
+                        setVenues(v => v.map(venue => venue.id === updated.id ? updated : venue));
+                      } catch (err: unknown) {
+                        alert(err instanceof Error ? err.message : 'Ошибка');
+                      }
+                    }}
+                  >
+                    {CURRENCIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <form
                   onSubmit={editingZone ? saveZone : createZone}
                   className="bg-white rounded-2xl shadow-sm p-4 space-y-3"
