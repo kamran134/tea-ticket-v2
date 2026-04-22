@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { Venue, Zone, Ticket, Currency } from '../types';
 import { CURRENCIES, formatPrice } from '../types';
+import { toast } from '../services/toast';
 
 type Tab = 'venues' | 'zones' | 'tickets';
 
@@ -80,6 +81,8 @@ export function ManagePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, filterVenueId, authenticated]);
 
+  const errMsg = (err: unknown) => err instanceof Error ? err.message : 'Ошибка';
+
   const createVenue = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -92,8 +95,9 @@ export function ManagePanel() {
       setNewVenueName('');
       setNewVenueDate('');
       setNewVenueCurrency('₼');
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+      toast.success('Мероприятие создано');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
@@ -110,8 +114,9 @@ export function ManagePanel() {
       });
       setZones(z => [...z, zone]);
       setNewZone(ZONE_DEFAULTS);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+      toast.success('Зона добавлена');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
@@ -128,8 +133,9 @@ export function ManagePanel() {
       });
       setZones(z => z.map(zone => (zone.id === updated.id ? updated : zone)));
       setEditingZone(null);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+      toast.success('Зона сохранена');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
@@ -138,8 +144,9 @@ export function ManagePanel() {
     try {
       await api.deleteZone(id);
       setZones(z => z.filter(zone => zone.id !== id));
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+      toast.success('Зона удалена');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
@@ -147,22 +154,23 @@ export function ManagePanel() {
     try {
       await api.updateTicketStatus(id, status);
       setPendingTickets(t => t.filter(ticket => ticket.id !== id));
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+      toast.success(status === 'CONFIRMED' ? 'Билет подтверждён' : 'Билет отклонён');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
   const copyRegistrationLink = (venueId: string) => {
     const url = `${window.location.origin}/?venue=${venueId}`;
-    navigator.clipboard.writeText(url).then(() => alert('Ссылка скопирована!'));
+    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
   };
 
   const toggleVenueActive = async (id: string, active: boolean) => {
     try {
       const updated = await api.toggleVenue(id, active);
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Ошибка');
+    } catch (err) {
+      toast.error(errMsg(err));
     }
   };
 
@@ -340,8 +348,8 @@ export function ManagePanel() {
                       try {
                         const updated = await api.updateVenueCurrency(selectedVenueId, c);
                         setVenues(v => v.map(venue => venue.id === updated.id ? updated : venue));
-                      } catch (err: unknown) {
-                        alert(err instanceof Error ? err.message : 'Ошибка');
+                      } catch (err) {
+                        toast.error(errMsg(err));
                       }
                     }}
                   >
