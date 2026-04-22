@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, RegisterResult, ApiResponse, Currency } from '../types';
+import type { Ticket, Venue, Zone, RegisterResult, ApiResponse, Currency, TicketStatus } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
