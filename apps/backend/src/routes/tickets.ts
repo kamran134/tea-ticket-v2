@@ -188,7 +188,8 @@ ticketsRouter.post('/:id/upload-receipt', upload.single('receipt'), async (req, 
 
     const updated = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     return res.json({ success: true, data: updated });
-  } catch {
+  } catch (err) {
+    console.error('[upload-receipt] error:', err);
     return res.status(500).json({ success: false, error: 'Failed to upload receipt' });
   }
 });
