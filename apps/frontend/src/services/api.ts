@@ -102,9 +102,10 @@ export const api = {
     });
   },
 
-  async getPendingTickets(venueId?: string): Promise<Ticket[]> {
-    const params = new URLSearchParams({ status: 'PENDING' });
+  async getTickets(venueId?: string, status?: TicketStatus): Promise<Ticket[]> {
+    const params = new URLSearchParams();
     if (venueId) params.set('venueId', venueId);
+    if (status) params.set('status', status);
     return request(`/api/tickets?${params.toString()}`, { headers: authHeaders() });
   },
 

@@ -1,10 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, Ticket, Currency } from '../types';
+import type { Venue, Zone, Ticket, Currency, TicketStatus } from '../types';
 import { CURRENCIES, formatPrice } from '../types';
 import { toast } from '../services/toast';
+import { StatsTab } from './StatsTab';
 
-type Tab = 'venues' | 'zones' | 'tickets';
+type Tab = 'venues' | 'zones' | 'tickets' | 'stats';
+type TicketFilter = TicketStatus | 'ALL';
+
+const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
+  { value: 'ALL', label: 'Все' },
+  { value: 'PENDING', label: 'Ожидают' },
+  { value: 'CONFIRMED', label: 'Подтверждены' },
+  { value: 'REJECTED', label: 'Отклонены' },
+];
+
+const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> = {
+  BOOKED:    { label: 'Забронирован', className: 'bg-blue-100 text-blue-700' },
+  PENDING:   { label: 'Ожидает',      className: 'bg-amber-100 text-amber-700' },
+  CONFIRMED: { label: 'Подтверждён',  className: 'bg-green-100 text-green-700' },
+  REJECTED:  { label: 'Отклонён',     className: 'bg-red-100 text-red-600' },
+  EXPIRED:   { label: 'Истёк',        className: 'bg-gray-100 text-gray-500' },
+};
 
 function isTokenValid(): boolean {
   const token = localStorage.getItem('admin_token');
@@ -37,10 +54,11 @@ export function ManagePanel() {
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
   const [newZone, setNewZone] = useState(ZONE_DEFAULTS);
 
-  // Pending tickets
-  const [pendingTickets, setPendingTickets] = useState<Ticket[]>([]);
+  // Tickets
+  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
+  const [ticketFilter, setTicketFilter] = useState<TicketFilter>('PENDING');
   const [filterVenueId, setFilterVenueId] = useState('');
-  const [pendingLoading, setPendingLoading] = useState(false);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,19 +87,21 @@ export function ManagePanel() {
     api.getZones(selectedVenueId).then(setZones);
   }, [selectedVenueId]);
 
-  const loadPending = () => {
-    setPendingLoading(true);
-    api.getPendingTickets(filterVenueId || undefined)
-      .then(setPendingTickets)
-      .finally(() => setPendingLoading(false));
+  const loadTickets = () => {
+    setTicketsLoading(true);
+    api.getTickets(filterVenueId || undefined)
+      .then(setAllTickets)
+      .finally(() => setTicketsLoading(false));
   };
 
   useEffect(() => {
-    if (tab === 'tickets' && authenticated) loadPending();
+    if (tab === 'tickets' && authenticated) loadTickets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, filterVenueId, authenticated]);
 
   const errMsg = (err: unknown) => err instanceof Error ? err.message : 'Ошибка';
+
+  // --- Venue handlers ---
 
   const createVenue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,6 +120,22 @@ export function ManagePanel() {
       toast.error(errMsg(err));
     }
   };
+
+  const toggleVenueActive = async (id: string, active: boolean) => {
+    try {
+      const updated = await api.toggleVenue(id, active);
+      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const copyRegistrationLink = (venueId: string) => {
+    const url = `${window.location.origin}/?venue=${venueId}`;
+    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
+  };
+
+  // --- Zone handlers ---
 
   const createZone = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,34 +186,50 @@ export function ManagePanel() {
     }
   };
 
+  // --- Ticket handlers ---
+
   const handleTicketStatus = async (id: string, status: 'CONFIRMED' | 'REJECTED') => {
     try {
+      const ticket = allTickets.find(t => t.id === id);
       await api.updateTicketStatus(id, status);
-      setPendingTickets(t => t.filter(ticket => ticket.id !== id));
+      setAllTickets(ts =>
+        ts.map(t =>
+          (ticket?.groupId ? t.groupId === ticket.groupId : t.id === id)
+            ? { ...t, status }
+            : t,
+        ),
+      );
       toast.success(status === 'CONFIRMED' ? 'Билет подтверждён' : 'Билет отклонён');
     } catch (err) {
       toast.error(errMsg(err));
     }
   };
 
-  const copyRegistrationLink = (venueId: string) => {
-    const url = `${window.location.origin}/?venue=${venueId}`;
-    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
-  };
-
-  const toggleVenueActive = async (id: string, active: boolean) => {
-    try {
-      const updated = await api.toggleVenue(id, active);
-      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
-    } catch (err) {
-      toast.error(errMsg(err));
-    }
-  };
+  // --- Derived state ---
 
   const selectedVenue = venues.find(v => v.id === selectedVenueId);
   const zoneCurrency = selectedVenue?.currency ?? '₼';
   const filterVenue = venues.find(v => v.id === filterVenueId);
   const ticketCurrency = filterVenue?.currency ?? '₼';
+
+  const ticketCounts = useMemo(() => ({
+    ALL: allTickets.length,
+    PENDING: allTickets.filter(t => t.status === 'PENDING').length,
+    CONFIRMED: allTickets.filter(t => t.status === 'CONFIRMED').length,
+    REJECTED: allTickets.filter(t => t.status === 'REJECTED').length,
+  }), [allTickets]);
+
+  const displayedTickets = useMemo(() =>
+    ticketFilter === 'ALL' ? allTickets : allTickets.filter(t => t.status === ticketFilter),
+    [allTickets, ticketFilter],
+  );
+
+  const TAB_LABELS: Record<Tab, string> = {
+    venues: 'Мероприятия',
+    zones: 'Зоны',
+    tickets: 'Билеты',
+    stats: 'Статистика',
+  };
 
   if (!authenticated) {
     return (
@@ -219,28 +271,25 @@ export function ManagePanel() {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-200">
-          {(['venues', 'zones', 'tickets'] as Tab[]).map(t => {
-            const labels: Record<Tab, string> = { venues: 'Мероприятия', zones: 'Зоны', tickets: 'Билеты' };
-            return (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                  tab === t
-                    ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {labels[t]}
-                {t === 'tickets' && pendingTickets.length > 0 && (
-                  <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                    {pendingTickets.length}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="flex border-b border-gray-200 overflow-x-auto">
+          {(['venues', 'zones', 'tickets', 'stats'] as Tab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                tab === t
+                  ? 'border-emerald-600 text-emerald-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {TAB_LABELS[t]}
+              {t === 'tickets' && ticketCounts.PENDING > 0 && (
+                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
+                  {ticketCounts.PENDING}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
 
         {/* VENUES TAB */}
@@ -286,7 +335,9 @@ export function ManagePanel() {
                   <div className="flex justify-between items-start">
                     <div>
                       <div className="flex items-center gap-2">
-                        <div className="font-semibold text-gray-800">{v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span></div>
+                        <div className="font-semibold text-gray-800">
+                          {v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span>
+                        </div>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                           v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
                         }`}>
@@ -486,66 +537,102 @@ export function ManagePanel() {
                 ))}
               </select>
               <button
-                onClick={loadPending}
-                disabled={pendingLoading}
+                onClick={loadTickets}
+                disabled={ticketsLoading}
                 className="px-3 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 text-sm transition-colors disabled:opacity-50"
               >
-                {pendingLoading ? '...' : '↻'}
+                {ticketsLoading ? '...' : '↻'}
               </button>
             </div>
 
-            {pendingTickets.length === 0 && (
-              <div className="text-center text-gray-400 py-10">Нет билетов на проверке</div>
+            {/* Status filter chips */}
+            <div className="flex gap-2 flex-wrap">
+              {TICKET_FILTERS.map(({ value, label }) => {
+                const count = ticketCounts[value as keyof typeof ticketCounts] ?? ticketCounts.ALL;
+                const isActive = ticketFilter === value;
+                return (
+                  <button
+                    key={value}
+                    onClick={() => setTicketFilter(value)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm'
+                    }`}
+                  >
+                    {label}
+                    <span className={`ml-1.5 text-xs ${isActive ? 'text-emerald-100' : 'text-gray-400'}`}>
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {ticketsLoading && (
+              <div className="text-center text-gray-400 py-10">Загрузка...</div>
+            )}
+
+            {!ticketsLoading && displayedTickets.length === 0 && (
+              <div className="text-center text-gray-400 py-10">Нет билетов</div>
             )}
 
             <div className="space-y-3">
-              {pendingTickets.map(t => (
-                <div key={t.id} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="font-semibold text-gray-800">{t.name}</div>
-                      <div className="text-sm text-gray-500">
-                        {t.phone} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+              {displayedTickets.map(t => {
+                const badge = STATUS_STYLE[t.status];
+                return (
+                  <div key={t.id} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-semibold text-gray-800">{t.name}</div>
+                        <div className="text-sm text-gray-500">
+                          {t.phone} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                        </div>
+                        {t.groupId && (
+                          <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
+                        )}
                       </div>
-                      {t.groupId && (
-                        <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
-                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium ${badge.className}`}>
+                        {badge.label}
+                      </span>
                     </div>
-                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full shrink-0">
-                      Pending
-                    </span>
-                  </div>
 
-                  {t.receiptLink && (
-                    <a
-                      href={t.receiptLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-emerald-700 hover:underline block"
-                    >
-                      Открыть чек →
-                    </a>
-                  )}
+                    {t.receiptLink && (
+                      <a
+                        href={t.receiptLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-emerald-700 hover:underline block"
+                      >
+                        Открыть чек →
+                      </a>
+                    )}
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
-                      className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
-                    >
-                      Подтвердить
-                    </button>
-                    <button
-                      onClick={() => handleTicketStatus(t.id, 'REJECTED')}
-                      className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
-                    >
-                      Отклонить
-                    </button>
+                    {t.status === 'PENDING' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
+                          className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                        >
+                          Подтвердить
+                        </button>
+                        <button
+                          onClick={() => handleTicketStatus(t.id, 'REJECTED')}
+                          className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
+                        >
+                          Отклонить
+                        </button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
+
+        {/* STATS TAB */}
+        {tab === 'stats' && <StatsTab venues={venues} />}
       </div>
     </div>
   );
