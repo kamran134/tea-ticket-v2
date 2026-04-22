@@ -4,8 +4,8 @@ const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
   const json: ApiResponse<T> = await res.json();
   if (!json.success || json.data === undefined) {
