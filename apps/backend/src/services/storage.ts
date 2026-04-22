@@ -1,28 +1,11 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { writeFile, mkdir } from 'fs/promises';
+import { join, dirname } from 'path';
 
-const s3 = new S3Client({
-  endpoint: process.env.S3_ENDPOINT || undefined,
-  region: process.env.S3_REGION || 'auto',
-  credentials: {
-    accessKeyId: process.env.S3_ACCESS_KEY!,
-    secretAccessKey: process.env.S3_SECRET_KEY!,
-  },
-  forcePathStyle: true,
-});
+const UPLOADS_DIR = process.env.UPLOADS_DIR ?? '/app/uploads';
 
-export async function uploadFile(
-  buffer: Buffer,
-  key: string,
-  contentType: string,
-): Promise<string> {
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: process.env.S3_BUCKET!,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ACL: 'public-read',
-    }),
-  );
-  return `${process.env.S3_PUBLIC_URL}/${key}`;
+export async function uploadFile(buffer: Buffer, key: string, _contentType: string): Promise<string> {
+  const filePath = join(UPLOADS_DIR, key);
+  await mkdir(dirname(filePath), { recursive: true });
+  await writeFile(filePath, buffer);
+  return `/uploads/${key}`;
 }

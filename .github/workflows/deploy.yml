@@ -111,12 +111,6 @@ jobs:
             export POSTGRES_PASSWORD='${{ secrets.POSTGRES_PASSWORD }}'
             export JWT_SECRET='${{ secrets.JWT_SECRET }}'
             export ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}'
-            export S3_ENDPOINT='${{ secrets.S3_ENDPOINT }}'
-            export S3_REGION='${{ secrets.S3_REGION }}'
-            export S3_BUCKET='${{ secrets.S3_BUCKET }}'
-            export S3_ACCESS_KEY='${{ secrets.S3_ACCESS_KEY }}'
-            export S3_SECRET_KEY='${{ secrets.S3_SECRET_KEY }}'
-            export S3_PUBLIC_URL='${{ secrets.S3_PUBLIC_URL }}'
             export CORS_ORIGIN='https://tea-ticket.com'
 
             docker compose pull
