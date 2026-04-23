@@ -21,6 +21,18 @@ export interface Venue {
   date: string;
   active: boolean;
   currency: Currency;
+  floorPlanImage: string | null;
+}
+
+export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';
+export type TableShape = 'ROUND' | 'RECT';
+
+export interface ZoneLayoutData {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color?: string;
 }
 
 export interface Zone {
@@ -31,7 +43,31 @@ export interface Zone {
   cardNumber: string;
   capacity: number;
   sortOrder: number;
+  type: ZoneType;
+  layoutData: ZoneLayoutData | null;
   available?: number;
+}
+
+export interface Seat {
+  id: string;
+  zoneId: string;
+  number: number;
+  row: number;
+  sectionIndex: number;
+  posInSection: number;
+  label: string | null;
+  occupied: boolean;
+}
+
+export interface ZoneTable {
+  id: string;
+  zoneId: string;
+  number: number;
+  shape: TableShape;
+  chairCount: number;
+  layoutData: Record<string, unknown> | null;
+  occupied: number;
+  available: number;
 }
 
 export interface Ticket {
@@ -49,6 +85,8 @@ export interface Ticket {
   createdAt: string;
   bookedAt: string;
   groupId: string | null;
+  seatId: string | null;
+  tableId: string | null;
 }
 
 export interface RegisterResult {

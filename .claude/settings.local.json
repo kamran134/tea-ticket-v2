@@ -4,7 +4,12 @@
       "Bash(npx prisma *)",
       "Bash(npx tsc *)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
-      "Bash(./node_modules/.bin/prisma generate *)"
+      "Bash(./node_modules/.bin/prisma generate *)",
+      "Bash(DATABASE_URL=\"postgresql://teaticket:secret@localhost:5432/teaticket\" npx prisma migrate dev --name add_zone_types_seats_tables)",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" npx prisma generate)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" node_modules/.bin/prisma generate)",
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" ./node_modules/.bin/prisma generate)"
     ]
   }
 }

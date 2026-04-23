@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, RegisterResult, ApiResponse, Currency, TicketStatus } from '../types';
+import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -47,6 +47,27 @@ export const api = {
     });
   },
 
+  async uploadFloorPlan(id: string, file: File): Promise<Venue> {
+    const formData = new FormData();
+    formData.append('floorPlan', file);
+    const res = await fetch(`${API_URL}/api/venues/${encodeURIComponent(id)}/upload-floor-plan`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    const json: ApiResponse<Venue> = await res.json();
+    if (!json.success || !json.data) throw new Error(json.error ?? 'Upload failed');
+    return json.data;
+  },
+
+  async clearFloorPlan(id: string): Promise<Venue> {
+    return request(`/api/venues/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ floorPlanImage: null }),
+    });
+  },
+
   async getZones(venueId: string): Promise<Zone[]> {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },
@@ -65,6 +86,8 @@ export const api = {
     venueId: string;
     zoneId: string;
     guests: { name: string }[];
+    seatId?: string;
+    tableId?: string;
   }): Promise<RegisterResult> {
     return request('/api/tickets/register', {
       method: 'POST',
@@ -148,6 +171,59 @@ export const api = {
     return request(`/api/zones/${encodeURIComponent(id)}`, {
       method: 'DELETE',
       headers: authHeaders(),
+    });
+  },
+
+  async getSeats(zoneId: string): Promise<Seat[]> {
+    return request(`/api/zones/${encodeURIComponent(zoneId)}/seats`);
+  },
+
+  async generateSeats(
+    zoneId: string,
+    payload: {
+      sections: { label: string; rows: number; seatsPerRow: number }[];
+      numberingOrder?: 'row-first' | 'section-first';
+      startFrom?: number;
+    },
+  ): Promise<{ count: number }> {
+    return request(`/api/zones/${encodeURIComponent(zoneId)}/generate-seats`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteSeats(zoneId: string): Promise<{ deleted: number }> {
+    return request(`/api/zones/${encodeURIComponent(zoneId)}/seats`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
+  async getTables(zoneId: string): Promise<ZoneTable[]> {
+    return request(`/api/zones/${encodeURIComponent(zoneId)}/tables`);
+  },
+
+  async generateTables(
+    zoneId: string,
+    payload: { count: number; shape?: 'ROUND' | 'RECT'; chairCount: number },
+  ): Promise<{ count: number; totalSeats: number }> {
+    return request(`/api/zones/${encodeURIComponent(zoneId)}/generate-tables`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updateZoneLayout(
+    id: string,
+    layoutData: ZoneLayoutData | null,
+    type?: ZoneType,
+  ): Promise<Zone> {
+    return request(`/api/zones/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ layoutData, ...(type && { type }) }),
     });
   },
 };

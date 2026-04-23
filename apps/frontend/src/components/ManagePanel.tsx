@@ -4,8 +4,10 @@ import type { Venue, Zone, Ticket, Currency, TicketStatus } from '../types';
 import { CURRENCIES, formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { StatsTab } from './StatsTab';
+import { ZoneConfigurator } from './ZoneConfigurator';
+import { ZoneMapEditor } from './ZoneMapEditor';
 
-type Tab = 'venues' | 'zones' | 'tickets' | 'stats';
+type Tab = 'venues' | 'zones' | 'map' | 'tickets' | 'stats';
 type TicketFilter = TicketStatus | 'ALL';
 
 const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
@@ -147,6 +149,8 @@ export function ManagePanel() {
         cardNumber: newZone.cardNumber,
         capacity: Number(newZone.capacity),
         sortOrder: Number(newZone.sortOrder),
+        type: 'GENERAL',
+        layoutData: null,
       });
       setZones(z => [...z, zone]);
       setNewZone(ZONE_DEFAULTS);
@@ -227,6 +231,7 @@ export function ManagePanel() {
   const TAB_LABELS: Record<Tab, string> = {
     venues: 'Мероприятия',
     zones: 'Зоны',
+    map: 'Схема',
     tickets: 'Билеты',
     stats: 'Статистика',
   };
@@ -272,7 +277,7 @@ export function ManagePanel() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(['venues', 'zones', 'tickets', 'stats'] as Tab[]).map(t => (
+          {(['venues', 'zones', 'map', 'tickets', 'stats'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -492,27 +497,35 @@ export function ManagePanel() {
 
                 <div className="space-y-2">
                   {zones.map(z => (
-                    <div key={z.id} className="bg-white rounded-xl shadow-sm p-4 flex justify-between items-center">
-                      <div>
-                        <div className="font-medium text-gray-800">{z.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {formatPrice(z.price, zoneCurrency)} ·{' '}
-                          {z.available !== undefined ? `${z.available}/` : ''}{z.capacity} мест
+                    <div key={z.id} className="bg-white rounded-xl shadow-sm p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-800">{z.name}</div>
+                          <div className="text-sm text-gray-500">
+                            {formatPrice(z.price, zoneCurrency)} ·{' '}
+                            {z.available !== undefined ? `${z.available}/` : ''}{z.capacity} мест
+                          </div>
+                        </div>
+                        <div className="flex gap-3 shrink-0 ml-4">
+                          <button
+                            onClick={() => setEditingZone(z)}
+                            className="text-sm text-emerald-700 hover:underline"
+                          >
+                            Ред.
+                          </button>
+                          <button
+                            onClick={() => deleteZone(z.id)}
+                            className="text-sm text-red-600 hover:underline"
+                          >
+                            Удал.
+                          </button>
                         </div>
                       </div>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => setEditingZone(z)}
-                          className="text-sm text-emerald-700 hover:underline"
-                        >
-                          Ред.
-                        </button>
-                        <button
-                          onClick={() => deleteZone(z.id)}
-                          className="text-sm text-red-600 hover:underline"
-                        >
-                          Удал.
-                        </button>
+                      <div className="mt-2">
+                        <ZoneConfigurator
+                          zone={z}
+                          onUpdated={updated => setZones(zs => zs.map(z2 => z2.id === updated.id ? updated : z2))}
+                        />
                       </div>
                     </div>
                   ))}
@@ -628,6 +641,37 @@ export function ManagePanel() {
                 );
               })}
             </div>
+          </div>
+        )}
+
+        {/* MAP TAB */}
+        {tab === 'map' && (
+          <div className="space-y-4">
+            <select
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              value={selectedVenueId}
+              onChange={e => setSelectedVenueId(e.target.value)}
+            >
+              <option value="">Выберите мероприятие</option>
+              {venues.map(v => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+
+            {selectedVenueId && selectedVenue && (
+              <ZoneMapEditor
+                venue={selectedVenue}
+                zones={zones}
+                onVenueUpdated={updated => setVenues(vs => vs.map(v => v.id === updated.id ? updated : v))}
+                onZoneUpdated={updated => setZones(zs => zs.map(z => z.id === updated.id ? updated : z))}
+              />
+            )}
+
+            {selectedVenueId && !zones.length && (
+              <p className="text-sm text-gray-400 text-center py-8">
+                Сначала создайте зоны во вкладке «Зоны»
+              </p>
+            )}
           </div>
         )}
 

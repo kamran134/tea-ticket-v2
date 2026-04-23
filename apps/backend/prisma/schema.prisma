@@ -15,27 +15,73 @@ enum TicketStatus {
   EXPIRED
 }
 
+enum ZoneType {
+  GENERAL
+  SEATED
+  TABLE
+}
+
+enum TableShape {
+  ROUND
+  RECT
+}
+
 model Venue {
-  id        String   @id @default(cuid())
-  name      String
-  date      DateTime
-  active    Boolean  @default(true)
-  currency  String   @default("₼")
-  createdAt DateTime @default(now())
-  zones     Zone[]
-  tickets   Ticket[]
+  id             String   @id @default(cuid())
+  name           String
+  date           DateTime
+  active         Boolean  @default(true)
+  currency       String   @default("₼")
+  floorPlanImage String?
+  createdAt      DateTime @default(now())
+  zones          Zone[]
+  tickets        Ticket[]
 }
 
 model Zone {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   venueId    String
   name       String
   price      Float
   cardNumber String
   capacity   Int
-  sortOrder  Int      @default(0)
-  venue      Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  sortOrder  Int       @default(0)
+  type       ZoneType  @default(GENERAL)
+  layoutData Json?
+  venue      Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
+  seats      Seat[]
+  tables     ZoneTable[]
+}
+
+model Seat {
+  id           String  @id @default(cuid())
+  zoneId       String
+  number       Int
+  row          Int
+  sectionIndex Int     @default(0)
+  posInSection Int
+  label        String?
+  zone         Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  ticket       Ticket?
+
+  @@unique([zoneId, number])
+  @@unique([zoneId, row, sectionIndex, posInSection])
+  @@index([zoneId])
+}
+
+model ZoneTable {
+  id         String     @id @default(cuid())
+  zoneId     String
+  number     Int
+  shape      TableShape @default(ROUND)
+  chairCount Int
+  layoutData Json?
+  zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  tickets    Ticket[]
+
+  @@unique([zoneId, number])
+  @@index([zoneId])
 }
 
 model Ticket {
@@ -53,8 +99,12 @@ model Ticket {
   createdAt   DateTime     @default(now())
   bookedAt    DateTime     @default(now())
   groupId     String?
+  seatId      String?      @unique
+  tableId     String?
   venue       Venue        @relation(fields: [venueId], references: [id])
   zone        Zone         @relation(fields: [zoneId], references: [id])
+  seat        Seat?        @relation(fields: [seatId], references: [id])
+  table       ZoneTable?   @relation(fields: [tableId], references: [id])
 
   @@index([groupId])
   @@index([status])

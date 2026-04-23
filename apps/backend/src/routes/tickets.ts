@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient, TicketStatus } from '@prisma/client';
+import { PrismaClient, TicketStatus as PrismaTicketStatus } from '@prisma/client';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
@@ -23,7 +23,7 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
   try {
     const tickets = await prisma.ticket.findMany({
       where: {
-        ...(status ? { status: status as TicketStatus } : {}),
+        ...(status ? { status: status as PrismaTicketStatus } : {}),
         ...(venueId ? { venueId: venueId as string } : {}),
       },
       orderBy: { createdAt: 'desc' },
@@ -88,6 +88,8 @@ const registerSchema = z.object({
   venueId: z.string().min(1),
   zoneId: z.string().min(1),
   guests: z.array(z.object({ name: z.string().min(1).max(200) })).default([]),
+  seatId: z.string().optional(),
+  tableId: z.string().optional(),
 });
 
 ticketsRouter.post('/register', async (req, res) => {
@@ -95,7 +97,7 @@ ticketsRouter.post('/register', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { name, phone, venueId, zoneId, guests } = parsed.data;
+  const { name, phone, venueId, zoneId, guests, seatId, tableId } = parsed.data;
 
   try {
     const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
@@ -103,21 +105,106 @@ ticketsRouter.post('/register', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Zone not found' });
     }
 
+    const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
+    const now = new Date();
+
+    if (zone.type === 'SEATED') {
+      if (!seatId) {
+        return res.status(400).json({ success: false, error: 'seatId is required for seated zones' });
+      }
+      const seat = await prisma.seat.findUnique({ where: { id: seatId } });
+      if (!seat || seat.zoneId !== zoneId) {
+        return res.status(404).json({ success: false, error: 'Seat not found in this zone' });
+      }
+      const isTaken = await prisma.ticket.findFirst({
+        where: { seatId, status: { in: activeStatuses } },
+      });
+      if (isTaken) {
+        return res.status(409).json({ success: false, error: 'Seat is already taken' });
+      }
+      const ticket = await prisma.ticket.create({
+        data: {
+          name, phone, venueId, zoneId,
+          zoneName: zone.name,
+          cardNumber: zone.cardNumber,
+          price: zone.price,
+          status: 'BOOKED',
+          bookedAt: now,
+          seatId,
+        },
+      });
+      return res.status(201).json({
+        success: true,
+        data: { id: ticket.id, groupId: null, totalPrice: zone.price, cardNumber: zone.cardNumber },
+      });
+    }
+
+    if (zone.type === 'TABLE') {
+      if (!tableId) {
+        return res.status(400).json({ success: false, error: 'tableId is required for table zones' });
+      }
+      const table = await prisma.zoneTable.findUnique({ where: { id: tableId } });
+      if (!table || table.zoneId !== zoneId) {
+        return res.status(404).json({ success: false, error: 'Table not found in this zone' });
+      }
+      const occupiedCount = await prisma.ticket.count({
+        where: { tableId, status: { in: activeStatuses } },
+      });
+      const totalNeeded = 1 + guests.length;
+      if (occupiedCount + totalNeeded > table.chairCount) {
+        return res.status(409).json({ success: false, error: 'Not enough chairs available at this table' });
+      }
+
+      const mainTicket = await prisma.ticket.create({
+        data: {
+          name, phone, venueId, zoneId,
+          zoneName: zone.name,
+          cardNumber: zone.cardNumber,
+          price: zone.price,
+          status: 'BOOKED',
+          bookedAt: now,
+          tableId,
+        },
+      });
+      const groupId = guests.length > 0 ? mainTicket.id : undefined;
+      if (groupId) {
+        await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId } });
+        await prisma.ticket.createMany({
+          data: guests.map(g => ({
+            name: g.name, phone, venueId, zoneId,
+            zoneName: zone.name,
+            cardNumber: zone.cardNumber,
+            price: zone.price,
+            status: 'BOOKED' as const,
+            bookedAt: now,
+            groupId,
+            tableId,
+          })),
+        });
+      }
+      return res.status(201).json({
+        success: true,
+        data: {
+          id: mainTicket.id,
+          groupId: groupId ?? null,
+          totalPrice: zone.price * totalNeeded,
+          cardNumber: zone.cardNumber,
+        },
+      });
+    }
+
+    // GENERAL zone — original logic
     const occupied = await prisma.ticket.count({
-      where: { zoneId, status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } },
+      where: { zoneId, status: { in: activeStatuses } },
     });
     const totalNeeded = 1 + guests.length;
     if (occupied + totalNeeded > zone.capacity) {
       return res.status(409).json({ success: false, error: 'Not enough seats available' });
     }
 
-    const now = new Date();
     const mainTicket = await prisma.ticket.create({
       data: {
-        name,
-        phone,
-        venueId,
-        zoneId,
+        name, phone, venueId, zoneId,
         zoneName: zone.name,
         cardNumber: zone.cardNumber,
         price: zone.price,
@@ -125,19 +212,12 @@ ticketsRouter.post('/register', async (req, res) => {
         bookedAt: now,
       },
     });
-
     const groupId = guests.length > 0 ? mainTicket.id : undefined;
     if (groupId) {
-      await prisma.ticket.update({
-        where: { id: mainTicket.id },
-        data: { groupId },
-      });
+      await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId } });
       await prisma.ticket.createMany({
         data: guests.map(g => ({
-          name: g.name,
-          phone,
-          venueId,
-          zoneId,
+          name: g.name, phone, venueId, zoneId,
           zoneName: zone.name,
           cardNumber: zone.cardNumber,
           price: zone.price,
