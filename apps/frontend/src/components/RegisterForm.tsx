@@ -122,7 +122,7 @@ export function RegisterForm() {
         ...(selectedSeatIds.length > 0 && { seatIds: selectedSeatIds }),
         ...(selectedTableId && { tableId: selectedTableId }),
       });
-      window.location.href = `/ticket?id=${result.id}`;
+      window.location.href = `/ticket?id=${result.id}&new=1`;
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка при регистрации');
     } finally {

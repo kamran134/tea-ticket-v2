@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
+import { toast } from '../services/toast';
 import type { Ticket, TicketStatus, Currency } from '../types';
 import { formatPrice } from '../types';
 
@@ -36,7 +37,15 @@ export function TicketView() {
   const [uploadError, setUploadError] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [copied, setCopied] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const ticketUrl = (() => {
+    const id = new URLSearchParams(window.location.search).get('id');
+    return `${window.location.origin}/ticket?id=${id}`;
+  })();
+
+  const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -47,6 +56,13 @@ export function TicketView() {
       setCurrency(currency);
       if (members) setMembers(members);
     });
+
+    if (params.get('new') === '1') {
+      window.history.replaceState(null, '', `/ticket?id=${id}`);
+      navigator.clipboard.writeText(`${window.location.origin}/ticket?id=${id}`)
+        .then(() => toast.success('Ссылка скопирована — не потеряйте её!'))
+        .catch(() => {});
+    }
   }, []);
 
   // Countdown for BOOKED tickets
@@ -88,6 +104,17 @@ export function TicketView() {
     }
   };
 
+  const handleCopy = () => {
+    navigator.clipboard.writeText(ticketUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  };
+
+  const handleShare = () => {
+    navigator.share({ url: ticketUrl }).catch(() => {});
+  };
+
   if (!ticket) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
@@ -124,6 +151,47 @@ export function TicketView() {
             </span>
           </div>
         </div>
+
+        {/* Save link bar */}
+        {(ticket.status === 'BOOKED' || ticket.status === 'PENDING') && (
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-700">Сохраните ссылку на билет</p>
+              <p className="text-xs text-gray-400 truncate">{ticketUrl}</p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <button
+                onClick={handleCopy}
+                title="Скопировать ссылку"
+                className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                {copied ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                  </svg>
+                )}
+              </button>
+              {canShare && (
+                <button
+                  onClick={handleShare}
+                  title="Поделиться"
+                  className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* BOOKED: payment instructions */}
         {ticket.status === 'BOOKED' && (
