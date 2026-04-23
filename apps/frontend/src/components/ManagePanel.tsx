@@ -6,6 +6,9 @@ import { toast } from '../services/toast';
 import { StatsTab } from './StatsTab';
 import { ZoneConfigurator } from './ZoneConfigurator';
 import { ZoneMapEditor } from './ZoneMapEditor';
+import { ConfirmDialog } from './ConfirmDialog';
+
+type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
 type Tab = 'venues' | 'zones' | 'map' | 'tickets' | 'stats';
 type TicketFilter = TicketStatus | 'ALL';
@@ -61,6 +64,12 @@ export function ManagePanel() {
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>('PENDING');
   const [filterVenueId, setFilterVenueId] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
+
+  // Confirm dialog
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+
+  const requestConfirm = (title: string, message: string, onConfirm: () => void) =>
+    setPendingConfirm({ title, message, onConfirm });
 
   const login = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,18 +188,42 @@ export function ManagePanel() {
     }
   };
 
-  const deleteZone = async (id: string) => {
-    if (!confirm('Удалить зону? Билеты не удаляются.')) return;
-    try {
-      await api.deleteZone(id);
-      setZones(z => z.filter(zone => zone.id !== id));
-      toast.success('Зона удалена');
-    } catch (err) {
-      toast.error(errMsg(err));
-    }
+  const deleteZone = (id: string) => {
+    requestConfirm('Удалить зону?', 'Билеты в этой зоне не будут удалены.', async () => {
+      try {
+        await api.deleteZone(id);
+        setZones(z => z.filter(zone => zone.id !== id));
+        toast.success('Зона удалена');
+      } catch (err) {
+        toast.error(errMsg(err));
+      }
+    });
   };
 
   // --- Ticket handlers ---
+
+  const deleteTicket = (ticket: Ticket) => {
+    const isGroup = Boolean(ticket.groupId);
+    requestConfirm(
+      isGroup ? 'Удалить групповой билет?' : 'Удалить билет?',
+      isGroup
+        ? `Будут удалены все ${allTickets.filter(t => t.groupId === ticket.groupId).length} участника группы.`
+        : `Билет «${ticket.name}» будет удалён безвозвратно.`,
+      async () => {
+        try {
+          await api.deleteTicket(ticket.id);
+          setAllTickets(ts =>
+            isGroup
+              ? ts.filter(t => t.groupId !== ticket.groupId)
+              : ts.filter(t => t.id !== ticket.id),
+          );
+          toast.success(isGroup ? 'Групповой билет удалён' : 'Билет удалён');
+        } catch (err) {
+          toast.error(errMsg(err));
+        }
+      },
+    );
+  };
 
   const handleTicketStatus = async (id: string, status: 'CONFIRMED' | 'REJECTED') => {
     try {
@@ -621,22 +654,31 @@ export function ManagePanel() {
                       </a>
                     )}
 
-                    {t.status === 'PENDING' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
-                          className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
-                        >
-                          Подтвердить
-                        </button>
-                        <button
-                          onClick={() => handleTicketStatus(t.id, 'REJECTED')}
-                          className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
-                        >
-                          Отклонить
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex gap-2">
+                      {t.status === 'PENDING' && (
+                        <>
+                          <button
+                            onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
+                            className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                          >
+                            Подтвердить
+                          </button>
+                          <button
+                            onClick={() => handleTicketStatus(t.id, 'REJECTED')}
+                            className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
+                          >
+                            Отклонить
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => deleteTicket(t)}
+                        className="px-3 py-2 text-gray-400 hover:text-red-600 transition-colors text-sm rounded-xl hover:bg-red-50"
+                        title="Удалить"
+                      >
+                        🗑
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -678,6 +720,15 @@ export function ManagePanel() {
         {/* STATS TAB */}
         {tab === 'stats' && <StatsTab venues={venues} />}
       </div>
+
+      {pendingConfirm && (
+        <ConfirmDialog
+          title={pendingConfirm.title}
+          message={pendingConfirm.message}
+          onConfirm={() => { pendingConfirm.onConfirm(); setPendingConfirm(null); }}
+          onCancel={() => setPendingConfirm(null)}
+        />
+      )}
     </div>
   );
 }

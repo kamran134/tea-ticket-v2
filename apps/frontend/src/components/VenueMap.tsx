@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type React from 'react';
 import type { Zone, Venue } from '../types';
 import { formatPrice } from '../types';
 
@@ -55,78 +56,97 @@ export function VenueMap({ venue, zones, selectedZoneId, currency, onZoneClick }
         )}
 
         {/* Zone overlays */}
-        {mappedZones.map((zone, i) => {
+        {mappedZones.flatMap((zone, i) => {
           const ld = zone.layoutData!;
           const isSelected = zone.id === selectedZoneId;
           const isEmpty = (zone.available ?? 0) <= 0;
           const color = getZoneColor(zone, i);
           const typeLabel = ZONE_TYPE_LABEL[zone.type];
 
-          return (
+          const blockStyle = (x: number, y: number, w: number, h: number): React.CSSProperties => ({
+            position: 'absolute',
+            left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`,
+            backgroundColor: isEmpty ? 'rgba(156,163,175,0.5)' : isSelected ? color : `${color}99`,
+            borderColor: isSelected ? color : `${color}cc`,
+            borderWidth: isSelected ? 2 : 1, borderStyle: 'solid',
+            borderRadius: 8, transition: 'all 0.15s ease',
+            cursor: isEmpty ? 'not-allowed' : 'pointer',
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '4px', minWidth: 0,
+          });
+
+          // Section-based (SEATED zones with multiple sections)
+          if (ld.sections && ld.sections.length > 0) {
+            return ld.sections.map(sec => (
+              <button
+                key={`${zone.id}-sec-${sec.sectionIndex}`}
+                type="button"
+                disabled={isEmpty}
+                onClick={() => onZoneClick(zone)}
+                style={blockStyle(sec.x, sec.y, sec.w, sec.h)}
+                title={`${zone.name} · ${sec.label}`}
+              >
+                <span className="font-semibold text-white drop-shadow leading-tight text-center"
+                  style={{ fontSize: 'clamp(8px, 1.3cqw, 12px)', lineHeight: 1.2 }}>
+                  {zone.name}
+                </span>
+                <span className="text-white/80 drop-shadow text-center"
+                  style={{ fontSize: 'clamp(7px, 1cqw, 10px)' }}>
+                  {sec.label}
+                </span>
+                {sec.sectionIndex === 0 && (
+                  <>
+                    <span className="text-white font-bold drop-shadow"
+                      style={{ fontSize: 'clamp(7px, 1.1cqw, 10px)' }}>
+                      {formatPrice(zone.price, currency)}
+                    </span>
+                    {zone.available !== undefined && (
+                      <span
+                        className={['drop-shadow', isEmpty ? 'text-white/60' : zone.available <= 5 ? 'text-yellow-200' : 'text-white/80'].join(' ')}
+                        style={{ fontSize: 'clamp(6px, 0.9cqw, 9px)' }}>
+                        {isEmpty ? 'Мест нет' : `${zone.available} мест`}
+                      </span>
+                    )}
+                  </>
+                )}
+              </button>
+            ));
+          }
+
+          // Single block (GENERAL, TABLE, single-section SEATED)
+          return [(
             <button
               key={zone.id}
               type="button"
               disabled={isEmpty}
               onClick={() => onZoneClick(zone)}
-              style={{
-                position: 'absolute',
-                left: `${ld.x}%`,
-                top: `${ld.y}%`,
-                width: `${ld.w}%`,
-                height: `${ld.h}%`,
-                backgroundColor: isEmpty
-                  ? 'rgba(156,163,175,0.5)'
-                  : isSelected
-                    ? color
-                    : `${color}99`,
-                borderColor: isSelected ? color : `${color}cc`,
-                borderWidth: isSelected ? 2 : 1,
-                borderStyle: 'solid',
-                borderRadius: 8,
-                transition: 'all 0.15s ease',
-                cursor: isEmpty ? 'not-allowed' : 'pointer',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '4px',
-                minWidth: 0,
-              }}
+              style={blockStyle(ld.x ?? 5, ld.y ?? 5, ld.w ?? 20, ld.h ?? 15)}
               title={zone.name}
             >
-              <span
-                className="font-semibold text-white drop-shadow leading-tight text-center"
-                style={{ fontSize: 'clamp(9px, 1.5cqw, 13px)', lineHeight: 1.2 }}
-              >
+              <span className="font-semibold text-white drop-shadow leading-tight text-center"
+                style={{ fontSize: 'clamp(9px, 1.5cqw, 13px)', lineHeight: 1.2 }}>
                 {zone.name}
               </span>
               {typeLabel && (
-                <span
-                  className="text-white/80 drop-shadow text-center"
-                  style={{ fontSize: 'clamp(7px, 1.1cqw, 10px)' }}
-                >
+                <span className="text-white/80 drop-shadow text-center"
+                  style={{ fontSize: 'clamp(7px, 1.1cqw, 10px)' }}>
                   {typeLabel}
                 </span>
               )}
-              <span
-                className="text-white font-bold drop-shadow"
-                style={{ fontSize: 'clamp(8px, 1.3cqw, 11px)' }}
-              >
+              <span className="text-white font-bold drop-shadow"
+                style={{ fontSize: 'clamp(8px, 1.3cqw, 11px)' }}>
                 {formatPrice(zone.price, currency)}
               </span>
               {zone.available !== undefined && (
                 <span
-                  className={[
-                    'drop-shadow',
-                    isEmpty ? 'text-white/60' : zone.available <= 5 ? 'text-yellow-200' : 'text-white/80',
-                  ].join(' ')}
-                  style={{ fontSize: 'clamp(7px, 1cqw, 10px)' }}
-                >
+                  className={['drop-shadow', isEmpty ? 'text-white/60' : zone.available <= 5 ? 'text-yellow-200' : 'text-white/80'].join(' ')}
+                  style={{ fontSize: 'clamp(7px, 1cqw, 10px)' }}>
                   {isEmpty ? 'Мест нет' : `${zone.available} мест`}
                 </span>
               )}
             </button>
-          );
+          )];
         })}
       </div>
 

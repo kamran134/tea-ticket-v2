@@ -27,12 +27,22 @@ export interface Venue {
 export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';
 export type TableShape = 'ROUND' | 'RECT';
 
-export interface ZoneLayoutData {
+export interface ZoneSectionLayout {
+  sectionIndex: number;
+  label: string;
   x: number;
   y: number;
   w: number;
   h: number;
+}
+
+export interface ZoneLayoutData {
   color?: string;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  sections?: ZoneSectionLayout[];
 }
 
 export interface Zone {

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api } from '../services/api';
-import type { Zone, ZoneType } from '../types';
+import type { Zone, ZoneType, ZoneSectionLayout } from '../types';
 import { toast } from '../services/toast';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface Props {
   zone: Zone;
@@ -34,6 +35,7 @@ export function ZoneConfigurator({ zone, onUpdated }: Props) {
   const [chairCount, setChairCount] = useState(8);
 
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const totalSeats = sections.reduce((s, sec) => s + sec.rows * sec.seatsPerRow, 0);
 
@@ -50,8 +52,27 @@ export function ZoneConfigurator({ zone, onUpdated }: Props) {
     try {
       const result = await api.generateSeats(zone.id, { sections, numberingOrder, startFrom });
       toast.success(`Создано ${result.count} мест`);
-      const updated = await api.getZones(zone.venueId);
-      const fresh = updated.find(z => z.id === zone.id);
+
+      if (sections.length > 1) {
+        const gap = 3;
+        const usableW = 90 - gap * (sections.length - 1);
+        const secW = usableW / sections.length;
+        const sectionLayouts: ZoneSectionLayout[] = sections.map((sec, i) => ({
+          sectionIndex: i,
+          label: sec.label,
+          x: 5 + i * (secW + gap),
+          y: 5,
+          w: secW,
+          h: 30,
+        }));
+        await api.updateZoneLayout(zone.id, {
+          ...(zone.layoutData?.color ? { color: zone.layoutData.color } : {}),
+          sections: sectionLayouts,
+        });
+      }
+
+      const updatedZones = await api.getZones(zone.venueId);
+      const fresh = updatedZones.find(z => z.id === zone.id);
       if (fresh) onUpdated(fresh);
       setOpen(false);
     } catch (err) {
@@ -78,7 +99,6 @@ export function ZoneConfigurator({ zone, onUpdated }: Props) {
   };
 
   const handleDeleteSeats = async () => {
-    if (!confirm('Удалить все места? Билеты с местами не удалятся.')) return;
     setLoading(true);
     try {
       await api.deleteSeats(zone.id);
@@ -252,7 +272,7 @@ export function ZoneConfigurator({ zone, onUpdated }: Props) {
               <hr className="border-gray-200" />
               <button
                 type="button"
-                onClick={handleDeleteSeats}
+                onClick={() => setConfirmDelete(true)}
                 disabled={loading}
                 className="text-sm text-red-500 hover:underline disabled:opacity-50"
               >
@@ -261,6 +281,16 @@ export function ZoneConfigurator({ zone, onUpdated }: Props) {
             </>
           )}
         </div>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Сбросить конфигурацию?"
+          message="Все места будут удалены. Билеты с местами не удалятся."
+          confirmLabel="Сбросить"
+          onConfirm={() => { setConfirmDelete(false); handleDeleteSeats(); }}
+          onCancel={() => setConfirmDelete(false)}
+        />
       )}
     </div>
   );

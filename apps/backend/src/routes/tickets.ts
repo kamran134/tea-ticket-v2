@@ -354,6 +354,24 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
   }
 });
 
+// DELETE /api/tickets/:id  (admin: delete ticket or entire group)
+ticketsRouter.delete('/:id', requireAuth, async (req, res) => {
+  try {
+    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    }
+    if (ticket.groupId) {
+      await prisma.ticket.deleteMany({ where: { groupId: ticket.groupId } });
+    } else {
+      await prisma.ticket.delete({ where: { id: req.params.id } });
+    }
+    return res.json({ success: true, data: { deleted: true } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to delete ticket' });
+  }
+});
+
 // PATCH /api/tickets/:id/status  (admin: confirm or reject)
 const statusSchema = z.object({
   status: z.enum(['CONFIRMED', 'REJECTED']),

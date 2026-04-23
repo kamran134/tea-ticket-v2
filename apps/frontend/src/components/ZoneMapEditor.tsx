@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { api } from '../services/api';
 import type { Zone, Venue, ZoneLayoutData } from '../types';
 import { toast } from '../services/toast';
+import { ConfirmDialog } from './ConfirmDialog';
 
 interface Props {
   venue: Venue;
@@ -21,10 +22,6 @@ const COLOR_PALETTE = [
   '#374151', '#b45309',
 ];
 
-function getZoneColor(zone: Zone, index: number): string {
-  return (zone.layoutData?.color as string | undefined) ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-}
-
 const DEFAULT_LAYOUT: ZoneLayoutData = { x: 5, y: 5, w: 20, h: 15, color: '#059669' };
 
 export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: Props) {
@@ -34,6 +31,7 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
   );
   const [saving, setSaving] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [aspectPercent, setAspectPercent] = useState(56.25);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,33 +74,65 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
     e: React.MouseEvent,
     zoneId: string,
     mode: 'move' | 'resize',
+    sectionIndex?: number,
   ) => {
     e.preventDefault();
     const container = containerRef.current;
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const startLayout = localLayouts[zoneId] ?? DEFAULT_LAYOUT;
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const layout = localLayouts[zoneId] ?? DEFAULT_LAYOUT;
+
+    if (sectionIndex !== undefined && layout.sections) {
+      const startSec = layout.sections[sectionIndex];
+      if (!startSec) return;
+
+      const onMove = (ev: MouseEvent) => {
+        const dx = ((ev.clientX - startClientX) / rect.width) * 100;
+        const dy = ((ev.clientY - startClientY) / rect.height) * 100;
+        setLocalLayouts(l => {
+          const z = l[zoneId];
+          if (!z?.sections) return l;
+          const sections = z.sections.map(s =>
+            s.sectionIndex !== sectionIndex ? s : mode === 'move'
+              ? { ...startSec, x: Math.max(0, Math.min(100 - startSec.w, startSec.x + dx)), y: Math.max(0, Math.min(100 - startSec.h, startSec.y + dy)) }
+              : { ...startSec, w: Math.max(5, Math.min(100 - startSec.x, startSec.w + dx)), h: Math.max(5, Math.min(100 - startSec.y, startSec.h + dy)) },
+          );
+          return { ...l, [zoneId]: { ...z, sections } };
+        });
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        setLocalLayouts(current => {
+          const updated = current[zoneId];
+          if (updated) void saveLayout(zoneId, updated);
+          return current;
+        });
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+      return;
+    }
+
+    // Single-block drag
+    const sx = layout.x ?? 5;
+    const sy = layout.y ?? 5;
+    const sw = layout.w ?? 20;
+    const sh = layout.h ?? 15;
 
     const onMove = (ev: MouseEvent) => {
-      const dx = ((ev.clientX - startX) / rect.width) * 100;
-      const dy = ((ev.clientY - startY) / rect.height) * 100;
-
+      const dx = ((ev.clientX - startClientX) / rect.width) * 100;
+      const dy = ((ev.clientY - startClientY) / rect.height) * 100;
       setLocalLayouts(l => ({
         ...l,
         [zoneId]: mode === 'move'
-          ? {
-              ...startLayout,
-              x: Math.max(0, Math.min(100 - startLayout.w, startLayout.x + dx)),
-              y: Math.max(0, Math.min(100 - startLayout.h, startLayout.y + dy)),
-            }
-          : {
-              ...startLayout,
-              w: Math.max(5, Math.min(100 - startLayout.x, startLayout.w + dx)),
-              h: Math.max(5, Math.min(100 - startLayout.y, startLayout.h + dy)),
-            },
+          ? { ...layout, x: Math.max(0, Math.min(100 - sw, sx + dx)), y: Math.max(0, Math.min(100 - sh, sy + dy)) }
+          : { ...layout, w: Math.max(5, Math.min(100 - sx, sw + dx)), h: Math.max(5, Math.min(100 - sy, sh + dy)) },
       }));
     };
 
@@ -110,8 +140,8 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       setLocalLayouts(current => {
-        const layout = current[zoneId];
-        if (layout) void saveLayout(zoneId, layout);
+        const updated = current[zoneId];
+        if (updated) void saveLayout(zoneId, updated);
         return current;
       });
     };
@@ -145,7 +175,6 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
   };
 
   const handleClearFloorPlan = async () => {
-    if (!confirm('Убрать схему зала?')) return;
     try {
       const updated = await api.clearFloorPlan(venue.id);
       onVenueUpdated(updated);
@@ -180,7 +209,7 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
         {venue.floorPlanImage && (
           <button
             type="button"
-            onClick={handleClearFloorPlan}
+            onClick={() => setConfirmClear(true)}
             className="text-sm text-red-500 hover:underline"
           >
             Убрать схему
@@ -210,84 +239,106 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
         )}
 
         {/* Draggable zone boxes */}
-        {zones.map((zone, i) => {
+        {zones.flatMap((zone, i) => {
           const layout = localLayouts[zone.id];
-          if (!layout) return null;
-          const color = getZoneColor(zone, i);
+          if (!layout) return [];
+          const color = layout.color ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length];
           const isSaving = saving === zone.id;
 
-          return (
+          const removeBtn = (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); void removeFromMap(zone); }}
+              title={`Убрать "${zone.name}" со схемы`}
+              style={{
+                position: 'absolute', top: 2, right: 2, width: 16, height: 16,
+                background: 'rgba(0,0,0,0.4)', color: 'white', border: 'none',
+                borderRadius: 3, cursor: 'pointer', fontSize: 10,
+                lineHeight: '16px', textAlign: 'center', padding: 0,
+              }}
+            >✕</button>
+          );
+
+          const resizeHandle = (onDown: (e: React.MouseEvent) => void) => (
+            <div
+              style={{
+                position: 'absolute', bottom: 2, right: 2, width: 10, height: 10,
+                background: 'white', border: `1px solid ${color}`, borderRadius: 2, cursor: 'se-resize',
+              }}
+              onMouseDown={e => { e.stopPropagation(); onDown(e); }}
+            />
+          );
+
+          // Section-based rendering (SEATED zones with multiple sections)
+          if (layout.sections && layout.sections.length > 0) {
+            return layout.sections.map(sec => (
+              <div
+                key={`${zone.id}-sec-${sec.sectionIndex}`}
+                style={{
+                  position: 'absolute',
+                  left: `${sec.x}%`, top: `${sec.y}%`,
+                  width: `${sec.w}%`, height: `${sec.h}%`,
+                  backgroundColor: `${color}cc`,
+                  border: `2px solid ${color}`,
+                  borderRadius: 6, cursor: 'move', userSelect: 'none',
+                }}
+                onMouseDown={e => handleDragStart(e, zone.id, 'move', sec.sectionIndex)}
+              >
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-1 pointer-events-none">
+                  <span className="text-white font-semibold text-center leading-tight drop-shadow"
+                    style={{ fontSize: 'clamp(7px, 1.2cqw, 11px)' }}>
+                    {zone.name}
+                  </span>
+                  <span className="text-white/80 text-center drop-shadow"
+                    style={{ fontSize: 'clamp(6px, 1cqw, 10px)' }}>
+                    {sec.label}
+                  </span>
+                  {isSaving && sec.sectionIndex === 0 && (
+                    <span className="text-white/60 text-center" style={{ fontSize: 'clamp(6px, 0.9cqw, 9px)' }}>
+                      сохранение...
+                    </span>
+                  )}
+                </div>
+                {resizeHandle(e => handleDragStart(e, zone.id, 'resize', sec.sectionIndex))}
+                {removeBtn}
+              </div>
+            ));
+          }
+
+          // Single-block rendering (GENERAL, TABLE, single-section SEATED)
+          const x = layout.x ?? 5;
+          const y = layout.y ?? 5;
+          const w = layout.w ?? 20;
+          const h = layout.h ?? 15;
+
+          return [(
             <div
               key={zone.id}
               style={{
                 position: 'absolute',
-                left: `${layout.x}%`,
-                top: `${layout.y}%`,
-                width: `${layout.w}%`,
-                height: `${layout.h}%`,
+                left: `${x}%`, top: `${y}%`,
+                width: `${w}%`, height: `${h}%`,
                 backgroundColor: `${color}cc`,
                 border: `2px solid ${color}`,
-                borderRadius: 6,
-                cursor: 'move',
-                userSelect: 'none',
+                borderRadius: 6, cursor: 'move', userSelect: 'none',
               }}
               onMouseDown={e => handleDragStart(e, zone.id, 'move')}
             >
-              {/* Zone label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-1 pointer-events-none">
                 <span className="text-white font-semibold text-center leading-tight drop-shadow"
                   style={{ fontSize: 'clamp(8px, 1.4cqw, 12px)' }}>
                   {zone.name}
                 </span>
                 {isSaving && (
-                  <span className="text-white/70 text-center"
-                    style={{ fontSize: 'clamp(7px, 1cqw, 9px)' }}>
+                  <span className="text-white/70 text-center" style={{ fontSize: 'clamp(7px, 1cqw, 9px)' }}>
                     сохранение...
                   </span>
                 )}
               </div>
-
-              {/* Resize handle */}
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: 2,
-                  right: 2,
-                  width: 10,
-                  height: 10,
-                  background: 'white',
-                  border: `1px solid ${color}`,
-                  borderRadius: 2,
-                  cursor: 'se-resize',
-                }}
-                onMouseDown={e => { e.stopPropagation(); handleDragStart(e, zone.id, 'resize'); }}
-              />
-
-              {/* Remove button */}
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); void removeFromMap(zone); }}
-                style={{
-                  position: 'absolute',
-                  top: 2,
-                  right: 2,
-                  width: 16,
-                  height: 16,
-                  background: 'rgba(0,0,0,0.4)',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: 3,
-                  cursor: 'pointer',
-                  fontSize: 10,
-                  lineHeight: '16px',
-                  textAlign: 'center',
-                  padding: 0,
-                }}
-              >
-                ✕
-              </button>
+              {resizeHandle(e => handleDragStart(e, zone.id, 'resize'))}
+              {removeBtn}
             </div>
-          );
+          )];
         })}
       </div>
 
@@ -338,6 +389,16 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
             ))}
           </div>
         </div>
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Убрать схему зала?"
+          message="Фотография зала будет удалена. Позиции зон останутся."
+          confirmLabel="Убрать"
+          onConfirm={() => { setConfirmClear(false); void handleClearFloorPlan(); }}
+          onCancel={() => setConfirmClear(false)}
+        />
       )}
     </div>
   );

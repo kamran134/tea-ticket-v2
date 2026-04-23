@@ -132,6 +132,13 @@ export const api = {
     return request(`/api/tickets?${params.toString()}`, { headers: authHeaders() });
   },
 
+  async deleteTicket(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/tickets/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
   async updateTicketStatus(id: string, status: 'CONFIRMED' | 'REJECTED'): Promise<Ticket> {
     return request(`/api/tickets/${encodeURIComponent(id)}/status`, {
       method: 'PATCH',
