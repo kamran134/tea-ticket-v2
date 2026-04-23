@@ -86,7 +86,7 @@ export const api = {
     venueId: string;
     zoneId: string;
     guests: { name: string }[];
-    seatId?: string;
+    seatIds?: string[];
     tableId?: string;
   }): Promise<RegisterResult> {
     return request('/api/tickets/register', {

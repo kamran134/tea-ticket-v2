@@ -25,7 +25,7 @@ export function RegisterForm() {
 
   const [seats, setSeats] = useState<Seat[]>([]);
   const [tables, setTables] = useState<ZoneTable[]>([]);
-  const [selectedSeatId, setSelectedSeatId] = useState<string | null>(null);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [subLoading, setSubLoading] = useState(false);
 
@@ -44,10 +44,11 @@ export function RegisterForm() {
   }, [venueId]);
 
   useEffect(() => {
-    setSelectedSeatId(null);
+    setSelectedSeatIds([]);
     setSelectedTableId(null);
     setSeats([]);
     setTables([]);
+    setGuests([]);
     if (!zoneId) return;
 
     const zone = zones.find(z => z.id === zoneId);
@@ -65,31 +66,47 @@ export function RegisterForm() {
   const selectedVenue = venues.find(v => v.id === venueId);
   const currency = selectedVenue?.currency ?? '₼';
   const selectedZone = zones.find(z => z.id === zoneId);
-  const selectedSeat = seats.find(s => s.id === selectedSeatId);
   const selectedTable = tables.find(t => t.id === selectedTableId);
+
+  const neededSeats = 1 + guests.length;
 
   const maxGuests = (() => {
     if (!selectedZone) return 0;
-    if (selectedZone.type === 'TABLE' && selectedTable) {
-      return selectedTable.available - 1;
+    if (selectedZone.type === 'SEATED') {
+      const freeSeats = seats.filter(s => !s.occupied).length;
+      return freeSeats - 1;
     }
-    if (selectedZone.type === 'SEATED') return 0;
+    if (selectedZone.type === 'TABLE' && selectedTable) return selectedTable.available - 1;
     return (selectedZone.available ?? 0) - 1;
   })();
 
-  const totalPrice = selectedZone ? selectedZone.price * (1 + guests.length) : 0;
+  const totalPrice = selectedZone ? selectedZone.price * neededSeats : 0;
 
   const canSubmit = (() => {
     if (!selectedZone || !name || !phone) return false;
-    if (selectedZone.type === 'SEATED') return !!selectedSeatId;
+    if (selectedZone.type === 'SEATED') return selectedSeatIds.length === neededSeats;
     if (selectedZone.type === 'TABLE') return !!selectedTableId;
-    return (selectedZone.available ?? 0) >= 1 + guests.length;
+    return (selectedZone.available ?? 0) >= neededSeats;
   })();
 
   const addGuest = () => setGuests(g => [...g, { name: '' }]);
-  const removeGuest = (i: number) => setGuests(g => g.filter((_, idx) => idx !== i));
+  const removeGuest = (i: number) => {
+    setGuests(g => g.filter((_, idx) => idx !== i));
+    // drop last selected seat when removing a guest
+    if (selectedZone?.type === 'SEATED') {
+      setSelectedSeatIds(ids => ids.slice(0, ids.length - 1));
+    }
+  };
   const updateGuest = (i: number, val: string) =>
     setGuests(g => g.map((g, idx) => (idx === i ? { name: val } : g)));
+
+  const toggleSeat = (seat: Seat) => {
+    setSelectedSeatIds(ids => {
+      if (ids.includes(seat.id)) return ids.filter(id => id !== seat.id);
+      if (ids.length >= neededSeats) return ids;
+      return [...ids, seat.id];
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +119,7 @@ export function RegisterForm() {
         venueId,
         zoneId,
         guests,
-        ...(selectedSeatId && { seatId: selectedSeatId }),
+        ...(selectedSeatIds.length > 0 && { seatIds: selectedSeatIds }),
         ...(selectedTableId && { tableId: selectedTableId }),
       });
       window.location.href = `/ticket?id=${result.id}`;
@@ -215,21 +232,15 @@ export function RegisterForm() {
             {/* Seat picker for SEATED zones */}
             {selectedZone?.type === 'SEATED' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Выберите место
-                  {selectedSeat && (
-                    <span className="ml-2 text-emerald-600 font-semibold">
-                      · Место {selectedSeat.label ?? selectedSeat.number}, ряд {selectedSeat.row}
-                    </span>
-                  )}
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Выберите места</label>
                 {subLoading ? (
                   <div className="text-center text-gray-400 py-4 text-sm">Загрузка...</div>
                 ) : (
                   <SeatPicker
                     seats={seats}
-                    selectedSeatId={selectedSeatId}
-                    onSelect={s => setSelectedSeatId(s.id)}
+                    selectedSeatIds={selectedSeatIds}
+                    neededSeats={neededSeats}
+                    onToggle={toggleSeat}
                   />
                 )}
               </div>
@@ -281,8 +292,8 @@ export function RegisterForm() {
               />
             </div>
 
-            {/* Guests — only for GENERAL and TABLE zones */}
-            {selectedZone && selectedZone.type !== 'SEATED' && (
+            {/* Guests */}
+            {selectedZone && (
               <>
                 {guests.length > 0 && (
                   <div className="space-y-2">

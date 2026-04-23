@@ -88,7 +88,7 @@ const registerSchema = z.object({
   venueId: z.string().min(1),
   zoneId: z.string().min(1),
   guests: z.array(z.object({ name: z.string().min(1).max(200) })).default([]),
-  seatId: z.string().optional(),
+  seatIds: z.array(z.string()).optional(),
   tableId: z.string().optional(),
 });
 
@@ -97,7 +97,7 @@ ticketsRouter.post('/register', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { name, phone, venueId, zoneId, guests, seatId, tableId } = parsed.data;
+  const { name, phone, venueId, zoneId, guests, seatIds, tableId } = parsed.data;
 
   try {
     const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
@@ -109,33 +109,61 @@ ticketsRouter.post('/register', async (req, res) => {
     const now = new Date();
 
     if (zone.type === 'SEATED') {
-      if (!seatId) {
-        return res.status(400).json({ success: false, error: 'seatId is required for seated zones' });
+      const totalNeeded = 1 + guests.length;
+      if (!seatIds || seatIds.length === 0) {
+        return res.status(400).json({ success: false, error: 'seatIds is required for seated zones' });
       }
-      const seat = await prisma.seat.findUnique({ where: { id: seatId } });
-      if (!seat || seat.zoneId !== zoneId) {
-        return res.status(404).json({ success: false, error: 'Seat not found in this zone' });
+      if (seatIds.length !== totalNeeded) {
+        return res.status(400).json({ success: false, error: `Select exactly ${totalNeeded} seat(s)` });
       }
-      const isTaken = await prisma.ticket.findFirst({
-        where: { seatId, status: { in: activeStatuses } },
+      if (new Set(seatIds).size !== seatIds.length) {
+        return res.status(400).json({ success: false, error: 'Duplicate seats selected' });
+      }
+
+      const seats = await prisma.seat.findMany({ where: { id: { in: seatIds }, zoneId } });
+      if (seats.length !== seatIds.length) {
+        return res.status(404).json({ success: false, error: 'One or more seats not found in this zone' });
+      }
+      const taken = await prisma.ticket.findFirst({
+        where: { seatId: { in: seatIds }, status: { in: activeStatuses } },
       });
-      if (isTaken) {
-        return res.status(409).json({ success: false, error: 'Seat is already taken' });
+      if (taken) {
+        return res.status(409).json({ success: false, error: 'One or more seats are already taken' });
       }
-      const ticket = await prisma.ticket.create({
+
+      const people = [{ name, seatId: seatIds[0] }, ...guests.map((g, i) => ({ name: g.name, seatId: seatIds[i + 1] }))];
+      const groupId = guests.length > 0 ? undefined : undefined; // set after first create
+
+      const mainTicket = await prisma.ticket.create({
         data: {
-          name, phone, venueId, zoneId,
-          zoneName: zone.name,
-          cardNumber: zone.cardNumber,
-          price: zone.price,
-          status: 'BOOKED',
-          bookedAt: now,
-          seatId,
+          name: people[0].name, phone, venueId, zoneId,
+          zoneName: zone.name, cardNumber: zone.cardNumber,
+          price: zone.price, status: 'BOOKED', bookedAt: now,
+          seatId: people[0].seatId,
         },
       });
+
+      const resolvedGroupId = guests.length > 0 ? mainTicket.id : null;
+      if (resolvedGroupId) {
+        await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId: resolvedGroupId } });
+        await prisma.ticket.createMany({
+          data: people.slice(1).map(p => ({
+            name: p.name, phone, venueId, zoneId,
+            zoneName: zone.name, cardNumber: zone.cardNumber,
+            price: zone.price, status: 'BOOKED' as const, bookedAt: now,
+            seatId: p.seatId, groupId: resolvedGroupId,
+          })),
+        });
+      }
+
       return res.status(201).json({
         success: true,
-        data: { id: ticket.id, groupId: null, totalPrice: zone.price, cardNumber: zone.cardNumber },
+        data: {
+          id: mainTicket.id,
+          groupId: resolvedGroupId,
+          totalPrice: zone.price * totalNeeded,
+          cardNumber: zone.cardNumber,
+        },
       });
     }
 
