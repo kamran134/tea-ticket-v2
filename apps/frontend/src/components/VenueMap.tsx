@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { Zone, Venue } from '../types';
 import { formatPrice } from '../types';
 
@@ -24,6 +25,7 @@ function getZoneColor(zone: Zone, index: number): string {
 }
 
 export function VenueMap({ venue, zones, selectedZoneId, currency, onZoneClick }: Props) {
+  const [aspectPercent, setAspectPercent] = useState(56.25);
   const mappedZones = zones.filter(z => z.layoutData !== null);
   const unmappedZones = zones.filter(z => z.layoutData === null);
 
@@ -34,15 +36,21 @@ export function VenueMap({ venue, zones, selectedZoneId, currency, onZoneClick }
       {/* Map canvas */}
       <div
         className="relative w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100"
-        style={{ paddingBottom: '56.25%' /* 16:9 */ }}
+        style={{ paddingBottom: `${aspectPercent}%` }}
       >
         {/* Floor plan image */}
         {venue.floorPlanImage && (
           <img
             src={venue.floorPlanImage}
             alt="Floor plan"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain"
             draggable={false}
+            onLoad={e => {
+              const img = e.currentTarget;
+              if (img.naturalWidth > 0) {
+                setAspectPercent((img.naturalHeight / img.naturalWidth) * 100);
+              }
+            }}
           />
         )}
 

@@ -34,7 +34,15 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
   );
   const [saving, setSaving] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [aspectPercent, setAspectPercent] = useState(56.25);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0) {
+      setAspectPercent((img.naturalHeight / img.naturalWidth) * 100);
+    }
+  };
 
   const saveLayout = useCallback(async (zoneId: string, layout: ZoneLayoutData) => {
     setSaving(zoneId);
@@ -185,14 +193,15 @@ export function ZoneMapEditor({ venue, zones, onVenueUpdated, onZoneUpdated }: P
       <div
         ref={containerRef}
         className="relative w-full rounded-xl overflow-hidden border-2 border-dashed border-gray-300 bg-gray-50 select-none"
-        style={{ paddingBottom: '56.25%' }}
+        style={{ paddingBottom: `${aspectPercent}%` }}
       >
         {venue.floorPlanImage ? (
           <img
             src={venue.floorPlanImage}
             alt="Floor plan"
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain"
             draggable={false}
+            onLoad={handleImageLoad}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
