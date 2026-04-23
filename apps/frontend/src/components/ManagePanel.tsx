@@ -56,6 +56,7 @@ export function ManagePanel() {
   // Zones
   const [selectedVenueId, setSelectedVenueId] = useState('');
   const [zones, setZones] = useState<Zone[]>([]);
+  const [zoneTickets, setZoneTickets] = useState<Ticket[]>([]);
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
   const [newZone, setNewZone] = useState(ZONE_DEFAULTS);
 
@@ -94,8 +95,9 @@ export function ManagePanel() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (!selectedVenueId) { setZones([]); return; }
-    api.getZones(selectedVenueId).then(setZones);
+    if (!selectedVenueId) { setZones([]); setZoneTickets([]); return; }
+    Promise.all([api.getZones(selectedVenueId), api.getTickets(selectedVenueId)])
+      .then(([z, t]) => { setZones(z); setZoneTickets(t); });
   }, [selectedVenueId]);
 
   const loadTickets = () => {
@@ -246,6 +248,19 @@ export function ManagePanel() {
 
   const selectedVenue = venues.find(v => v.id === selectedVenueId);
   const zoneCurrency = selectedVenue?.currency ?? '₼';
+
+  const zoneRevenue = useMemo(() => {
+    if (!zones.length || !zoneTickets.length) return null;
+    let confirmed = 0;
+    let pending = 0;
+    for (const z of zones) {
+      const zt = zoneTickets.filter(t => t.zoneId === z.id);
+      confirmed += zt.filter(t => t.status === 'CONFIRMED').length * z.price;
+      pending += zt.filter(t => t.status === 'PENDING').length * z.price;
+    }
+    return { confirmed, pending };
+  }, [zones, zoneTickets]);
+
   const filterVenue = venues.find(v => v.id === filterVenueId);
   const ticketCurrency = filterVenue?.currency ?? '₼';
 
@@ -527,6 +542,23 @@ export function ManagePanel() {
                     )}
                   </div>
                 </form>
+
+                {zoneRevenue && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+                      <div className="text-xs text-emerald-600">Подтверждённая выручка</div>
+                      <div className="text-base font-bold text-emerald-700 mt-0.5">
+                        {formatPrice(zoneRevenue.confirmed, zoneCurrency)}
+                      </div>
+                    </div>
+                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+                      <div className="text-xs text-amber-600">Ожидаемая выручка</div>
+                      <div className="text-base font-bold text-amber-700 mt-0.5">
+                        {formatPrice(zoneRevenue.pending, zoneCurrency)}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   {zones.map(z => (
