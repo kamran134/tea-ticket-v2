@@ -732,6 +732,15 @@ export function ManagePanel() {
               ))}
             </select>
 
+            {selectedVenueId && zones.length > 0 && (
+              <div className="bg-emerald-50 rounded-xl px-4 py-3 border border-emerald-100 flex justify-between items-center">
+                <span className="text-sm text-emerald-700">Выручка при полной продаже</span>
+                <span className="font-bold text-emerald-800">
+                  {formatPrice(zones.reduce((s, z) => s + z.capacity * z.price, 0), zoneCurrency)}
+                </span>
+              </div>
+            )}
+
             {selectedVenueId && selectedVenue && (
               <ZoneMapEditor
                 venue={selectedVenue}
