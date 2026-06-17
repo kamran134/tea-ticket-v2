@@ -6,11 +6,12 @@ import { toast } from '../services/toast';
 import { StatsTab } from './StatsTab';
 import { ZoneConfigurator } from './ZoneConfigurator';
 import { ZoneMapEditor } from './ZoneMapEditor';
+import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
-type Tab = 'venues' | 'zones' | 'map' | 'tickets' | 'stats';
+type Tab = 'venues' | 'zones' | 'map' | 'gridmap' | 'tickets' | 'stats';
 type TicketFilter = TicketStatus | 'ALL';
 
 const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
@@ -280,6 +281,7 @@ export function ManagePanel() {
     venues: 'Мероприятия',
     zones: 'Зоны',
     map: 'Схема',
+    gridmap: 'Сетка',
     tickets: 'Билеты',
     stats: 'Статистика',
   };
@@ -325,7 +327,7 @@ export function ManagePanel() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(['venues', 'zones', 'map', 'tickets', 'stats'] as Tab[]).map(t => (
+          {(['venues', 'zones', 'map', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -754,6 +756,34 @@ export function ManagePanel() {
               <p className="text-sm text-gray-400 text-center py-8">
                 Сначала создайте зоны во вкладке «Зоны»
               </p>
+            )}
+          </div>
+        )}
+
+        {/* GRID MAP TAB */}
+        {tab === 'gridmap' && (
+          <div className="space-y-4">
+            <select
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              value={selectedVenueId}
+              onChange={e => setSelectedVenueId(e.target.value)}
+            >
+              <option value="">Выберите мероприятие</option>
+              {venues.map(v => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+
+            {selectedVenueId && selectedVenue && (
+              <GridMapEditor
+                key={selectedVenueId}
+                venue={selectedVenue}
+                onVenueUpdated={updated => setVenues(vs => vs.map(v => v.id === updated.id ? updated : v))}
+              />
+            )}
+
+            {selectedVenueId && !selectedVenue && (
+              <p className="text-sm text-gray-400 text-center py-8">Загрузка...</p>
             )}
           </div>
         )}

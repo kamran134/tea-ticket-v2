@@ -33,6 +33,7 @@ model Venue {
   active         Boolean  @default(true)
   currency       String   @default("₼")
   floorPlanImage String?
+  gridLayout     Json?
   createdAt      DateTime @default(now())
   zones          Zone[]
   tickets        Ticket[]

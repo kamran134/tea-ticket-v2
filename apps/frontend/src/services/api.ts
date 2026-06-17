@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData } from '../types';
+import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -231,6 +231,14 @@ export const api = {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify({ layoutData, ...(type && { type }) }),
+    });
+  },
+
+  async saveGridLayout(venueId: string, layout: GridLayout): Promise<Venue> {
+    return request(`/api/venues/${encodeURIComponent(venueId)}/grid-layout`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(layout),
     });
   },
 };

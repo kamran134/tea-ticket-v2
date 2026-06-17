@@ -15,6 +15,22 @@ export function formatPrice(amount: number, currency: Currency | string): string
   return `${formatted} ${currency}`;
 }
 
+export type GridCellState = 'empty' | 'blocked' | string;
+
+export interface GridZone {
+  id: string;
+  name: string;
+  color: string;
+  pricePerSeat: number;
+}
+
+export interface GridLayout {
+  rows: number;
+  cols: number;
+  cells: GridCellState[][];
+  zones: GridZone[];
+}
+
 export interface Venue {
   id: string;
   name: string;
@@ -22,6 +38,7 @@ export interface Venue {
   active: boolean;
   currency: Currency;
   floorPlanImage: string | null;
+  gridLayout: GridLayout | null;
 }
 
 export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';

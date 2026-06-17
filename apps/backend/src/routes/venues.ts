@@ -80,6 +80,37 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   }
 });
 
+// PUT /api/venues/:id/grid-layout
+const gridZoneSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(100),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  pricePerSeat: z.number().min(0),
+});
+
+const gridLayoutSchema = z.object({
+  rows: z.number().int().min(1).max(100),
+  cols: z.number().int().min(1).max(100),
+  cells: z.array(z.array(z.string())),
+  zones: z.array(gridZoneSchema),
+});
+
+venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
+  const parsed = gridLayoutSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
+  }
+  try {
+    const venue = await prisma.venue.update({
+      where: { id: req.params.id },
+      data: { gridLayout: parsed.data },
+    });
+    return res.json({ success: true, data: venue });
+  } catch {
+    return res.status(404).json({ success: false, error: 'Venue not found' });
+  }
+});
+
 // POST /api/venues/:id/upload-floor-plan
 venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPlan'), async (req, res) => {
   if (!req.file) {
