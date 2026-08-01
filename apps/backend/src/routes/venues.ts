@@ -3,6 +3,7 @@ import { Prisma, PrismaClient, TicketStatus } from '@prisma/client';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
+import { generateVenueSlug, slugify } from '../services/slug';
 import { z } from 'zod';
 
 const upload = multer({
@@ -18,14 +19,46 @@ export const venuesRouter = Router();
 
 venuesRouter.get('/', async (req, res) => {
   const all = req.query.all === 'true';
+  const upcoming = req.query.upcoming === 'true';
   try {
     const venues = await prisma.venue.findMany({
-      where: all ? undefined : { active: true },
-      orderBy: { date: 'desc' },
+      where: upcoming
+        ? { active: true, date: { gte: new Date() } }
+        : (all ? undefined : { active: true }),
+      orderBy: { date: upcoming ? 'asc' : 'desc' },
     });
     return res.json({ success: true, data: venues });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch venues' });
+  }
+});
+
+// GET /api/venues/slug-available?slug=&excludeId=  (admin: live availability check)
+venuesRouter.get('/slug-available', requireAuth, async (req, res) => {
+  const { slug, excludeId } = req.query;
+  if (!slug || typeof slug !== 'string') {
+    return res.status(400).json({ success: false, error: 'slug is required' });
+  }
+  const normalized = slugify(slug);
+  try {
+    const existing = await prisma.venue.findUnique({ where: { slug: normalized } });
+    const available = !existing || existing.id === excludeId;
+    return res.json({ success: true, data: { slug: normalized, available } });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to check slug' });
+  }
+});
+
+// GET /api/venues/by-slug/:slug  (public: resolve a venue for its event page)
+venuesRouter.get('/by-slug/:slug', async (req, res) => {
+  try {
+    const venue = await prisma.venue.findUnique({ where: { slug: req.params.slug } });
+    if (!venue || !venue.active) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    return res.json({ success: true, data: venue });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to fetch venue' });
   }
 });
 
@@ -35,6 +68,7 @@ const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
   currency: z.enum(ALLOWED_CURRENCIES).default('₼'),
+  slug: z.string().min(1).max(100).optional(),
 });
 
 venuesRouter.post('/', requireAuth, async (req, res) => {
@@ -42,16 +76,25 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
+  const date = new Date(parsed.data.date);
+  const slug = parsed.data.slug ? slugify(parsed.data.slug) : generateVenueSlug(parsed.data.name, date);
+  if (!slug) {
+    return res.status(400).json({ success: false, error: 'Could not derive a slug from the name' });
+  }
   try {
     const venue = await prisma.venue.create({
       data: {
         name: parsed.data.name,
-        date: new Date(parsed.data.date),
+        date,
         currency: parsed.data.currency,
+        slug,
       },
     });
     return res.status(201).json({ success: true, data: venue });
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return res.status(409).json({ success: false, error: `Slug "${slug}" is already taken` });
+    }
     return res.status(500).json({ success: false, error: 'Failed to create venue' });
   }
 });
@@ -60,8 +103,10 @@ const patchVenueSchema = z.object({
   active: z.boolean().optional(),
   currency: z.enum(ALLOWED_CURRENCIES).optional(),
   floorPlanImage: z.string().nullable().optional(),
-}).refine(d => d.active !== undefined || d.currency !== undefined || d.floorPlanImage !== undefined, {
-  message: 'Provide active, currency, or floorPlanImage',
+  posterImage: z.string().nullable().optional(),
+  slug: z.string().min(1).max(100).optional(),
+}).refine(d => Object.values(d).some(v => v !== undefined), {
+  message: 'Provide active, currency, floorPlanImage, posterImage, or slug',
 });
 
 venuesRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -69,13 +114,21 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
+  const { slug, ...rest } = parsed.data;
+  const normalizedSlug = slug !== undefined ? slugify(slug) : undefined;
+  if (slug !== undefined && !normalizedSlug) {
+    return res.status(400).json({ success: false, error: 'Invalid slug' });
+  }
   try {
     const venue = await prisma.venue.update({
       where: { id: req.params.id },
-      data: parsed.data,
+      data: { ...rest, ...(normalizedSlug !== undefined && { slug: normalizedSlug }) },
     });
     return res.json({ success: true, data: venue });
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return res.status(409).json({ success: false, error: `Slug "${normalizedSlug}" is already taken` });
+    }
     return res.status(404).json({ success: false, error: 'Venue not found' });
   }
 });
@@ -243,5 +296,25 @@ venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPla
   } catch (err) {
     console.error('[upload-floor-plan]', err);
     return res.status(500).json({ success: false, error: 'Failed to upload floor plan' });
+  }
+});
+
+// POST /api/venues/:id/upload-poster
+venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, error: 'No file uploaded' });
+  }
+  try {
+    const ext = req.file.originalname.split('.').pop() ?? 'jpg';
+    const key = `posters/${req.params.id}/${Date.now()}.${ext}`;
+    const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
+    const venue = await prisma.venue.update({
+      where: { id: req.params.id },
+      data: { posterImage: url },
+    });
+    return res.json({ success: true, data: venue });
+  } catch (err) {
+    console.error('[upload-poster]', err);
+    return res.status(500).json({ success: false, error: 'Failed to upload poster' });
   }
 });

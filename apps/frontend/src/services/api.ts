@@ -27,8 +27,24 @@ export const api = {
     });
   },
 
-  async getVenues(all = false): Promise<Venue[]> {
-    return request(`/api/venues${all ? '?all=true' : ''}`);
+  async getVenues(opts: { all?: boolean; upcoming?: boolean } = {}): Promise<Venue[]> {
+    const params = new URLSearchParams();
+    if (opts.all) params.set('all', 'true');
+    if (opts.upcoming) params.set('upcoming', 'true');
+    const qs = params.toString();
+    return request(`/api/venues${qs ? `?${qs}` : ''}`);
+  },
+
+  async getVenueBySlug(slug: string): Promise<Venue> {
+    return request(`/api/venues/by-slug/${encodeURIComponent(slug)}`);
+  },
+
+  async checkSlugAvailable(slug: string, excludeId?: string): Promise<{ slug: string; available: boolean }> {
+    const params = new URLSearchParams({ slug });
+    if (excludeId) params.set('excludeId', excludeId);
+    return request(`/api/venues/slug-available?${params.toString()}`, {
+      headers: authHeaders(),
+    });
   },
 
   async toggleVenue(id: string, active: boolean): Promise<Venue> {
@@ -65,6 +81,27 @@ export const api = {
       method: 'PATCH',
       headers: authHeaders(),
       body: JSON.stringify({ floorPlanImage: null }),
+    });
+  },
+
+  async uploadPoster(id: string, file: File): Promise<Venue> {
+    const formData = new FormData();
+    formData.append('poster', file);
+    const res = await fetch(`${API_URL}/api/venues/${encodeURIComponent(id)}/upload-poster`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData,
+    });
+    const json: ApiResponse<Venue> = await res.json();
+    if (!json.success || !json.data) throw new Error(json.error ?? 'Upload failed');
+    return json.data;
+  },
+
+  async updateVenueSlug(id: string, slug: string): Promise<Venue> {
+    return request(`/api/venues/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ slug }),
     });
   },
 
@@ -147,11 +184,11 @@ export const api = {
     });
   },
 
-  async createVenue(name: string, date: string, currency: Currency): Promise<Venue> {
+  async createVenue(name: string, date: string, currency: Currency, slug?: string): Promise<Venue> {
     return request('/api/venues', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ name, date, currency }),
+      body: JSON.stringify({ name, date, currency, ...(slug && { slug }) }),
     });
   },
 

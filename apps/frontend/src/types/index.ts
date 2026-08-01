@@ -26,10 +26,12 @@ export interface GridLayout {
 export interface Venue {
   id: string;
   name: string;
+  slug: string;
   date: string;
   active: boolean;
   currency: Currency;
   floorPlanImage: string | null;
+  posterImage: string | null;
   gridLayout: GridLayout | null;
 }
 

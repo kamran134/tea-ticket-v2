@@ -90,4 +90,51 @@
 
 ## Этап 11: Проверка
 - [x] Typecheck/build backend и frontend (`tsc --noEmit` + `tsc` + `vite build` — чисто)
-- [ ] Дождаться подтверждения перед пушем — меняется реальный флоу приёма денег
+- [x] Дождаться подтверждения перед пушем — меняется реальный флоу приёма денег
+
+---
+
+# Часть 3: Афиша на главной + страница мероприятия по слагу
+
+## Концепция
+`/` — афиша (карточки с постером, только active + дата в будущем).
+`/e/:slug` — страница конкретного мероприятия (текущий RegisterForm, но без
+выпадающего списка мероприятий — venue всегда определяется слагом из URL).
+Один Vite entry (`index.html`/`main.tsx`), выбор Afisha/RegisterForm по pathname.
+
+## Этап 12: БД
+- [x] `Venue.slug String @unique`, `Venue.posterImage String?`
+- [x] Миграция: добавить колонки, бэкофилл `slug = id` для существующих строк,
+      `NOT NULL` + уникальный индекс
+
+## Этап 13: Backend
+- [x] `services/slug.ts` — транслитерация RU→EN + `generateVenueSlug(name, date)`
+- [x] `POST /api/venues` — принимает необязательный `slug` (иначе автогенерация),
+      409 при коллизии (`P2002`)
+- [x] `PATCH /api/venues/:id` — добавить `slug`, `posterImage`
+- [x] `GET /api/venues/slug-available?slug=&excludeId=` — проверка занятости (admin)
+- [x] `GET /api/venues/by-slug/:slug` — публичный резолвинг для страницы мероприятия
+      (только active, иначе 404 — как уже ведёт себя текущий флоу)
+- [x] `POST /api/venues/:id/upload-poster` — по аналогии с upload-floor-plan
+- [x] `GET /api/venues?upcoming=true` — только active + дата в будущем, сортировка по дате
+
+## Этап 14: Frontend — типы и API
+- [x] `types/index.ts`: `Venue.slug`, `Venue.posterImage`
+- [x] `api.ts`: `getVenues` с `upcoming`, `getVenueBySlug`, `checkSlugAvailable`, `uploadPoster`,
+      `createVenue`/`updateVenue` — `slug`
+
+## Этап 15: Frontend — Афиша + роутинг
+- [x] `Afisha.tsx` — карточки (постер/заглушка, название, дата) → ссылка `/e/{slug}`
+- [x] `main.tsx` — по pathname рендерит `Afisha` или `RegisterForm(slug)`
+- [x] `RegisterForm.tsx` — убрать список мероприятий, резолвить venue по `slug`-пропу
+- [x] `nginx.conf` (frontend-контейнер) — `location /e/ { try_files $uri /index.html; }`
+
+## Этап 16: Frontend — админка
+- [x] Форма создания мероприятия: поле «Слаг» с live-автогенерацией из
+      названия+даты, редактируемое, проверка занятости (debounce)
+- [x] На карточке мероприятия: изменить слаг, загрузить постер
+- [x] «Скопировать ссылку» → `/e/{slug}` вместо `/?venue={id}`
+
+## Этап 17: Проверка
+- [x] Typecheck/build backend и frontend
+- [ ] Подтвердить перед пушем — меняется главная страница и формат ссылок

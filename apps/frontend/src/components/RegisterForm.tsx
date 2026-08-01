@@ -13,10 +13,14 @@ const ZONE_TYPE_BADGE: Record<string, string> = {
   TABLE: 'Столы',
 };
 
-export function RegisterForm() {
-  const [venues, setVenues] = useState<Venue[]>([]);
+interface Props {
+  slug: string;
+}
+
+export function RegisterForm({ slug }: Props) {
+  const [venue, setVenue] = useState<Venue | null>(null);
+  const [venueNotFound, setVenueNotFound] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
-  const [venueId, setVenueId] = useState('');
   const [zoneId, setZoneId] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -34,18 +38,15 @@ export function RegisterForm() {
   const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const venueParam = params.get('venue');
-    api.getVenues().then(v => {
-      setVenues(v);
-      if (venueParam) setVenueId(venueParam);
-    });
-  }, []);
+    api.getVenueBySlug(slug)
+      .then(setVenue)
+      .catch(() => setVenueNotFound(true));
+  }, [slug]);
 
   useEffect(() => {
-    if (!venueId) { setZones([]); setZoneId(''); return; }
-    api.getZones(venueId).then(setZones);
-  }, [venueId]);
+    if (!venue) return;
+    api.getZones(venue.id).then(setZones);
+  }, [venue]);
 
   useEffect(() => {
     setSelectedSeatIds(pendingSeatId ? [pendingSeatId] : []);
@@ -69,13 +70,12 @@ export function RegisterForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoneId, zones]);
 
-  const selectedVenue = venues.find(v => v.id === venueId);
-  const currency = selectedVenue?.currency ?? '₼';
+  const currency = venue?.currency ?? '₼';
   const selectedZone = zones.find(z => z.id === zoneId);
   const selectedTable = tables.find(t => t.id === selectedTableId);
 
-  const hasGridZones = !!selectedVenue?.gridLayout &&
-    zones.some(z => selectedVenue.gridLayout!.cells.some(row => row.includes(z.id)));
+  const hasGridZones = !!venue?.gridLayout &&
+    zones.some(z => venue.gridLayout!.cells.some(row => row.includes(z.id)));
   const hasSchemaZones = zones.some(z => z.layoutData !== null);
 
   const neededSeats = 1 + guests.length;
@@ -131,13 +131,14 @@ export function RegisterForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!venue) return;
     setError('');
     setLoading(true);
     try {
       const result = await api.register({
         name: name.trim(),
         phone: phone.trim(),
-        venueId,
+        venueId: venue.id,
         zoneId,
         guests,
         ...(selectedSeatIds.length > 0 && { seatIds: selectedSeatIds }),
@@ -151,12 +152,37 @@ export function RegisterForm() {
     }
   };
 
+  if (venueNotFound) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+        <div className="text-center">
+          <div className="text-4xl mb-2">🔍</div>
+          <h1 className="text-xl font-semibold text-gray-700">Мероприятие не найдено</h1>
+          <p className="text-gray-500 mt-1">Возможно, ссылка устарела или мероприятие уже прошло.</p>
+          <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">На афишу</a>
+        </div>
+      </div>
+    );
+  }
+
+  if (!venue) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-gray-400">
+        Загрузка...
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-emerald-800">🍵 Tea Ticket</h1>
-          <p className="text-gray-600 mt-2">Забронируйте место на мероприятие</p>
+          <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
+          <p className="text-gray-600 mt-2">
+            {new Date(venue.date).toLocaleString('ru-RU', {
+              day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+            })}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -165,32 +191,13 @@ export function RegisterForm() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {venues.length > 1 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Мероприятие</label>
-                <select
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                  value={venueId}
-                  onChange={e => setVenueId(e.target.value)}
-                  required
-                >
-                  <option value="">Выберите мероприятие</option>
-                  {venues.map(v => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} ({new Date(v.date).toLocaleDateString('ru-RU')})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* Zone selector: map if available, cards otherwise */}
             {zones.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Зона</label>
-                {selectedVenue && hasGridZones ? (
+                {hasGridZones ? (
                   <VenueGridMap
-                    venue={selectedVenue}
+                    venue={venue}
                     zones={zones}
                     selectedZoneId={zoneId}
                     currency={currency}
@@ -199,9 +206,9 @@ export function RegisterForm() {
                     onZoneClick={z => setZoneId(z.id)}
                     onSeatToggle={selectGridSeat}
                   />
-                ) : selectedVenue && hasSchemaZones ? (
+                ) : hasSchemaZones ? (
                   <VenueMap
-                    venue={selectedVenue}
+                    venue={venue}
                     zones={zones}
                     selectedZoneId={zoneId}
                     currency={currency}

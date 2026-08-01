@@ -29,10 +29,12 @@ enum TableShape {
 model Venue {
   id             String   @id @default(cuid())
   name           String
+  slug           String   @unique
   date           DateTime
   active         Boolean  @default(true)
   currency       String   @default("₼")
   floorPlanImage String?
+  posterImage    String?
   gridLayout     Json?
   createdAt      DateTime @default(now())
   zones          Zone[]

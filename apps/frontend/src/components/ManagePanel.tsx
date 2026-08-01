@@ -3,6 +3,7 @@ import { api } from '../services/api';
 import type { Venue, Zone, Ticket, Currency, TicketStatus } from '../types';
 import { CURRENCIES, formatPrice } from '../types';
 import { toast } from '../services/toast';
+import { generateVenueSlug, slugify } from '../utils/slug';
 import { StatsTab } from './StatsTab';
 import { ZoneConfigurator } from './ZoneConfigurator';
 import { ZoneMapEditor } from './ZoneMapEditor';
@@ -54,6 +55,12 @@ export function ManagePanel() {
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueDate, setNewVenueDate] = useState('');
   const [newVenueCurrency, setNewVenueCurrency] = useState<Currency>('₼');
+  const [newVenueSlug, setNewVenueSlug] = useState('');
+  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [editingSlugId, setEditingSlugId] = useState<string | null>(null);
+  const [editingSlugValue, setEditingSlugValue] = useState('');
+  const [uploadingPosterId, setUploadingPosterId] = useState<string | null>(null);
 
   // Zones
   const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -93,7 +100,7 @@ export function ManagePanel() {
 
   useEffect(() => {
     if (!authenticated) return;
-    api.getVenues(true).then(setVenues);
+    api.getVenues({ all: true }).then(setVenues);
   }, [authenticated]);
 
   useEffect(() => {
@@ -101,6 +108,24 @@ export function ManagePanel() {
     Promise.all([api.getZones(selectedVenueId), api.getTickets(selectedVenueId)])
       .then(([z, t]) => { setZones(z); setZoneTickets(t); });
   }, [selectedVenueId]);
+
+  // Auto-suggest a slug from name+date until the admin edits it by hand
+  useEffect(() => {
+    if (slugManuallyEdited) return;
+    setNewVenueSlug(generateVenueSlug(newVenueName, newVenueDate));
+  }, [newVenueName, newVenueDate, slugManuallyEdited]);
+
+  // Debounced availability check for the new-venue slug
+  useEffect(() => {
+    if (!newVenueSlug) { setSlugStatus('idle'); return; }
+    setSlugStatus('checking');
+    const t = setTimeout(() => {
+      api.checkSlugAvailable(newVenueSlug)
+        .then(r => setSlugStatus(r.available ? 'available' : 'taken'))
+        .catch(() => setSlugStatus('idle'));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [newVenueSlug]);
 
   const loadTickets = () => {
     setTicketsLoading(true);
@@ -125,11 +150,15 @@ export function ManagePanel() {
         newVenueName.trim(),
         new Date(newVenueDate).toISOString(),
         newVenueCurrency,
+        newVenueSlug || undefined,
       );
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
       setNewVenueCurrency('₼');
+      setNewVenueSlug('');
+      setSlugManuallyEdited(false);
+      setSlugStatus('idle');
       toast.success('Мероприятие создано');
     } catch (err) {
       toast.error(errMsg(err));
@@ -145,9 +174,35 @@ export function ManagePanel() {
     }
   };
 
-  const copyRegistrationLink = (venueId: string) => {
-    const url = `${window.location.origin}/?venue=${venueId}`;
+  const copyRegistrationLink = (slug: string) => {
+    const url = `${window.location.origin}/e/${slug}`;
     navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
+  };
+
+  const saveVenueSlug = async (id: string) => {
+    const slug = slugify(editingSlugValue);
+    if (!slug) { toast.error('Пустой слаг'); return; }
+    try {
+      const updated = await api.updateVenueSlug(id, slug);
+      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
+      setEditingSlugId(null);
+      toast.success('Слаг обновлён');
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
+  };
+
+  const uploadPoster = async (id: string, file: File) => {
+    setUploadingPosterId(id);
+    try {
+      const updated = await api.uploadPoster(id, file);
+      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
+      toast.success('Постер загружен');
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setUploadingPosterId(null);
+    }
   };
 
   // --- Zone handlers ---
@@ -377,9 +432,33 @@ export function ManagePanel() {
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
+              <div>
+                <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
+                  <span className="font-mono">/e/</span>
+                  <span>слаг ссылки на страницу мероприятия</span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="letnyaya-vecherinka-2026-08-15"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                  value={newVenueSlug}
+                  onChange={e => { setSlugManuallyEdited(true); setNewVenueSlug(slugify(e.target.value)); }}
+                  required
+                />
+                {slugStatus === 'checking' && (
+                  <p className="text-xs text-gray-400 mt-1">Проверка...</p>
+                )}
+                {slugStatus === 'available' && (
+                  <p className="text-xs text-emerald-600 mt-1">✓ свободен</p>
+                )}
+                {slugStatus === 'taken' && (
+                  <p className="text-xs text-red-600 mt-1">Уже занят, выберите другой</p>
+                )}
+              </div>
               <button
                 type="submit"
-                className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+                disabled={slugStatus === 'taken'}
+                className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
               >
                 Создать
               </button>
@@ -388,31 +467,92 @@ export function ManagePanel() {
             <div className="space-y-2">
               {venues.map(v => (
                 <div key={v.id} className="bg-white rounded-xl shadow-sm p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <div className="font-semibold text-gray-800">
-                          {v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span>
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="flex gap-3 min-w-0">
+                      {v.posterImage ? (
+                        <img
+                          src={v.posterImage}
+                          alt=""
+                          className="w-14 h-14 rounded-lg object-cover shrink-0 border border-gray-100"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-xl shrink-0">
+                          🍵
                         </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {v.active ? 'Активно' : 'Скрыто'}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-500 mt-0.5">
-                        {new Date(v.date).toLocaleString('ru-RU')}
+                      )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="font-semibold text-gray-800">
+                            {v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {v.active ? 'Активно' : 'Скрыто'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-gray-500 mt-0.5">
+                          {new Date(v.date).toLocaleString('ru-RU')}
+                        </div>
+
+                        {editingSlugId === v.id ? (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className="text-xs text-gray-400 font-mono shrink-0">/e/</span>
+                            <input
+                              type="text"
+                              autoFocus
+                              className="border border-gray-300 rounded px-2 py-1 text-xs font-mono w-40 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              value={editingSlugValue}
+                              onChange={e => setEditingSlugValue(e.target.value)}
+                              onKeyDown={e => e.key === 'Enter' && saveVenueSlug(v.id)}
+                            />
+                            <button
+                              onClick={() => saveVenueSlug(v.id)}
+                              className="text-xs text-emerald-700 hover:underline shrink-0"
+                            >
+                              Сохранить
+                            </button>
+                            <button
+                              onClick={() => setEditingSlugId(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600 shrink-0"
+                            >
+                              Отмена
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => { setEditingSlugId(v.id); setEditingSlugValue(v.slug); }}
+                            className="text-xs text-gray-400 hover:text-emerald-700 font-mono mt-1.5 truncate block"
+                            title="Изменить слаг"
+                          >
+                            /e/{v.slug}
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-1.5 ml-4 shrink-0">
                       {v.active && (
                         <button
-                          onClick={() => copyRegistrationLink(v.id)}
+                          onClick={() => copyRegistrationLink(v.slug)}
                           className="text-xs text-emerald-700 hover:underline"
                         >
                           Скопировать ссылку
                         </button>
                       )}
+                      <label className="text-xs text-gray-400 hover:text-emerald-700 cursor-pointer">
+                        {uploadingPosterId === v.id ? 'Загрузка...' : v.posterImage ? 'Сменить постер' : 'Загрузить постер'}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingPosterId === v.id}
+                          onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file) uploadPoster(v.id, file);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
                       <button
                         onClick={() => toggleVenueActive(v.id, !v.active)}
                         className={`text-xs hover:underline ${
