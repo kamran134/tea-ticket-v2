@@ -482,7 +482,7 @@ export function RegisterForm({ slug }: Props) {
               disabled={loading || !canSubmit}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+              {loading ? 'Покупка...' : 'Купить'}
             </button>
           </form>
         </div>

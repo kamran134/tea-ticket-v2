@@ -407,9 +407,14 @@ export function ManagePanel() {
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Управление</h1>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            Выйти
-          </button>
+          <div className="flex items-center gap-3">
+            <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
+              Сканер
+            </a>
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+              Выйти
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
