@@ -6,6 +6,7 @@ import { authRouter } from './routes/auth';
 import { ticketsRouter } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
 import { zonesRouter } from './routes/zones';
+import { gridTemplatesRouter } from './routes/grid-templates';
 import { startCronJobs } from './services/cron';
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/tickets', ticketsRouter);
 app.use('/api/venues', venuesRouter);
 app.use('/api/zones', zonesRouter);
+app.use('/api/grid-templates', gridTemplatesRouter);
 
 startCronJobs();
 

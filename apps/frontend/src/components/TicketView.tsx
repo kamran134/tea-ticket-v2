@@ -95,7 +95,10 @@ export function TicketView() {
               {members.length > 1 ? `Итого · ${members.length} чел.` : 'Стоимость'}
             </span>
             <span className="text-xl font-bold text-emerald-700">
-              {formatPrice(members.length > 1 ? ticket.price * members.length : ticket.price, currency)}
+              {formatPrice(
+                members.length > 1 ? members.reduce((sum, m) => sum + m.price, 0) : ticket.price,
+                currency,
+              )}
             </span>
           </div>
         </div>
@@ -201,14 +204,17 @@ export function TicketView() {
         {members.length > 1 && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <h3 className="font-semibold text-gray-800 mb-3">
-              Группа ({members.length} чел.)
+              {ticket.name} + {members.length - 1}
             </h3>
             <div className="space-y-2">
               {members.map(m => (
                 <div key={m.id} className="flex justify-between items-center py-1.5 border-b last:border-0">
-                  <span className="text-sm text-gray-800">{m.name}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm text-gray-800">{m.name}</div>
+                    <div className="text-xs text-gray-400">{m.zoneName}</div>
+                  </div>
                   <span
-                    className={`text-xs px-2 py-0.5 rounded-full ${
+                    className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
                       m.checkedIn ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}
                   >

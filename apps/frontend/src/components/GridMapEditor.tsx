@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, GridLayout, GridCellState } from '../types';
+import type { Venue, Zone, ZoneType, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 
@@ -53,6 +53,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     buildCells(initial?.rows ?? 10, initial?.cols ?? 15, initial?.cells),
   );
   const [zones, setZones] = useState<Zone[]>([]);
+  const [tableZones, setTableZones] = useState<Zone[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [zonesError, setZonesError] = useState(false);
   const [activeTool, setActiveTool] = useState<Tool>('block');
@@ -67,6 +68,30 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [newZoneColor, setNewZoneColor] = useState(ZONE_COLORS[0]);
   const [newZoneNoSeats, setNewZoneNoSeats] = useState(false);
   const [newZoneCapacity, setNewZoneCapacity] = useState('');
+
+  // Zone editing (name/price/capacity/color) — for both grid zones and tables
+  const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
+  const [editZoneName, setEditZoneName] = useState('');
+  const [editZonePrice, setEditZonePrice] = useState('');
+  const [editZoneCapacity, setEditZoneCapacity] = useState('');
+  const [editZoneColor, setEditZoneColor] = useState(ZONE_COLORS[0]);
+  const [savingZoneEdit, setSavingZoneEdit] = useState(false);
+
+  // Tables (not painted on the grid — managed here since "Зоны" tab is hidden)
+  const [showTableForm, setShowTableForm] = useState(false);
+  const [newTableZoneName, setNewTableZoneName] = useState('');
+  const [newTableZonePrice, setNewTableZonePrice] = useState('');
+  const [configuringTableZoneId, setConfiguringTableZoneId] = useState<string | null>(null);
+  const [tableCount, setTableCount] = useState('10');
+  const [tableChairCount, setTableChairCount] = useState('8');
+  const [savingTables, setSavingTables] = useState(false);
+
+  // Grid templates
+  const [templates, setTemplates] = useState<GridTemplateSummary[]>([]);
+  const [showSaveTemplateForm, setShowSaveTemplateForm] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
 
   // Drawing
   const isDrawing = useRef(false);
@@ -87,9 +112,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     api.getZones(venue.id)
       .then(zs => {
         if (cancelled) return;
-        const relevant = zs.filter(z => z.type !== 'TABLE');
-        setZones(relevant);
-        const validIds = new Set(relevant.map(z => z.id));
+        const gridZones = zs.filter(z => z.type !== 'TABLE');
+        setZones(gridZones);
+        setTableZones(zs.filter(z => z.type === 'TABLE'));
+        const validIds = new Set(gridZones.map(z => z.id));
         setCells(prev =>
           prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || validIds.has(c) ? c : 'empty'))),
         );
@@ -106,6 +132,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   }, [venue.id]);
 
   useEffect(() => loadZones(), [loadZones]);
+
+  useEffect(() => {
+    api.getGridTemplates().then(setTemplates).catch(() => {});
+  }, []);
 
   const applyGridSize = () => {
     const r = Math.max(1, Math.min(100, pendingRows));
@@ -180,20 +210,167 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
   };
 
-  const removeZone = useCallback(async (zoneId: string) => {
+  const removeZone = useCallback(async (zone: Zone) => {
     try {
-      await api.deleteZone(zoneId);
-      setZones(prev => prev.filter(z => z.id !== zoneId));
-      setCells(prev => prev.map(row => row.map(c => (c === zoneId ? 'empty' : c))));
-      setActiveTool(t => (t === zoneId ? 'block' : t));
+      await api.deleteZone(zone.id);
+      if (zone.type === 'TABLE') {
+        setTableZones(prev => prev.filter(z => z.id !== zone.id));
+      } else {
+        setZones(prev => prev.filter(z => z.id !== zone.id));
+        setCells(prev => prev.map(row => row.map(c => (c === zone.id ? 'empty' : c))));
+        setActiveTool(t => (t === zone.id ? 'block' : t));
+      }
       toast.success('Зона удалена');
     } catch (err) {
       toast.error(errMsg(err, 'Не удалось удалить зону — возможно, на неё уже есть билеты'));
     }
   }, []);
 
+  const startEditZone = (zone: Zone) => {
+    setEditingZoneId(zone.id);
+    setEditZoneName(zone.name);
+    setEditZonePrice(String(zone.price));
+    setEditZoneCapacity(zone.type === 'GENERAL' ? String(zone.capacity) : '');
+    setEditZoneColor(zone.color ?? ZONE_COLORS[0]);
+  };
+
+  const saveZoneEdit = async (zone: Zone) => {
+    if (!editZoneName.trim() || !editZonePrice) return;
+    setSavingZoneEdit(true);
+    try {
+      const updated = await api.updateZone(zone.id, {
+        name: editZoneName.trim(),
+        price: Number(editZonePrice),
+        ...(zone.type !== 'TABLE' && { color: editZoneColor }),
+        ...(zone.type === 'GENERAL' && editZoneCapacity && { capacity: Number(editZoneCapacity) }),
+      });
+      const apply = (list: Zone[]) => list.map(z => (z.id === updated.id ? updated : z));
+      if (zone.type === 'TABLE') setTableZones(apply); else setZones(apply);
+      setEditingZoneId(null);
+      toast.success('Зона обновлена');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось сохранить зону'));
+    } finally {
+      setSavingZoneEdit(false);
+    }
+  };
+
+  const addTableZone = async () => {
+    if (!newTableZoneName.trim() || !newTableZonePrice) return;
+    setAddingZone(true);
+    try {
+      const zone = await api.createZone({
+        venueId: venue.id,
+        name: newTableZoneName.trim(),
+        price: Number(newTableZonePrice),
+        capacity: 1,
+        sortOrder: zones.length + tableZones.length,
+        type: 'TABLE',
+        color: null,
+        layoutData: null,
+      });
+      setTableZones(prev => [...prev, zone]);
+      setShowTableForm(false);
+      setNewTableZoneName('');
+      setNewTableZonePrice('');
+      setConfiguringTableZoneId(zone.id);
+      toast.success('Зона-стол создана — настройте количество столов');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось создать зону'));
+    } finally {
+      setAddingZone(false);
+    }
+  };
+
+  const generateTablesForZone = async (zoneId: string) => {
+    const count = Number(tableCount);
+    const chairCount = Number(tableChairCount);
+    if (!count || !chairCount) return;
+    setSavingTables(true);
+    try {
+      const result = await api.generateTables(zoneId, { count, chairCount });
+      toast.success(`Создано ${result.count} столов (${result.totalSeats} мест)`);
+      const fresh = await api.getZones(venue.id);
+      setTableZones(fresh.filter(z => z.type === 'TABLE'));
+      setConfiguringTableZoneId(null);
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось создать столы'));
+    } finally {
+      setSavingTables(false);
+    }
+  };
+
   const clearAll = () => {
     setCells(buildCells(rows, cols));
+  };
+
+  const saveAsTemplate = async () => {
+    if (!templateName.trim() || zones.length === 0) return;
+    setSavingTemplate(true);
+    try {
+      const slotMap = new Map(zones.map((z, i) => [z.id, `slot-${i}`]));
+      const templateCells = cells.map(row => row.map(c => slotMap.get(c) ?? c));
+      const templateZones: GridTemplateZoneSlot[] = zones.map((z, i) => ({
+        slotId: `slot-${i}`,
+        name: z.name,
+        color: z.color,
+        type: z.type as 'GENERAL' | 'SEATED',
+        ...(z.type === 'GENERAL' && { capacity: z.capacity }),
+      }));
+      const created = await api.saveGridTemplate({
+        name: templateName.trim(), rows, cols, cells: templateCells, zones: templateZones,
+      });
+      setTemplates(prev => [
+        { id: created.id, name: created.name, rows: created.rows, cols: created.cols, zoneCount: templateZones.length, createdAt: created.createdAt },
+        ...prev,
+      ]);
+      setShowSaveTemplateForm(false);
+      setTemplateName('');
+      toast.success('Шаблон сохранён');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось сохранить шаблон'));
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const applyTemplate = async (templateId: string) => {
+    if (!templateId) return;
+    setApplyingTemplateId(templateId);
+    try {
+      const template = await api.getGridTemplate(templateId);
+      const slotToRealId = new Map<string, string>();
+      const createdZones: Zone[] = [];
+      let sortOrder = zones.length;
+      for (const slot of template.zones) {
+        const zone = await api.createZone({
+          venueId: venue.id,
+          name: slot.name,
+          price: 1, // placeholder — backend requires price > 0; admin must set the real price
+          capacity: slot.type === 'GENERAL' ? (slot.capacity ?? 1) : 1,
+          sortOrder: sortOrder++,
+          type: slot.type as ZoneType,
+          color: slot.color,
+          layoutData: null,
+        });
+        slotToRealId.set(slot.slotId, zone.id);
+        createdZones.push(zone);
+      }
+      setZones(prev => [...prev, ...createdZones]);
+      setRows(template.rows);
+      setCols(template.cols);
+      setPendingRows(template.rows);
+      setPendingCols(template.cols);
+      setCells(template.cells.map(row =>
+        row.map(c => (c === 'empty' || c === 'blocked' ? c : (slotToRealId.get(c) ?? 'empty'))),
+      ));
+      setLocked(false);
+      toast.success('Шаблон применён — проставьте цены зон и сохраните сетку');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось загрузить шаблон'));
+    } finally {
+      setApplyingTemplateId(null);
+    }
   };
 
   const revenue = useMemo(() => {
@@ -218,7 +395,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       onVenueUpdated(updatedVenue);
       setZones(updatedZones.filter(z => z.type !== 'TABLE'));
       setLocked(true);
-      toast.success('Сетка сохранена');
+      toast.success('Схема сохранена');
     } catch (err) {
       toast.error(errMsg(err, 'Ошибка сохранения'));
     } finally {
@@ -226,12 +403,84 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
   };
 
+  const zoneEditForm = (zone: Zone) => (
+    <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Название</label>
+        <input
+          type="text"
+          value={editZoneName}
+          onChange={e => setEditZoneName(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Цена ({currency})</label>
+        <input
+          type="number"
+          value={editZonePrice}
+          onChange={e => setEditZonePrice(e.target.value)}
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+          min="0"
+        />
+      </div>
+      {zone.type === 'GENERAL' && (
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Вместимость</label>
+          <input
+            type="number"
+            value={editZoneCapacity}
+            onChange={e => setEditZoneCapacity(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            min="1"
+          />
+        </div>
+      )}
+      {zone.type !== 'TABLE' && (
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Цвет</label>
+          <div className="flex gap-1 flex-wrap max-w-[160px]">
+            {ZONE_COLORS.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setEditZoneColor(c)}
+                style={{ backgroundColor: c }}
+                className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                  editZoneColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-105'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => saveZoneEdit(zone)}
+          disabled={savingZoneEdit || !editZoneName.trim() || !editZonePrice}
+          className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+        >
+          {savingZoneEdit ? '...' : 'Сохранить'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditingZoneId(null)}
+          className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          Отмена
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h3 className="font-semibold text-gray-800">Сетка зала</h3>
-        <div className="flex gap-2 items-center">
+        <h3 className="font-semibold text-gray-800">Схема зала</h3>
+        <div className="flex gap-2 items-center flex-wrap">
           {!locked && (
             <button
               type="button"
@@ -240,6 +489,31 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             >
               Очистить
             </button>
+          )}
+          {!locked && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowSaveTemplateForm(s => !s)}
+                disabled={zones.length === 0}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40"
+              >
+                Сохранить как шаблон
+              </button>
+              <select
+                value=""
+                onChange={e => applyTemplate(e.target.value)}
+                disabled={applyingTemplateId !== null || templates.length === 0}
+                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:opacity-40"
+              >
+                <option value="">
+                  {applyingTemplateId ? 'Применяю...' : templates.length === 0 ? 'Нет шаблонов' : 'Загрузить шаблон...'}
+                </option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.rows}×{t.cols}, {t.zoneCount} зон)</option>
+                ))}
+              </select>
+            </>
           )}
           {locked ? (
             <button
@@ -261,6 +535,39 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           )}
         </div>
       </div>
+
+      {showSaveTemplateForm && (
+        <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Название шаблона</label>
+            <input
+              type="text"
+              value={templateName}
+              onChange={e => setTemplateName(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              placeholder="Кирхе — основной зал"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={saveAsTemplate}
+              disabled={savingTemplate || !templateName.trim()}
+              className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+            >
+              {savingTemplate ? '...' : 'Сохранить'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSaveTemplateForm(false); setTemplateName(''); }}
+              className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Zones load status */}
       {zonesLoading && (
@@ -348,34 +655,46 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
             {/* Zone tools */}
             {zones.map((zone, i) => (
-              <div
-                key={zone.id}
-                className={`flex items-center rounded-lg border-2 transition-all overflow-hidden ${
-                  activeTool === zone.id ? 'border-gray-800' : 'border-transparent'
-                }`}
-                style={{ backgroundColor: `${zoneColor(zone, i)}18` }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setActiveTool(zone.id)}
-                  className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 text-sm"
+              editingZoneId === zone.id ? (
+                <div key={zone.id} className="w-full">{zoneEditForm(zone)}</div>
+              ) : (
+                <div
+                  key={zone.id}
+                  className={`flex items-center rounded-lg border-2 transition-all overflow-hidden ${
+                    activeTool === zone.id ? 'border-gray-800' : 'border-transparent'
+                  }`}
+                  style={{ backgroundColor: `${zoneColor(zone, i)}18` }}
                 >
-                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, i) }} />
-                  <span className="font-medium text-gray-800">{zone.name}</span>
-                  <span className="text-gray-400 text-xs">{formatPrice(zone.price, currency)}</span>
-                  {zone.type === 'GENERAL' && (
-                    <span className="text-gray-400 text-xs">· без мест</span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => removeZone(zone.id)}
-                  className="text-gray-300 hover:text-red-400 pr-2 pl-0.5 py-1.5 text-xs transition-colors"
-                  title="Удалить зону"
-                >
-                  ✕
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTool(zone.id)}
+                    className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 text-sm"
+                  >
+                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, i) }} />
+                    <span className="font-medium text-gray-800">{zone.name}</span>
+                    <span className="text-gray-400 text-xs">{formatPrice(zone.price, currency)}</span>
+                    {zone.type === 'GENERAL' && (
+                      <span className="text-gray-400 text-xs">· без мест</span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEditZone(zone)}
+                    className="text-gray-300 hover:text-emerald-600 px-1 py-1.5 text-xs transition-colors"
+                    title="Редактировать зону"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeZone(zone)}
+                    className="text-gray-300 hover:text-red-400 pr-2 pl-0.5 py-1.5 text-xs transition-colors"
+                    title="Удалить зону"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
             ))}
 
             {/* Add zone button */}
@@ -557,6 +876,155 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             <span className="font-semibold text-gray-700">Итого</span>
             <span className="font-bold text-emerald-700 text-lg">{formatPrice(revenue.total, currency)}</span>
           </div>
+        </div>
+      )}
+
+      {/* Tables — not painted on the grid, managed here since "Зоны" is hidden */}
+      {(tableZones.length > 0 || !locked) && (
+        <div className="space-y-2 border-t border-gray-100 pt-4">
+          <h4 className="text-sm font-semibold text-gray-700">Столы</h4>
+          <div className="flex flex-wrap gap-2">
+            {tableZones.map(zone => (
+              editingZoneId === zone.id ? (
+                <div key={zone.id} className="w-full">{zoneEditForm(zone)}</div>
+              ) : (
+                <div key={zone.id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
+                  <div>
+                    <div className="font-medium text-gray-800">{zone.name}</div>
+                    <div className="text-xs text-gray-400">
+                      {formatPrice(zone.price, currency)} · {zone.capacity} мест
+                      {zone.available !== undefined && ` · ${zone.available} свободно`}
+                    </div>
+                  </div>
+                  {!locked && (
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startEditZone(zone)}
+                        className="text-gray-300 hover:text-emerald-600 px-1 py-1 text-xs transition-colors"
+                        title="Редактировать"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfiguringTableZoneId(t => (t === zone.id ? null : zone.id))}
+                        className="text-gray-300 hover:text-emerald-600 px-1 py-1 text-xs transition-colors"
+                        title="Настроить столы"
+                      >
+                        ⚙
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeZone(zone)}
+                        className="text-gray-300 hover:text-red-400 px-1 py-1 text-xs transition-colors"
+                        title="Удалить"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            ))}
+
+            {!locked && (
+              <button
+                type="button"
+                onClick={() => setShowTableForm(s => !s)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 border-2 border-dashed border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
+              >
+                + Стол-зона
+              </button>
+            )}
+          </div>
+
+          {showTableForm && (
+            <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Название</label>
+                <input
+                  type="text"
+                  value={newTableZoneName}
+                  onChange={e => setNewTableZoneName(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  placeholder="Банкетные столы"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Цена за место ({currency})</label>
+                <input
+                  type="number"
+                  value={newTableZonePrice}
+                  onChange={e => setNewTableZonePrice(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  placeholder="5000"
+                  min="0"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={addTableZone}
+                  disabled={addingZone || !newTableZoneName.trim() || !newTableZonePrice}
+                  className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                >
+                  {addingZone ? '...' : 'Создать'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowTableForm(false); setNewTableZoneName(''); setNewTableZonePrice(''); }}
+                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
+
+          {configuringTableZoneId && (
+            <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Количество столов</label>
+                <input
+                  type="number"
+                  value={tableCount}
+                  onChange={e => setTableCount(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Стульев за столом</label>
+                <input
+                  type="number"
+                  value={tableChairCount}
+                  onChange={e => setTableChairCount(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  min="1"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => generateTablesForZone(configuringTableZoneId)}
+                  disabled={savingTables}
+                  className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                >
+                  {savingTables ? '...' : 'Сгенерировать'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfiguringTableZoneId(null)}
+                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Отмена
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 w-full">Перезапишет текущие столы этой зоны (если на них ещё нет билетов).</p>
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -2,13 +2,6 @@ export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EX
 
 export type Currency = '₸' | '₼' | '$' | '₽';
 
-export const CURRENCIES: { value: Currency; label: string }[] = [
-  { value: '₼', label: 'Манат (₼)' },
-  { value: '₸', label: 'Тенге (₸)' },
-  { value: '$', label: 'Доллар ($)' },
-  { value: '₽', label: 'Рубль (₽)' },
-];
-
 export function formatPrice(amount: number, currency: Currency | string): string {
   const formatted = amount.toLocaleString('ru-RU');
   if (currency === '$') return `$${formatted}`;
@@ -21,6 +14,28 @@ export interface GridLayout {
   rows: number;
   cols: number;
   cells: GridCellState[][];
+}
+
+export interface GridTemplateZoneSlot {
+  slotId: string;
+  name: string;
+  color: string | null;
+  type: 'GENERAL' | 'SEATED';
+  capacity?: number;
+}
+
+export interface GridTemplateSummary {
+  id: string;
+  name: string;
+  rows: number;
+  cols: number;
+  zoneCount: number;
+  createdAt: string;
+}
+
+export interface GridTemplate extends GridTemplateSummary {
+  cells: GridCellState[][];
+  zones: GridTemplateZoneSlot[];
 }
 
 export interface Venue {
@@ -109,6 +124,13 @@ export interface Ticket {
   groupId: string | null;
   seatId: string | null;
   tableId: string | null;
+}
+
+export interface CartItem {
+  zoneId: string;
+  seatIds?: string[];
+  tableId?: string;
+  quantity?: number;
 }
 
 export interface RegisterResult {

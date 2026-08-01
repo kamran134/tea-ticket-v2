@@ -41,6 +41,16 @@ model Venue {
   tickets        Ticket[]
 }
 
+model GridTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  rows      Int
+  cols      Int
+  cells     Json
+  zones     Json
+  createdAt DateTime @default(now())
+}
+
 model Zone {
   id         String    @id @default(cuid())
   venueId    String

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, Ticket, Currency, TicketStatus } from '../types';
-import { CURRENCIES, formatPrice } from '../types';
+import type { Venue, Zone, Ticket, TicketStatus } from '../types';
+import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { generateVenueSlug, slugify } from '../utils/slug';
 import { StatsTab } from './StatsTab';
@@ -44,6 +44,12 @@ function isTokenValid(): boolean {
 
 const ZONE_DEFAULTS = { name: '', price: '', capacity: '', sortOrder: '0' };
 
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function ManagePanel() {
   const [authenticated, setAuthenticated] = useState(isTokenValid);
   const [password, setPassword] = useState('');
@@ -54,13 +60,16 @@ export function ManagePanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueDate, setNewVenueDate] = useState('');
-  const [newVenueCurrency, setNewVenueCurrency] = useState<Currency>('₼');
   const [newVenueSlug, setNewVenueSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [editingSlugId, setEditingSlugId] = useState<string | null>(null);
   const [editingSlugValue, setEditingSlugValue] = useState('');
   const [uploadingPosterId, setUploadingPosterId] = useState<string | null>(null);
+  const [editingVenueId, setEditingVenueId] = useState<string | null>(null);
+  const [editVenueName, setEditVenueName] = useState('');
+  const [editVenueDate, setEditVenueDate] = useState('');
+  const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
   // Zones
   const [selectedVenueId, setSelectedVenueId] = useState('');
@@ -149,19 +158,41 @@ export function ManagePanel() {
       const venue = await api.createVenue(
         newVenueName.trim(),
         new Date(newVenueDate).toISOString(),
-        newVenueCurrency,
         newVenueSlug || undefined,
       );
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
-      setNewVenueCurrency('₼');
       setNewVenueSlug('');
       setSlugManuallyEdited(false);
       setSlugStatus('idle');
       toast.success('Мероприятие создано');
     } catch (err) {
       toast.error(errMsg(err));
+    }
+  };
+
+  const startEditVenue = (v: Venue) => {
+    setEditingVenueId(v.id);
+    setEditVenueName(v.name);
+    setEditVenueDate(toDatetimeLocal(v.date));
+  };
+
+  const saveVenueEdit = async (id: string) => {
+    if (!editVenueName.trim() || !editVenueDate) return;
+    setSavingVenueEdit(true);
+    try {
+      const updated = await api.updateVenue(id, {
+        name: editVenueName.trim(),
+        date: new Date(editVenueDate).toISOString(),
+      });
+      setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
+      setEditingVenueId(null);
+      toast.success('Мероприятие обновлено');
+    } catch (err) {
+      toast.error(errMsg(err));
+    } finally {
+      setSavingVenueEdit(false);
     }
   };
 
@@ -336,8 +367,8 @@ export function ManagePanel() {
   const TAB_LABELS: Record<Tab, string> = {
     venues: 'Мероприятия',
     zones: 'Зоны',
-    map: 'Схема',
-    gridmap: 'Сетка',
+    map: 'Схема (старая)',
+    gridmap: 'Схема',
     tickets: 'Билеты',
     stats: 'Статистика',
   };
@@ -383,7 +414,7 @@ export function ManagePanel() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(['venues', 'zones', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
+          {(['venues', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -423,15 +454,6 @@ export function ManagePanel() {
                 onChange={e => setNewVenueDate(e.target.value)}
                 required
               />
-              <select
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                value={newVenueCurrency}
-                onChange={e => setNewVenueCurrency(e.target.value as Currency)}
-              >
-                {CURRENCIES.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
               <div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
                   <span className="font-mono">/e/</span>
@@ -481,19 +503,52 @@ export function ManagePanel() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="font-semibold text-gray-800">
-                            {v.name} <span className="text-gray-400 font-normal text-xs">{v.currency}</span>
+                        {editingVenueId === v.id ? (
+                          <div className="space-y-1.5 mb-1.5">
+                            <input
+                              type="text"
+                              autoFocus
+                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              value={editVenueName}
+                              onChange={e => setEditVenueName(e.target.value)}
+                            />
+                            <input
+                              type="datetime-local"
+                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              value={editVenueDate}
+                              onChange={e => setEditVenueDate(e.target.value)}
+                            />
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => saveVenueEdit(v.id)}
+                                disabled={savingVenueEdit}
+                                className="text-xs text-emerald-700 hover:underline disabled:opacity-50"
+                              >
+                                Сохранить
+                              </button>
+                              <button
+                                onClick={() => setEditingVenueId(null)}
+                                className="text-xs text-gray-400 hover:text-gray-600"
+                              >
+                                Отмена
+                              </button>
+                            </div>
                           </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                            v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
-                          }`}>
-                            {v.active ? 'Активно' : 'Скрыто'}
-                          </span>
-                        </div>
-                        <div className="text-sm text-gray-500 mt-0.5">
-                          {new Date(v.date).toLocaleString('ru-RU')}
-                        </div>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="font-semibold text-gray-800">{v.name}</div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                              }`}>
+                                {v.active ? 'Активно' : 'Скрыто'}
+                              </span>
+                            </div>
+                            <div className="text-sm text-gray-500 mt-0.5">
+                              {new Date(v.date).toLocaleString('ru-RU')}
+                            </div>
+                          </>
+                        )}
 
                         {editingSlugId === v.id ? (
                           <div className="flex items-center gap-1.5 mt-1.5">
@@ -539,6 +594,12 @@ export function ManagePanel() {
                           Скопировать ссылку
                         </button>
                       )}
+                      <button
+                        onClick={() => startEditVenue(v)}
+                        className="text-xs text-gray-400 hover:text-emerald-700"
+                      >
+                        Редактировать
+                      </button>
                       <label className="text-xs text-gray-400 hover:text-emerald-700 cursor-pointer">
                         {uploadingPosterId === v.id ? 'Загрузка...' : v.posterImage ? 'Сменить постер' : 'Загрузить постер'}
                         <input
@@ -585,27 +646,6 @@ export function ManagePanel() {
 
             {selectedVenueId && (
               <>
-                <div className="bg-white rounded-xl shadow-sm px-4 py-3 flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Валюта мероприятия</span>
-                  <select
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                    value={zoneCurrency}
-                    onChange={async e => {
-                      const c = e.target.value as Currency;
-                      try {
-                        const updated = await api.updateVenueCurrency(selectedVenueId, c);
-                        setVenues(v => v.map(venue => venue.id === updated.id ? updated : venue));
-                      } catch (err) {
-                        toast.error(errMsg(err));
-                      }
-                    }}
-                  >
-                    {CURRENCIES.map(c => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-
                 <form
                   onSubmit={editingZone ? saveZone : createZone}
                   className="bg-white rounded-2xl shadow-sm p-4 space-y-3"

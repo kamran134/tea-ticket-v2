@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout } from '../types';
+import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -55,11 +55,11 @@ export const api = {
     });
   },
 
-  async updateVenueCurrency(id: string, currency: Currency): Promise<Venue> {
+  async updateVenue(id: string, data: { name?: string; date?: string }): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify({ currency }),
+      body: JSON.stringify(data),
     });
   },
 
@@ -121,10 +121,8 @@ export const api = {
     name: string;
     phone: string;
     venueId: string;
-    zoneId: string;
-    guests: { name: string }[];
-    seatIds?: string[];
-    tableId?: string;
+    items: CartItem[];
+    guestNames?: string[];
   }): Promise<RegisterResult> {
     return request('/api/tickets/register', {
       method: 'POST',
@@ -184,11 +182,11 @@ export const api = {
     });
   },
 
-  async createVenue(name: string, date: string, currency: Currency, slug?: string): Promise<Venue> {
+  async createVenue(name: string, date: string, slug?: string): Promise<Venue> {
     return request('/api/venues', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ name, date, currency, ...(slug && { slug }) }),
+      body: JSON.stringify({ name, date, ...(slug && { slug }) }),
     });
   },
 
@@ -276,6 +274,35 @@ export const api = {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify(layout),
+    });
+  },
+
+  async getGridTemplates(): Promise<GridTemplateSummary[]> {
+    return request('/api/grid-templates', { headers: authHeaders() });
+  },
+
+  async getGridTemplate(id: string): Promise<GridTemplate> {
+    return request(`/api/grid-templates/${encodeURIComponent(id)}`, { headers: authHeaders() });
+  },
+
+  async saveGridTemplate(payload: {
+    name: string;
+    rows: number;
+    cols: number;
+    cells: GridLayout['cells'];
+    zones: GridTemplateZoneSlot[];
+  }): Promise<GridTemplate> {
+    return request('/api/grid-templates', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deleteGridTemplate(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/grid-templates/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
     });
   },
 };

@@ -82,190 +82,181 @@ ticketsRouter.get('/:id', async (req, res) => {
 });
 
 // POST /api/tickets/register
+// A single checkout can span multiple zones — each cart item is either a set
+// of specific seats (SEATED), a quantity of chairs at one table (TABLE), or
+// a plain quantity (GENERAL). One ticket row is created per person/seat, all
+// sharing one groupId. The buyer's own name covers the first ticket; the
+// rest use guestNames[i] if given, otherwise an auto "Гость N" placeholder.
+const cartItemSchema = z.object({
+  zoneId: z.string().min(1),
+  seatIds: z.array(z.string().min(1)).optional(),
+  tableId: z.string().min(1).optional(),
+  quantity: z.number().int().positive().optional(),
+});
+
 const registerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(7).max(20),
   venueId: z.string().min(1),
-  zoneId: z.string().min(1),
-  guests: z.array(z.object({ name: z.string().min(1).max(200) })).default([]),
-  seatIds: z.array(z.string()).optional(),
-  tableId: z.string().optional(),
+  items: z.array(cartItemSchema).min(1),
+  guestNames: z.array(z.string().max(200)).optional().default([]),
 });
+
+class RegisterError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
 
 ticketsRouter.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { name, phone, venueId, zoneId, guests, seatIds, tableId } = parsed.data;
+  const { name, phone, venueId, items, guestNames } = parsed.data;
+  const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
+  const now = new Date();
 
   try {
-    const zone = await prisma.zone.findUnique({ where: { id: zoneId } });
-    if (!zone) {
-      return res.status(404).json({ success: false, error: 'Zone not found' });
-    }
-
-    const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
-    const now = new Date();
-
-    if (zone.type === 'SEATED') {
-      const totalNeeded = 1 + guests.length;
-      if (!seatIds || seatIds.length === 0) {
-        return res.status(400).json({ success: false, error: 'seatIds is required for seated zones' });
-      }
-      if (seatIds.length !== totalNeeded) {
-        return res.status(400).json({ success: false, error: `Select exactly ${totalNeeded} seat(s)` });
-      }
-      if (new Set(seatIds).size !== seatIds.length) {
-        return res.status(400).json({ success: false, error: 'Duplicate seats selected' });
+    const result = await prisma.$transaction(async tx => {
+      const zoneIds = [...new Set(items.map(i => i.zoneId))];
+      const zones = await tx.zone.findMany({ where: { id: { in: zoneIds }, venueId } });
+      const zoneById = new Map(zones.map(z => [z.id, z]));
+      if (zoneById.size !== zoneIds.length) {
+        throw new RegisterError(404, 'One or more zones not found');
       }
 
-      const seats = await prisma.seat.findMany({ where: { id: { in: seatIds }, zoneId } });
-      if (seats.length !== seatIds.length) {
-        return res.status(404).json({ success: false, error: 'One or more seats not found in this zone' });
+      interface Slot { zoneId: string; zone: (typeof zones)[number]; seatId?: string; tableId?: string }
+      const slots: Slot[] = [];
+
+      for (const item of items) {
+        const zone = zoneById.get(item.zoneId)!;
+
+        if (item.seatIds && item.seatIds.length > 0) {
+          if (zone.type !== 'SEATED') {
+            throw new RegisterError(400, `Zone "${zone.name}" is not a seated zone`);
+          }
+          if (new Set(item.seatIds).size !== item.seatIds.length) {
+            throw new RegisterError(400, 'Duplicate seats selected');
+          }
+          for (const seatId of item.seatIds) slots.push({ zoneId: zone.id, zone, seatId });
+        } else if (item.tableId) {
+          if (zone.type !== 'TABLE') {
+            throw new RegisterError(400, `Zone "${zone.name}" is not a table zone`);
+          }
+          const qty = item.quantity ?? 0;
+          if (qty < 1) {
+            throw new RegisterError(400, 'quantity is required for table items');
+          }
+          for (let i = 0; i < qty; i++) slots.push({ zoneId: zone.id, zone, tableId: item.tableId });
+        } else if (item.quantity) {
+          if (zone.type !== 'GENERAL') {
+            throw new RegisterError(400, `Zone "${zone.name}" requires seatIds or a tableId`);
+          }
+          for (let i = 0; i < item.quantity; i++) slots.push({ zoneId: zone.id, zone });
+        } else {
+          throw new RegisterError(400, 'Each item needs seatIds, tableId+quantity, or quantity');
+        }
       }
-      const taken = await prisma.ticket.findFirst({
-        where: { seatId: { in: seatIds }, status: { in: activeStatuses } },
-      });
-      if (taken) {
-        return res.status(409).json({ success: false, error: 'One or more seats are already taken' });
+
+      if (slots.length === 0) {
+        throw new RegisterError(400, 'Cart is empty');
       }
 
-      const people = [{ name, seatId: seatIds[0] }, ...guests.map((g, i) => ({ name: g.name, seatId: seatIds[i + 1] }))];
-      const groupId = guests.length > 0 ? undefined : undefined; // set after first create
-
-      const mainTicket = await prisma.ticket.create({
-        data: {
-          name: people[0].name, phone, venueId, zoneId,
-          zoneName: zone.name, cardNumber: zone.cardNumber,
-          price: zone.price, status: 'BOOKED', bookedAt: now,
-          seatId: people[0].seatId,
-        },
-      });
-
-      const resolvedGroupId = guests.length > 0 ? mainTicket.id : null;
-      if (resolvedGroupId) {
-        await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId: resolvedGroupId } });
-        await prisma.ticket.createMany({
-          data: people.slice(1).map(p => ({
-            name: p.name, phone, venueId, zoneId,
-            zoneName: zone.name, cardNumber: zone.cardNumber,
-            price: zone.price, status: 'BOOKED' as const, bookedAt: now,
-            seatId: p.seatId, groupId: resolvedGroupId,
-          })),
+      // Seats: exist, belong to the right zone, not already taken
+      const allSeatIds = slots.map(s => s.seatId).filter((x): x is string => !!x);
+      if (new Set(allSeatIds).size !== allSeatIds.length) {
+        throw new RegisterError(400, 'Duplicate seats selected');
+      }
+      if (allSeatIds.length > 0) {
+        const seats = await tx.seat.findMany({ where: { id: { in: allSeatIds } } });
+        if (seats.length !== allSeatIds.length) {
+          throw new RegisterError(404, 'One or more seats not found');
+        }
+        const seatById = new Map(seats.map(s => [s.id, s]));
+        for (const slot of slots) {
+          if (slot.seatId && seatById.get(slot.seatId)!.zoneId !== slot.zoneId) {
+            throw new RegisterError(400, 'Seat does not belong to the selected zone');
+          }
+        }
+        const taken = await tx.ticket.findFirst({
+          where: { seatId: { in: allSeatIds }, status: { in: activeStatuses } },
         });
+        if (taken) {
+          throw new RegisterError(409, 'One or more seats are already taken');
+        }
       }
 
-      return res.status(201).json({
-        success: true,
-        data: {
-          id: mainTicket.id,
-          groupId: resolvedGroupId,
-          totalPrice: zone.price * totalNeeded,
-          cardNumber: zone.cardNumber,
-        },
-      });
-    }
-
-    if (zone.type === 'TABLE') {
-      if (!tableId) {
-        return res.status(400).json({ success: false, error: 'tableId is required for table zones' });
-      }
-      const table = await prisma.zoneTable.findUnique({ where: { id: tableId } });
-      if (!table || table.zoneId !== zoneId) {
-        return res.status(404).json({ success: false, error: 'Table not found in this zone' });
-      }
-      const occupiedCount = await prisma.ticket.count({
-        where: { tableId, status: { in: activeStatuses } },
-      });
-      const totalNeeded = 1 + guests.length;
-      if (occupiedCount + totalNeeded > table.chairCount) {
-        return res.status(409).json({ success: false, error: 'Not enough chairs available at this table' });
+      // Tables: exist, enough free chairs for what this checkout is claiming
+      const tableIds = [...new Set(slots.map(s => s.tableId).filter((x): x is string => !!x))];
+      if (tableIds.length > 0) {
+        const tables = await tx.zoneTable.findMany({ where: { id: { in: tableIds } } });
+        const tableById = new Map(tables.map(t => [t.id, t]));
+        if (tableById.size !== tableIds.length) {
+          throw new RegisterError(404, 'One or more tables not found');
+        }
+        for (const tableId of tableIds) {
+          const table = tableById.get(tableId)!;
+          const requested = slots.filter(s => s.tableId === tableId).length;
+          const occupied = await tx.ticket.count({ where: { tableId, status: { in: activeStatuses } } });
+          if (occupied + requested > table.chairCount) {
+            throw new RegisterError(409, 'Not enough chairs available at the selected table');
+          }
+        }
       }
 
-      const mainTicket = await prisma.ticket.create({
-        data: {
-          name, phone, venueId, zoneId,
-          zoneName: zone.name,
-          cardNumber: zone.cardNumber,
-          price: zone.price,
-          status: 'BOOKED',
-          bookedAt: now,
-          tableId,
-        },
-      });
-      const groupId = guests.length > 0 ? mainTicket.id : undefined;
-      if (groupId) {
-        await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId } });
-        await prisma.ticket.createMany({
-          data: guests.map(g => ({
-            name: g.name, phone, venueId, zoneId,
-            zoneName: zone.name,
-            cardNumber: zone.cardNumber,
-            price: zone.price,
-            status: 'BOOKED' as const,
-            bookedAt: now,
-            groupId,
-            tableId,
-          })),
-        });
+      // GENERAL zones: enough declared capacity left
+      const generalZoneIds = [...new Set(
+        slots.filter(s => !s.seatId && !s.tableId).map(s => s.zoneId),
+      )];
+      for (const zoneId of generalZoneIds) {
+        const zone = zoneById.get(zoneId)!;
+        const requested = slots.filter(s => s.zoneId === zoneId && !s.seatId && !s.tableId).length;
+        const occupied = await tx.ticket.count({ where: { zoneId, status: { in: activeStatuses } } });
+        if (occupied + requested > zone.capacity) {
+          throw new RegisterError(409, `Not enough seats available in zone "${zone.name}"`);
+        }
       }
-      return res.status(201).json({
-        success: true,
-        data: {
-          id: mainTicket.id,
-          groupId: groupId ?? null,
-          totalPrice: zone.price * totalNeeded,
-          cardNumber: zone.cardNumber,
-        },
-      });
-    }
 
-    // GENERAL zone — original logic
-    const occupied = await prisma.ticket.count({
-      where: { zoneId, status: { in: activeStatuses } },
-    });
-    const totalNeeded = 1 + guests.length;
-    if (occupied + totalNeeded > zone.capacity) {
-      return res.status(409).json({ success: false, error: 'Not enough seats available' });
-    }
-
-    const mainTicket = await prisma.ticket.create({
-      data: {
-        name, phone, venueId, zoneId,
-        zoneName: zone.name,
-        cardNumber: zone.cardNumber,
-        price: zone.price,
-        status: 'BOOKED',
+      const names = [
+        name,
+        ...Array.from({ length: slots.length - 1 }, (_, i) => guestNames[i]?.trim() || `Гость ${i + 1}`),
+      ];
+      const ticketRows = slots.map((slot, i) => ({
+        name: names[i],
+        phone,
+        venueId,
+        zoneId: slot.zoneId,
+        zoneName: slot.zone.name,
+        cardNumber: slot.zone.cardNumber,
+        price: slot.zone.price,
+        status: 'BOOKED' as const,
         bookedAt: now,
-      },
-    });
-    const groupId = guests.length > 0 ? mainTicket.id : undefined;
-    if (groupId) {
-      await prisma.ticket.update({ where: { id: mainTicket.id }, data: { groupId } });
-      await prisma.ticket.createMany({
-        data: guests.map(g => ({
-          name: g.name, phone, venueId, zoneId,
-          zoneName: zone.name,
-          cardNumber: zone.cardNumber,
-          price: zone.price,
-          status: 'BOOKED' as const,
-          bookedAt: now,
-          groupId,
-        })),
-      });
-    }
+        seatId: slot.seatId,
+        tableId: slot.tableId,
+      }));
 
-    return res.status(201).json({
-      success: true,
-      data: {
-        id: mainTicket.id,
-        groupId: groupId ?? null,
-        totalPrice: zone.price * totalNeeded,
-        cardNumber: zone.cardNumber,
-      },
+      const mainTicket = await tx.ticket.create({ data: ticketRows[0] });
+      const groupId = ticketRows.length > 1 ? mainTicket.id : null;
+      if (groupId) {
+        await tx.ticket.update({ where: { id: mainTicket.id }, data: { groupId } });
+        await tx.ticket.createMany({
+          data: ticketRows.slice(1).map(t => ({ ...t, groupId })),
+        });
+      }
+
+      const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
+      return { id: mainTicket.id, groupId, totalPrice, cardNumber: mainTicket.cardNumber };
     });
-  } catch {
+
+    return res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof RegisterError) {
+      return res.status(err.status).json({ success: false, error: err.message });
+    }
+    console.error('[register] error:', err);
     return res.status(500).json({ success: false, error: 'Failed to register' });
   }
 });

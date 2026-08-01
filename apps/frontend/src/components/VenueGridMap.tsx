@@ -15,16 +15,15 @@ function zoneColor(zone: Zone, index: number): string {
 interface Props {
   venue: Venue;
   zones: Zone[];
-  selectedZoneId: string | null;
   currency: string;
-  neededSeats: number;
-  selectedSeatIds: string[];
-  onZoneClick: (zone: Zone) => void;
+  cartSeatIds: string[];
+  cartQuantityByZone: Record<string, number>;
+  onZoneAdd: (zone: Zone) => void;
   onSeatToggle: (zone: Zone, seat: Seat) => void;
 }
 
 export function VenueGridMap({
-  venue, zones, selectedZoneId, currency, neededSeats, selectedSeatIds, onZoneClick, onSeatToggle,
+  venue, zones, currency, cartSeatIds, cartQuantityByZone, onZoneAdd, onSeatToggle,
 }: Props) {
   const layout = venue.gridLayout;
 
@@ -74,20 +73,8 @@ export function VenueGridMap({
   const usedZones = zones.filter(z => layout.cells.some(row => row.includes(z.id)));
   if (usedZones.length === 0) return null;
 
-  const selectedZone = zones.find(z => z.id === selectedZoneId);
-  const filled = selectedSeatIds.length;
-  const remaining = neededSeats - filled;
-
   return (
     <div className="space-y-3">
-      {selectedZone?.type === 'SEATED' && (
-        <div className={`text-sm font-medium ${remaining <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
-          {remaining <= 0
-            ? `Выбрано ${filled} из ${neededSeats} мест`
-            : `Выберите ещё ${remaining} место${remaining > 1 ? (remaining < 5 ? 'а' : '') : ''}`}
-        </div>
-      )}
-
       {/* Grid canvas */}
       <div className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100 select-none">
         <div
@@ -126,21 +113,19 @@ export function VenueGridMap({
                     />
                   );
                 }
-                const isCurrentZone = zone.id === selectedZoneId;
-                const isSelected = isCurrentZone && selectedSeatIds.includes(seat.id);
+                const isSelected = cartSeatIds.includes(seat.id);
                 const isOccupied = seat.occupied;
-                const canSelect = !isOccupied && (isCurrentZone ? (isSelected || filled < neededSeats) : true);
                 return (
                   <div
                     key={`${r}-${c}`}
-                    onClick={() => canSelect && onSeatToggle(zone, seat)}
+                    onClick={() => !isOccupied && onSeatToggle(zone, seat)}
                     title={`${zone.name} · ${seat.label ?? `Место ${seat.number}`} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
                     style={{
                       aspectRatio: '1',
                       backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? color : `${color}55`,
                       outline: isSelected ? `2px solid ${color}` : 'none',
                       outlineOffset: -1,
-                      cursor: canSelect ? 'pointer' : 'not-allowed',
+                      cursor: isOccupied ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -157,18 +142,18 @@ export function VenueGridMap({
                 );
               }
 
-              // GENERAL (no specific seats): the whole cell just selects the zone
-              const isSelected = zone.id === selectedZoneId;
-              const isEmpty = (zone.available ?? 0) <= 0;
+              // GENERAL (no specific seats): the whole cell adds one to the cart
+              const inCart = cartQuantityByZone[zone.id] ?? 0;
+              const isEmpty = (zone.available ?? 0) <= inCart;
               return (
                 <div
                   key={`${r}-${c}`}
-                  onClick={() => !isEmpty && onZoneClick(zone)}
+                  onClick={() => !isEmpty && onZoneAdd(zone)}
                   title={`${zone.name} · ${formatPrice(zone.price, currency)}${isEmpty ? ' · мест нет' : ''}`}
                   style={{
                     aspectRatio: '1',
-                    backgroundColor: isEmpty ? 'rgba(156,163,175,0.5)' : isSelected ? color : `${color}99`,
-                    outline: isSelected ? `2px solid ${color}` : 'none',
+                    backgroundColor: isEmpty && inCart === 0 ? 'rgba(156,163,175,0.5)' : inCart > 0 ? color : `${color}99`,
+                    outline: inCart > 0 ? `2px solid ${color}` : 'none',
                     outlineOffset: -1,
                     cursor: isEmpty ? 'not-allowed' : 'pointer',
                     minWidth: 4,
@@ -187,11 +172,14 @@ export function VenueGridMap({
       <div className="flex flex-wrap gap-2">
         {usedZones.map(zone => {
           const index = zoneById.get(zone.id)!.index;
-          const isSelected = zone.id === selectedZoneId;
-          const isEmpty = (zone.available ?? 0) <= 0;
+          const inCart = cartQuantityByZone[zone.id] ?? 0;
+          const seatsInCart = zone.type === 'SEATED'
+            ? (seatsByZone[zone.id] ?? []).filter(s => cartSeatIds.includes(s.id)).length
+            : 0;
+          const isEmpty = (zone.available ?? 0) <= inCart;
           const className = [
             'flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-xs transition-colors',
-            isSelected
+            inCart > 0 || seatsInCart > 0
               ? 'border-emerald-600 bg-emerald-50'
               : isEmpty
                 ? 'border-gray-100 bg-gray-50 opacity-50'
@@ -207,6 +195,9 @@ export function VenueGridMap({
                   · {isEmpty ? 'мест нет' : `${zone.available} мест`}
                 </span>
               )}
+              {(inCart > 0 || seatsInCart > 0) && (
+                <span className="text-emerald-700 font-semibold">× {inCart || seatsInCart}</span>
+              )}
             </>
           );
           return zone.type === 'GENERAL' ? (
@@ -214,8 +205,8 @@ export function VenueGridMap({
               key={zone.id}
               type="button"
               disabled={isEmpty}
-              onClick={() => onZoneClick(zone)}
-              className={`${className} ${!isSelected && !isEmpty ? 'hover:border-emerald-300' : ''}`}
+              onClick={() => onZoneAdd(zone)}
+              className={`${className} ${!isEmpty ? 'hover:border-emerald-300' : ''}`}
             >
               {content}
             </button>

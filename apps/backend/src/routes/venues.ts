@@ -62,12 +62,11 @@ venuesRouter.get('/by-slug/:slug', async (req, res) => {
   }
 });
 
-const ALLOWED_CURRENCIES = ['₸', '₼', '$', '₽'] as const;
+const CURRENCY = '₼';
 
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
-  currency: z.enum(ALLOWED_CURRENCIES).default('₼'),
   slug: z.string().min(1).max(100).optional(),
 });
 
@@ -86,7 +85,7 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
       data: {
         name: parsed.data.name,
         date,
-        currency: parsed.data.currency,
+        currency: CURRENCY,
         slug,
       },
     });
@@ -100,13 +99,14 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
 });
 
 const patchVenueSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  date: z.string().datetime().optional(),
   active: z.boolean().optional(),
-  currency: z.enum(ALLOWED_CURRENCIES).optional(),
   floorPlanImage: z.string().nullable().optional(),
   posterImage: z.string().nullable().optional(),
   slug: z.string().min(1).max(100).optional(),
 }).refine(d => Object.values(d).some(v => v !== undefined), {
-  message: 'Provide active, currency, floorPlanImage, posterImage, or slug',
+  message: 'Provide name, date, active, floorPlanImage, posterImage, or slug',
 });
 
 venuesRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -114,7 +114,7 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { slug, ...rest } = parsed.data;
+  const { slug, date, ...rest } = parsed.data;
   const normalizedSlug = slug !== undefined ? slugify(slug) : undefined;
   if (slug !== undefined && !normalizedSlug) {
     return res.status(400).json({ success: false, error: 'Invalid slug' });
@@ -122,7 +122,11 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   try {
     const venue = await prisma.venue.update({
       where: { id: req.params.id },
-      data: { ...rest, ...(normalizedSlug !== undefined && { slug: normalizedSlug }) },
+      data: {
+        ...rest,
+        ...(date !== undefined && { date: new Date(date) }),
+        ...(normalizedSlug !== undefined && { slug: normalizedSlug }),
+      },
     });
     return res.json({ success: true, data: venue });
   } catch (err) {
