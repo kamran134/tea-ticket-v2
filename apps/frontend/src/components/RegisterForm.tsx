@@ -29,6 +29,9 @@ export function RegisterForm() {
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const [subLoading, setSubLoading] = useState(false);
+  // Set right before switching zoneId via a direct seat click on the grid,
+  // so the reset effect below seeds the selection instead of clearing it.
+  const [pendingSeatId, setPendingSeatId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -45,7 +48,8 @@ export function RegisterForm() {
   }, [venueId]);
 
   useEffect(() => {
-    setSelectedSeatIds([]);
+    setSelectedSeatIds(pendingSeatId ? [pendingSeatId] : []);
+    setPendingSeatId(null);
     setSelectedTableId(null);
     setSeats([]);
     setTables([]);
@@ -62,6 +66,7 @@ export function RegisterForm() {
       setSubLoading(true);
       api.getTables(zoneId).then(setTables).finally(() => setSubLoading(false));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoneId, zones]);
 
   const selectedVenue = venues.find(v => v.id === venueId);
@@ -111,6 +116,17 @@ export function RegisterForm() {
       if (ids.length >= neededSeats) return ids;
       return [...ids, seat.id];
     });
+  };
+
+  // Direct seat click on the grid map: switches zone (seeding the selection
+  // with this seat) if it belongs to a different zone, otherwise toggles it.
+  const selectGridSeat = (zone: Zone, seat: Seat) => {
+    if (zone.id !== zoneId) {
+      setPendingSeatId(seat.id);
+      setZoneId(zone.id);
+      return;
+    }
+    toggleSeat(seat);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -178,7 +194,10 @@ export function RegisterForm() {
                     zones={zones}
                     selectedZoneId={zoneId}
                     currency={currency}
+                    neededSeats={neededSeats}
+                    selectedSeatIds={selectedSeatIds}
                     onZoneClick={z => setZoneId(z.id)}
+                    onSeatToggle={selectGridSeat}
                   />
                 ) : selectedVenue && hasSchemaZones ? (
                   <VenueMap
@@ -242,8 +261,8 @@ export function RegisterForm() {
               </div>
             )}
 
-            {/* Seat picker for SEATED zones */}
-            {selectedZone?.type === 'SEATED' && (
+            {/* Seat picker for SEATED zones — grid flow selects seats directly on the map above */}
+            {selectedZone?.type === 'SEATED' && !hasGridZones && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Выберите места</label>
                 {subLoading ? (

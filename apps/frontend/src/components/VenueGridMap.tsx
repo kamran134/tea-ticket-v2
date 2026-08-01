@@ -1,4 +1,6 @@
-import type { Venue, Zone } from '../types';
+import { useState, useEffect, useMemo } from 'react';
+import { api } from '../services/api';
+import type { Venue, Zone, Seat } from '../types';
 import { formatPrice } from '../types';
 
 const FALLBACK_COLORS = [
@@ -15,20 +17,77 @@ interface Props {
   zones: Zone[];
   selectedZoneId: string | null;
   currency: string;
+  neededSeats: number;
+  selectedSeatIds: string[];
   onZoneClick: (zone: Zone) => void;
+  onSeatToggle: (zone: Zone, seat: Seat) => void;
 }
 
-export function VenueGridMap({ venue, zones, selectedZoneId, currency, onZoneClick }: Props) {
+export function VenueGridMap({
+  venue, zones, selectedZoneId, currency, neededSeats, selectedSeatIds, onZoneClick, onSeatToggle,
+}: Props) {
   const layout = venue.gridLayout;
+
+  const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
+
+  // Seats for every SEATED zone painted on the grid — loaded eagerly so any
+  // seat can be clicked directly, without a separate "pick zone first" step.
+  const seatedZoneIds = useMemo(() => {
+    if (!layout) return [] as string[];
+    const ids = new Set<string>();
+    for (const row of layout.cells) {
+      for (const cell of row) {
+        if (zoneById.get(cell)?.zone.type === 'SEATED') ids.add(cell);
+      }
+    }
+    return [...ids];
+  }, [layout, zoneById]);
+  const seatedZoneKey = seatedZoneIds.join(',');
+
+  const [seatsByZone, setSeatsByZone] = useState<Record<string, Seat[]>>({});
+  const [loadingSeats, setLoadingSeats] = useState(false);
+
+  useEffect(() => {
+    if (seatedZoneIds.length === 0) { setSeatsByZone({}); return; }
+    let cancelled = false;
+    setLoadingSeats(true);
+    Promise.all(seatedZoneIds.map(id => api.getSeats(id).then(seats => [id, seats] as const)))
+      .then(entries => {
+        if (cancelled) return;
+        setSeatsByZone(Object.fromEntries(entries));
+      })
+      .finally(() => { if (!cancelled) setLoadingSeats(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seatedZoneKey]);
+
+  const seatByCell = useMemo(() => {
+    const map = new Map<string, Seat>();
+    for (const [zoneId, seats] of Object.entries(seatsByZone)) {
+      for (const seat of seats) map.set(`${zoneId}|${seat.row}|${seat.posInSection}`, seat);
+    }
+    return map;
+  }, [seatsByZone]);
+
   if (!layout) return null;
 
-  const zoneById = new Map(zones.map((z, i) => [z.id, { zone: z, index: i }]));
   const usedZones = zones.filter(z => layout.cells.some(row => row.includes(z.id)));
-
   if (usedZones.length === 0) return null;
+
+  const selectedZone = zones.find(z => z.id === selectedZoneId);
+  const filled = selectedSeatIds.length;
+  const remaining = neededSeats - filled;
 
   return (
     <div className="space-y-3">
+      {selectedZone?.type === 'SEATED' && (
+        <div className={`text-sm font-medium ${remaining <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+          {remaining <= 0
+            ? `Выбрано ${filled} из ${neededSeats} мест`
+            : `Выберите ещё ${remaining} место${remaining > 1 ? (remaining < 5 ? 'а' : '') : ''}`}
+        </div>
+      )}
+
       {/* Grid canvas */}
       <div className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100 select-none">
         <div
@@ -55,14 +114,57 @@ export function VenueGridMap({ venue, zones, selectedZoneId, currency, onZoneCli
                 );
               }
               const { zone, index } = entry;
+              const color = zoneColor(zone, index);
+
+              if (zone.type === 'SEATED') {
+                const seat = seatByCell.get(`${zone.id}|${r}|${c}`);
+                if (!seat) {
+                  return (
+                    <div
+                      key={`${r}-${c}`}
+                      style={{ aspectRatio: '1', backgroundColor: `${color}55`, minWidth: 4, minHeight: 4 }}
+                    />
+                  );
+                }
+                const isCurrentZone = zone.id === selectedZoneId;
+                const isSelected = isCurrentZone && selectedSeatIds.includes(seat.id);
+                const isOccupied = seat.occupied;
+                const canSelect = !isOccupied && (isCurrentZone ? (isSelected || filled < neededSeats) : true);
+                return (
+                  <div
+                    key={`${r}-${c}`}
+                    onClick={() => canSelect && onSeatToggle(zone, seat)}
+                    title={`${zone.name} · ${seat.label ?? `Место ${seat.number}`} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
+                    style={{
+                      aspectRatio: '1',
+                      backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? color : `${color}55`,
+                      outline: isSelected ? `2px solid ${color}` : 'none',
+                      outlineOffset: -1,
+                      cursor: canSelect ? 'pointer' : 'not-allowed',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 'clamp(6px, 1.6cqw, 11px)',
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      color: isOccupied ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
+                      minWidth: 4,
+                      minHeight: 4,
+                    }}
+                  >
+                    {seat.label ?? seat.number}
+                  </div>
+                );
+              }
+
+              // GENERAL (no specific seats): the whole cell just selects the zone
               const isSelected = zone.id === selectedZoneId;
               const isEmpty = (zone.available ?? 0) <= 0;
-              const color = zoneColor(zone, index);
               return (
                 <div
                   key={`${r}-${c}`}
-                  title={`${zone.name} · ${formatPrice(zone.price, currency)}${isEmpty ? ' · мест нет' : ''}`}
                   onClick={() => !isEmpty && onZoneClick(zone)}
+                  title={`${zone.name} · ${formatPrice(zone.price, currency)}${isEmpty ? ' · мест нет' : ''}`}
                   style={{
                     aspectRatio: '1',
                     backgroundColor: isEmpty ? 'rgba(156,163,175,0.5)' : isSelected ? color : `${color}99`,
@@ -79,27 +181,24 @@ export function VenueGridMap({ venue, zones, selectedZoneId, currency, onZoneCli
         </div>
       </div>
 
-      {/* Zone legend / alternate selector */}
+      {loadingSeats && <p className="text-xs text-gray-400">Загрузка мест...</p>}
+
+      {/* Zone legend — clickable for zones without specific seats, informational for seated ones */}
       <div className="flex flex-wrap gap-2">
         {usedZones.map(zone => {
           const index = zoneById.get(zone.id)!.index;
           const isSelected = zone.id === selectedZoneId;
           const isEmpty = (zone.available ?? 0) <= 0;
-          return (
-            <button
-              key={zone.id}
-              type="button"
-              disabled={isEmpty}
-              onClick={() => onZoneClick(zone)}
-              className={[
-                'flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-xs transition-colors',
-                isSelected
-                  ? 'border-emerald-600 bg-emerald-50'
-                  : isEmpty
-                    ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                    : 'border-gray-200 hover:border-emerald-300',
-              ].join(' ')}
-            >
+          const className = [
+            'flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-xs transition-colors',
+            isSelected
+              ? 'border-emerald-600 bg-emerald-50'
+              : isEmpty
+                ? 'border-gray-100 bg-gray-50 opacity-50'
+                : 'border-gray-200',
+          ].join(' ');
+          const content = (
+            <>
               <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, index) }} />
               <span className="font-medium text-gray-800">{zone.name}</span>
               <span className="text-gray-400">{formatPrice(zone.price, currency)}</span>
@@ -108,7 +207,20 @@ export function VenueGridMap({ venue, zones, selectedZoneId, currency, onZoneCli
                   · {isEmpty ? 'мест нет' : `${zone.available} мест`}
                 </span>
               )}
+            </>
+          );
+          return zone.type === 'GENERAL' ? (
+            <button
+              key={zone.id}
+              type="button"
+              disabled={isEmpty}
+              onClick={() => onZoneClick(zone)}
+              className={`${className} ${!isSelected && !isEmpty ? 'hover:border-emerald-300' : ''}`}
+            >
+              {content}
             </button>
+          ) : (
+            <div key={zone.id} className={className}>{content}</div>
           );
         })}
       </div>
