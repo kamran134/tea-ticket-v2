@@ -1,7 +1,9 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:${POSTGRES_VERSION:-17}-alpine
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -17,18 +19,22 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-tea-ticket-backend:latest}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:${BACKEND_PORT:-3001}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
-      CORS_ORIGIN: https://tea-ticket.com
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      UPLOADS_DIR: /app/uploads
       PORT: 3000
     volumes:
-      - /opt/tea-ticket-v2/uploads:/app/uploads
+      - ${UPLOADS_PATH}:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -36,10 +42,13 @@ services:
       - internal
 
   frontend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    image: ${FRONTEND_IMAGE:-tea-ticket-frontend:latest}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     networks:
       - internal
 
