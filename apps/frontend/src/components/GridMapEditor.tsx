@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, GridLayout, GridZone, GridCellState } from '../types';
+import type { Venue, Zone, GridLayout, GridCellState } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 
@@ -28,6 +28,14 @@ function countCellsByZone(cells: GridCellState[]): Record<string, number> {
   return counts;
 }
 
+function zoneColor(zone: Zone, index: number): string {
+  return zone.color ?? ZONE_COLORS[index % ZONE_COLORS.length];
+}
+
+function errMsg(err: unknown, fallback: string): string {
+  return err instanceof Error ? err.message : fallback;
+}
+
 interface Props {
   venue: Venue;
   onVenueUpdated: (venue: Venue) => void;
@@ -44,16 +52,20 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [cells, setCells] = useState<GridCellState[][]>(() =>
     buildCells(initial?.rows ?? 10, initial?.cols ?? 15, initial?.cells),
   );
-  const [zones, setZones] = useState<GridZone[]>(initial?.zones ?? []);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [activeTool, setActiveTool] = useState<Tool>('block');
   const [locked, setLocked] = useState(!!initial);
   const [saving, setSaving] = useState(false);
+  const [addingZone, setAddingZone] = useState(false);
 
   // Zone creation form
   const [showZoneForm, setShowZoneForm] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
+  const [newZoneCardNumber, setNewZoneCardNumber] = useState('');
   const [newZonePrice, setNewZonePrice] = useState('');
   const [newZoneColor, setNewZoneColor] = useState(ZONE_COLORS[0]);
+  const [newZoneNoSeats, setNewZoneNoSeats] = useState(false);
+  const [newZoneCapacity, setNewZoneCapacity] = useState('');
 
   // Drawing
   const isDrawing = useRef(false);
@@ -64,6 +76,23 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     document.addEventListener('mouseup', stop);
     return () => document.removeEventListener('mouseup', stop);
   }, []);
+
+  // Load real zones for this venue; drop any painted cell referencing a zone
+  // that no longer exists (e.g. leftover ids from before this feature existed).
+  useEffect(() => {
+    let cancelled = false;
+    api.getZones(venue.id).then(zs => {
+      if (cancelled) return;
+      const relevant = zs.filter(z => z.type !== 'TABLE');
+      setZones(relevant);
+      const validIds = new Set(relevant.map(z => z.id));
+      setCells(prev =>
+        prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || validIds.has(c) ? c : 'empty'))),
+      );
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venue.id]);
 
   const applyGridSize = () => {
     const r = Math.max(1, Math.min(100, pendingRows));
@@ -102,26 +131,54 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     });
   }, [locked]);
 
-  const addZone = () => {
-    if (!newZoneName.trim() || !newZonePrice) return;
-    const zone: GridZone = {
-      id: `z-${Date.now()}`,
-      name: newZoneName.trim(),
-      color: newZoneColor,
-      pricePerSeat: Number(newZonePrice),
-    };
-    setZones(prev => [...prev, zone]);
-    setActiveTool(zone.id);
-    setShowZoneForm(false);
+  const resetZoneForm = () => {
     setNewZoneName('');
+    setNewZoneCardNumber('');
     setNewZonePrice('');
-    setNewZoneColor(ZONE_COLORS[(zones.length + 1) % ZONE_COLORS.length]);
+    setNewZoneNoSeats(false);
+    setNewZoneCapacity('');
+    setNewZoneColor(ZONE_COLORS[zones.length % ZONE_COLORS.length]);
   };
 
-  const removeZone = useCallback((zoneId: string) => {
-    setZones(prev => prev.filter(z => z.id !== zoneId));
-    setCells(prev => prev.map(row => row.map(c => (c === zoneId ? 'empty' : c))));
-    setActiveTool(t => (t === zoneId ? 'block' : t));
+  const addZone = async () => {
+    if (!newZoneName.trim() || !newZonePrice || !newZoneCardNumber.trim()) return;
+    if (newZoneNoSeats && !newZoneCapacity) return;
+
+    setAddingZone(true);
+    try {
+      const zone = await api.createZone({
+        venueId: venue.id,
+        name: newZoneName.trim(),
+        price: Number(newZonePrice),
+        cardNumber: newZoneCardNumber.trim(),
+        capacity: newZoneNoSeats ? Number(newZoneCapacity) : 1,
+        sortOrder: zones.length,
+        type: newZoneNoSeats ? 'GENERAL' : 'SEATED',
+        color: newZoneColor,
+        layoutData: null,
+      });
+      setZones(prev => [...prev, zone]);
+      setActiveTool(zone.id);
+      setShowZoneForm(false);
+      resetZoneForm();
+      toast.success('Зона создана');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось создать зону'));
+    } finally {
+      setAddingZone(false);
+    }
+  };
+
+  const removeZone = useCallback(async (zoneId: string) => {
+    try {
+      await api.deleteZone(zoneId);
+      setZones(prev => prev.filter(z => z.id !== zoneId));
+      setCells(prev => prev.map(row => row.map(c => (c === zoneId ? 'empty' : c))));
+      setActiveTool(t => (t === zoneId ? 'block' : t));
+      toast.success('Зона удалена');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось удалить зону — возможно, на неё уже есть билеты'));
+    }
   }, []);
 
   const clearAll = () => {
@@ -133,8 +190,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     const countsByZone = countCellsByZone(flat);
     let total = 0;
     const details = zones.map(zone => {
-      const count = countsByZone[zone.id] ?? 0;
-      const amount = count * zone.pricePerSeat;
+      // GENERAL zones sell by declared capacity, not by painted cell count
+      const count = zone.type === 'GENERAL' ? zone.capacity : (countsByZone[zone.id] ?? 0);
+      const amount = count * zone.price;
       total += amount;
       return { zone, count, amount };
     });
@@ -144,13 +202,14 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const save = async () => {
     setSaving(true);
     try {
-      const layout: GridLayout = { rows, cols, cells, zones };
-      const updated = await api.saveGridLayout(venue.id, layout);
-      onVenueUpdated(updated);
+      const layout: GridLayout = { rows, cols, cells };
+      const { venue: updatedVenue, zones: updatedZones } = await api.saveGridLayout(venue.id, layout);
+      onVenueUpdated(updatedVenue);
+      setZones(updatedZones.filter(z => z.type !== 'TABLE'));
       setLocked(true);
-      toast.success('Схема сохранена');
+      toast.success('Сетка сохранена');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Ошибка сохранения');
+      toast.error(errMsg(err, 'Ошибка сохранения'));
     } finally {
       setSaving(false);
     }
@@ -260,22 +319,25 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             {zones.length > 0 && <span className="w-px h-6 bg-gray-200" />}
 
             {/* Zone tools */}
-            {zones.map(zone => (
+            {zones.map((zone, i) => (
               <div
                 key={zone.id}
                 className={`flex items-center rounded-lg border-2 transition-all overflow-hidden ${
                   activeTool === zone.id ? 'border-gray-800' : 'border-transparent'
                 }`}
-                style={{ backgroundColor: `${zone.color}18` }}
+                style={{ backgroundColor: `${zoneColor(zone, i)}18` }}
               >
                 <button
                   type="button"
                   onClick={() => setActiveTool(zone.id)}
                   className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1.5 text-sm"
                 >
-                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zone.color }} />
+                  <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, i) }} />
                   <span className="font-medium text-gray-800">{zone.name}</span>
-                  <span className="text-gray-400 text-xs">{formatPrice(zone.pricePerSeat, currency)}</span>
+                  <span className="text-gray-400 text-xs">{formatPrice(zone.price, currency)}</span>
+                  {zone.type === 'GENERAL' && (
+                    <span className="text-gray-400 text-xs">· без мест</span>
+                  )}
                 </button>
                 <button
                   type="button"
@@ -307,23 +369,52 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   type="text"
                   value={newZoneName}
                   onChange={e => setNewZoneName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addZone()}
                   className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
                   placeholder="VIP"
                   autoFocus
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Цена за место ({currency})</label>
+                <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
+                <input
+                  type="text"
+                  value={newZoneCardNumber}
+                  onChange={e => setNewZoneCardNumber(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  placeholder="0000 0000 0000"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Цена ({currency})</label>
                 <input
                   type="number"
                   value={newZonePrice}
                   onChange={e => setNewZonePrice(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addZone()}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
                   placeholder="5000"
                   min="0"
                 />
+              </div>
+              <div>
+                <label className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5 whitespace-nowrap">
+                  <input
+                    type="checkbox"
+                    checked={newZoneNoSeats}
+                    onChange={e => setNewZoneNoSeats(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  Без конкретных мест
+                </label>
+                {newZoneNoSeats && (
+                  <input
+                    type="number"
+                    value={newZoneCapacity}
+                    onChange={e => setNewZoneCapacity(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                    placeholder="Вместимость"
+                    min="1"
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">Цвет</label>
@@ -345,14 +436,14 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 <button
                   type="button"
                   onClick={addZone}
-                  disabled={!newZoneName.trim() || !newZonePrice}
+                  disabled={addingZone || !newZoneName.trim() || !newZonePrice || !newZoneCardNumber.trim() || (newZoneNoSeats && !newZoneCapacity)}
                   className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
                 >
-                  Добавить
+                  {addingZone ? '...' : 'Добавить'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowZoneForm(false)}
+                  onClick={() => { setShowZoneForm(false); resetZoneForm(); }}
                   className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Отмена
@@ -377,9 +468,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         >
           {cells.map((row, r) =>
             row.map((cell, c) => {
-              const zone = cell !== 'empty' && cell !== 'blocked'
-                ? zones.find(z => z.id === cell)
-                : null;
+              const zoneIndex = cell !== 'empty' && cell !== 'blocked'
+                ? zones.findIndex(z => z.id === cell)
+                : -1;
+              const zone = zoneIndex >= 0 ? zones[zoneIndex] : null;
               return (
                 <div
                   key={`${r}-${c}`}
@@ -387,7 +479,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     aspectRatio: '1',
                     backgroundColor:
                       cell === 'blocked' ? '#9ca3af' :
-                      zone ? zone.color + 'cc' : '#ffffff',
+                      zone ? zoneColor(zone, zoneIndex) + 'cc' : '#ffffff',
                     cursor: locked ? 'default' : 'crosshair',
                     minWidth: 4,
                     minHeight: 4,
@@ -404,11 +496,11 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       {/* Legend when locked */}
       {locked && zones.length > 0 && (
         <div className="flex flex-wrap gap-3">
-          {zones.map(zone => {
+          {zones.map((zone, i) => {
             const count = revenue.details.find(d => d.zone.id === zone.id)?.count ?? 0;
             return (
               <div key={zone.id} className="flex items-center gap-1.5 text-sm">
-                <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zone.color }} />
+                <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, i) }} />
                 <span className="text-gray-700">{zone.name}</span>
                 <span className="text-gray-400">({count} мест)</span>
               </div>
@@ -431,10 +523,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               .map(({ zone, count, amount }) => (
                 <div key={zone.id} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zone.color }} />
+                    <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zone.color ?? '#9ca3af' }} />
                     <span className="text-gray-700 truncate">{zone.name}</span>
                     <span className="text-gray-400 text-xs shrink-0">
-                      {count} × {formatPrice(zone.pricePerSeat, currency)}
+                      {count} × {formatPrice(zone.price, currency)}
                     </span>
                   </div>
                   <span className="font-medium text-gray-800 ml-2 shrink-0">

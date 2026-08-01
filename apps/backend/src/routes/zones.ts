@@ -74,6 +74,8 @@ zonesRouter.get('/', async (req, res) => {
   }
 });
 
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
 const createZoneSchema = z.object({
   venueId: z.string().min(1),
   name: z.string().min(1).max(200),
@@ -82,6 +84,7 @@ const createZoneSchema = z.object({
   capacity: z.number().int().positive(),
   sortOrder: z.number().int().default(0),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).default('GENERAL'),
+  color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
 });
 
@@ -114,6 +117,7 @@ const updateZoneSchema = z.object({
   capacity: z.number().int().positive().optional(),
   sortOrder: z.number().int().optional(),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).optional(),
+  color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
 });
 
@@ -138,7 +142,10 @@ zonesRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
     await prisma.zone.delete({ where: { id: req.params.id } });
     return res.json({ success: true, data: { deleted: true } });
-  } catch {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      return res.status(409).json({ success: false, error: 'Cannot delete zone: tickets already exist for it' });
+    }
     return res.status(500).json({ success: false, error: 'Failed to delete zone' });
   }
 });

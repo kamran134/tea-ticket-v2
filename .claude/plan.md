@@ -1,53 +1,56 @@
-# План: Визуальная схема зала + гибридные места
+# План: Сетка = реальные зоны/места + зона без мест
 
 ## Концепция
-Зона (Zone) получает тип: `GENERAL` (без мест), `SEATED` (ряды/колонны), `TABLE` (столы).
-Ticket привязывается к конкретному Seat или ZoneTable (оба опциональны).
-Визуальная карта — SVG поверх фона зала; зоны позиционируются через layoutData.
+«Сетка» (`GridMapEditor`) перестаёт быть черновиком-калькулятором поверх `Venue.gridLayout`
+и становится редактором над настоящими `Zone`/`Seat`. Закрашенная ячейка — либо реальное
+место (`Seat`, для `type: SEATED`), либо просто часть визуальной области зоны без мест
+(`type: GENERAL`, вместимость — отдельное число). Сетка используется и на покупке билета
+вместо «Схемы». «Схема» (`ZoneMapEditor`/`VenueMap`) скрывается из UI, код не удаляется.
 
 ---
 
-## Этап 1: Схема БД + миграция ✅
-- [x] Добавить `ZoneType` enum (`GENERAL`, `SEATED`, `TABLE`) в schema.prisma
-- [x] Добавить `type ZoneType` и `layoutData Json?` в модель `Zone`
-- [x] Создать модель `Seat` (zoneId, number, row, sectionIndex, posInSection, label?)
-- [x] Создать модель `ZoneTable` (zoneId, number, shape, chairCount, layoutData?)
-- [x] Добавить `seatId String? @unique` и `tableId String?` в `Ticket`
-- [x] Создать SQL-миграцию (применить вручную: `psql < migration.sql`)
+## Этап 1: Схема БД
+- [x] Добавить `color String?` в модель `Zone` (для покраски на сетке)
+- [x] Миграция `add_zone_color`
 
-## Этап 2: Backend — новые роуты ✅
-- [x] `GET /api/zones/:id/seats`
-- [x] `POST /api/zones/:id/generate-seats`
-- [x] `DELETE /api/zones/:id/seats`
-- [x] `GET /api/zones/:id/tables`
-- [x] `POST /api/zones/:id/generate-tables`
-- [x] Обновить `POST /api/tickets/register` — seatId/tableId + валидация
-- [x] Обновить `GET /api/zones` — available для всех типов
-- [x] Обновить `PUT /api/zones/:id` — type и layoutData
+## Этап 2: Backend
+- [x] `zones.ts`: добавить `color` в `createZoneSchema`/`updateZoneSchema`
+- [x] `zones.ts` DELETE `/:id`: перехватывать FK-конфликт (P2003) → 409 с понятным сообщением
+- [x] `venues.ts` `PUT /:id/grid-layout`: новая схема `{ rows, cols, cells: string[][] }`
+      (без вложенного `zones[]` — ячейка ссылается на реальный `Zone.id`)
+- [x] Транзакционная синхронизация мест для `SEATED`-зон при сохранении сетки:
+      diff закрашенных ячеек ↔ существующие `Seat` (row/posInSection = координаты ячейки,
+      sectionIndex = 0), запрет удаления ячейки/места с активным билетом (409),
+      пересчёт `capacity` зоны
 
-## Этап 3: Frontend типы + API-сервис ✅
-- [x] Обновить `Zone`, `Ticket`, добавить `Seat`, `ZoneTable`, `ZoneType`
-- [x] Добавить методы: getSeats, generateSeats, deleteSeats, getTables, generateTables
-- [x] Обновить `register` — seatId/tableId
+## Этап 3: Frontend типы + API
+- [x] `types/index.ts`: `color` в `Zone`, `GridLayout` без `zones[]`, убрать `GridZone`
+- [x] `api.ts`: обновить `saveGridLayout` под новую схему, вернуть `{ venue, zones }`
 
-## Этап 4: Админ UI ✅
-- [x] `ZoneConfigurator` компонент: генератор секций (SEATED) + генератор столов (TABLE)
-- [x] Интегрирован в список зон ManagePanel
+## Этап 4: Admin UI — GridMapEditor
+- [x] Загружать реальные зоны венью через `api.getZones` (не только из `gridLayout`)
+- [x] Форма «+Зона»: номер карты, чекбокс «Без конкретных мест»
+      (снят → `SEATED`, отмечен → `GENERAL` + поле «Вместимость»)
+- [x] `addZone` → `api.createZone` (реальная зона сразу)
+- [x] `removeZone` → `api.deleteZone` (+ обработка 409 «есть билеты»)
+- [x] `save()` → новый `api.saveGridLayout`, синхронизация мест на бэке, toast при 409
 
-## Этап 5: Пользовательский UI ✅
-- [x] `SeatPicker` — grid мест по рядам и секциям
-- [x] `TablePicker` — карточки столов с доступностью
-- [x] `RegisterForm` — зоны как карточки, SeatPicker/TablePicker по типу зоны
+## Этап 5: Покупка билета
+- [x] Новый компонент `VenueGridMap.tsx` — сетка зала, клик по ячейке выбирает зону
+- [x] `RegisterForm.tsx`: приоритет gridLayout → legacy VenueMap → карточки
+- [ ] Ручная проверка: `SeatPicker` корректно показывает места, сгенерированные из сетки
 
-## Этап 6: Визуальная схема зала ✅
-- [x] `floorPlanImage String?` в модель `Venue` + миграция
-- [x] `POST /api/venues/:id/upload-floor-plan` — загрузка фото зала
-- [x] `VenueMap` компонент — CSS-positioned зоны поверх фото, кликабельные
-- [x] `ZoneMapEditor` — drag-and-drop редактор + загрузка схемы + цвета зон
-- [x] ManagePanel: вкладка «Схема» с ZoneMapEditor
-- [x] RegisterForm: автопереключение на VenueMap когда есть позиции зон
+## Этап 6: Скрыть «Схему»
+- [x] `ManagePanel.tsx`: убрать вкладку «Схема» из списка табов (код не трогать)
+
+## Этап 7: Проверка
+- [x] Typecheck/build backend и frontend (`tsc --noEmit` + `vite build` — чисто)
+- [ ] Сценарий в браузере: зона с местами через сетку → покупка → занятая ячейка видна
+      (не выполнено — в окружении нет БД: нет `.env`/`docker-compose`/`DATABASE_URL`)
+- [ ] Сценарий в браузере: зона без мест через сетку → покупка по количеству гостей
+      (не выполнено — та же причина)
 
 ---
 
 ## Порядок зависимостей
-Этап 1 → Этап 2 → Этап 3 → Этапы 4 и 5 параллельно → Этап 6
+Этап 1 → Этап 2 → Этап 3 → Этап 4 → Этап 5 → Этап 6 → Этап 7

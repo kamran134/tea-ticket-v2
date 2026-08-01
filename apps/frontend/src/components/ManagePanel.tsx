@@ -162,6 +162,7 @@ export function ManagePanel() {
         capacity: Number(newZone.capacity),
         sortOrder: Number(newZone.sortOrder),
         type: 'GENERAL',
+        color: null,
         layoutData: null,
       });
       setZones(z => [...z, zone]);
@@ -327,7 +328,7 @@ export function ManagePanel() {
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(['venues', 'zones', 'map', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
+          {(['venues', 'zones', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}

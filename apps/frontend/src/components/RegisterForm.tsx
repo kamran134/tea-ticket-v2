@@ -5,6 +5,7 @@ import { formatPrice } from '../types';
 import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueMap } from './VenueMap';
+import { VenueGridMap } from './VenueGridMap';
 
 const ZONE_TYPE_BADGE: Record<string, string> = {
   GENERAL: '',
@@ -67,6 +68,10 @@ export function RegisterForm() {
   const currency = selectedVenue?.currency ?? '₼';
   const selectedZone = zones.find(z => z.id === zoneId);
   const selectedTable = tables.find(t => t.id === selectedTableId);
+
+  const hasGridZones = !!selectedVenue?.gridLayout &&
+    zones.some(z => selectedVenue.gridLayout!.cells.some(row => row.includes(z.id)));
+  const hasSchemaZones = zones.some(z => z.layoutData !== null);
 
   const neededSeats = 1 + guests.length;
 
@@ -167,7 +172,15 @@ export function RegisterForm() {
             {zones.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Зона</label>
-                {selectedVenue && zones.some(z => z.layoutData !== null) ? (
+                {selectedVenue && hasGridZones ? (
+                  <VenueGridMap
+                    venue={selectedVenue}
+                    zones={zones}
+                    selectedZoneId={zoneId}
+                    currency={currency}
+                    onZoneClick={z => setZoneId(z.id)}
+                  />
+                ) : selectedVenue && hasSchemaZones ? (
                   <VenueMap
                     venue={selectedVenue}
                     zones={zones}

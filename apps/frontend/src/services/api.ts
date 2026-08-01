@@ -234,7 +234,7 @@ export const api = {
     });
   },
 
-  async saveGridLayout(venueId: string, layout: GridLayout): Promise<Venue> {
+  async saveGridLayout(venueId: string, layout: GridLayout): Promise<{ venue: Venue; zones: Zone[] }> {
     return request(`/api/venues/${encodeURIComponent(venueId)}/grid-layout`, {
       method: 'PUT',
       headers: authHeaders(),

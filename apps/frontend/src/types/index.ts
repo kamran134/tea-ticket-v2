@@ -17,18 +17,10 @@ export function formatPrice(amount: number, currency: Currency | string): string
 
 export type GridCellState = 'empty' | 'blocked' | string;
 
-export interface GridZone {
-  id: string;
-  name: string;
-  color: string;
-  pricePerSeat: number;
-}
-
 export interface GridLayout {
   rows: number;
   cols: number;
   cells: GridCellState[][];
-  zones: GridZone[];
 }
 
 export interface Venue {
@@ -71,6 +63,7 @@ export interface Zone {
   capacity: number;
   sortOrder: number;
   type: ZoneType;
+  color: string | null;
   layoutData: ZoneLayoutData | null;
   available?: number;
 }
