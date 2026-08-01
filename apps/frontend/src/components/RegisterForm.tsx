@@ -467,12 +467,12 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             {cartTotal > 0 && (
-              <div className="p-4 bg-emerald-600 rounded-xl text-white">
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm opacity-90">
+                  <span className="text-sm text-emerald-700">
                     Итого · {cartCount} {pluralize(cartCount, 'билет', 'билета', 'билетов')}
                   </span>
-                  <span className="text-2xl font-bold">{formatPrice(cartTotal, currency)}</span>
+                  <span className="text-2xl font-bold text-emerald-800">{formatPrice(cartTotal, currency)}</span>
                 </div>
               </div>
             )}

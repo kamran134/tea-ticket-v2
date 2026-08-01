@@ -210,6 +210,11 @@ export function ManagePanel() {
     navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
   };
 
+  const copyTicketLink = (id: string) => {
+    const url = `${window.location.origin}/ticket?id=${id}`;
+    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка на билет скопирована'));
+  };
+
   const saveVenueSlug = async (id: string) => {
     const slug = slugify(editingSlugValue);
     if (!slug) { toast.error('Пустой слаг'); return; }
@@ -860,6 +865,13 @@ export function ManagePanel() {
                         Открыть чек →
                       </a>
                     )}
+
+                    <button
+                      onClick={() => copyTicketLink(t.id)}
+                      className="text-sm text-emerald-700 hover:underline block"
+                    >
+                      Скопировать ссылку на билет
+                    </button>
 
                     <div className="flex gap-2">
                       {(t.status === 'PENDING' || t.status === 'BOOKED') && (
