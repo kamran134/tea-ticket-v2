@@ -32,6 +32,35 @@ function zoneColor(zone: Zone, index: number): string {
   return zone.color ?? ZONE_COLORS[index % ZONE_COLORS.length];
 }
 
+const GRID_LINE = '#e5e7eb';
+
+// Cells painted with the same GENERAL zone should read as one filled area,
+// not a grid — so the border between two such neighbours is hidden.
+function sameZoneNeighbor(cells: GridCellState[][], r: number, c: number, zoneId: string): boolean {
+  return cells[r]?.[c] === zoneId;
+}
+
+interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
+
+function zoneBoundingBoxes(cells: GridCellState[][], zoneIds: Set<string>): Map<string, ZoneBox> {
+  const boxes = new Map<string, ZoneBox>();
+  cells.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (!zoneIds.has(cell)) return;
+      const box = boxes.get(cell);
+      if (!box) {
+        boxes.set(cell, { minRow: r, maxRow: r, minCol: c, maxCol: c });
+      } else {
+        box.minRow = Math.min(box.minRow, r);
+        box.maxRow = Math.max(box.maxRow, r);
+        box.minCol = Math.min(box.minCol, c);
+        box.maxCol = Math.max(box.maxCol, c);
+      }
+    });
+  });
+  return boxes;
+}
+
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
@@ -92,6 +121,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+
+  // Large grids are cramped inline — offer a fullscreen view for them
+  const [expanded, setExpanded] = useState(false);
+  const showExpandToggle = cols > 15 || rows > 15;
 
   // Drawing
   const isDrawing = useRef(false);
@@ -154,6 +187,8 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       const currentValue = prev[row][col];
       const paintValue: GridCellState =
         activeTool === 'erase' ? 'empty' :
+        activeTool === 'block' ?
+          (currentValue === 'blocked' ? 'empty' : 'blocked') :
         currentValue === activeTool ? 'empty' : activeTool;
       drawValue.current = paintValue;
       const next = [...prev];
@@ -373,6 +408,11 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
   };
 
+  const generalZoneBoxes = useMemo(() => {
+    const generalIds = new Set(zones.filter(z => z.type === 'GENERAL').map(z => z.id));
+    return zoneBoundingBoxes(cells, generalIds);
+  }, [cells, zones]);
+
   const revenue = useMemo(() => {
     const flat = cells.flat();
     const countsByZone = countCellsByZone(flat);
@@ -476,11 +516,20 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className={expanded ? 'fixed inset-0 z-50 bg-white overflow-auto p-4 space-y-4' : 'space-y-4'}>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-gray-800">Схема зала</h3>
         <div className="flex gap-2 items-center flex-wrap">
+          {showExpandToggle && (
+            <button
+              type="button"
+              onClick={() => setExpanded(e => !e)}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              {expanded ? 'Свернуть' : 'На весь экран'}
+            </button>
+          )}
           {!locked && (
             <button
               type="button"
@@ -793,14 +842,15 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
       {/* Grid canvas */}
       <div
-        className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100 select-none"
+        className={`relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none ${
+          expanded ? 'overflow-auto' : 'overflow-hidden'
+        }`}
         onMouseLeave={() => { isDrawing.current = false; }}
       >
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gap: '1px',
+            gridTemplateColumns: `repeat(${cols}, minmax(${expanded ? '28px' : '0'}, 1fr))`,
           }}
         >
           {cells.map((row, r) =>
@@ -809,6 +859,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 ? zones.findIndex(z => z.id === cell)
                 : -1;
               const zone = zoneIndex >= 0 ? zones[zoneIndex] : null;
+              const isGeneralFill = zone?.type === 'GENERAL';
               return (
                 <div
                   key={`${r}-${c}`}
@@ -820,6 +871,12 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     cursor: locked ? 'default' : 'crosshair',
                     minWidth: 4,
                     minHeight: 4,
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderTopColor: isGeneralFill && sameZoneNeighbor(cells, r - 1, c, zone!.id) ? 'transparent' : GRID_LINE,
+                    borderBottomColor: isGeneralFill && sameZoneNeighbor(cells, r + 1, c, zone!.id) ? 'transparent' : GRID_LINE,
+                    borderLeftColor: isGeneralFill && sameZoneNeighbor(cells, r, c - 1, zone!.id) ? 'transparent' : GRID_LINE,
+                    borderRightColor: isGeneralFill && sameZoneNeighbor(cells, r, c + 1, zone!.id) ? 'transparent' : GRID_LINE,
                   }}
                   onMouseDown={() => handleCellMouseDown(r, c)}
                   onMouseEnter={() => handleCellMouseEnter(r, c)}
@@ -828,6 +885,30 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             }),
           )}
         </div>
+
+        {/* Zone name overlay for GENERAL areas — sits on top, clicks pass through to cells */}
+        {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          return (
+            <div
+              key={zoneId}
+              className="absolute flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+              style={{
+                left: `${(box.minCol / cols) * 100}%`,
+                top: `${(box.minRow / rows) * 100}%`,
+                width: `${((box.maxCol - box.minCol + 1) / cols) * 100}%`,
+                height: `${((box.maxRow - box.minRow + 1) / rows) * 100}%`,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                lineHeight: 1.2,
+              }}
+            >
+              {zone.name}
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend when locked */}

@@ -6,6 +6,7 @@ import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueMap } from './VenueMap';
 import { VenueGridMap } from './VenueGridMap';
+import { QuantityModal } from './QuantityModal';
 
 interface CartLine {
   key: string;
@@ -49,6 +50,8 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatZoneId, setLegacySeatZoneId] = useState<string | null>(null);
   const [legacySeatsCache, setLegacySeatsCache] = useState<Record<string, Seat[]>>({});
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
+
+  const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
 
   useEffect(() => {
     api.getVenueBySlug(slug)
@@ -118,14 +121,13 @@ export function RegisterForm({ slug }: Props) {
     });
   };
 
-  const addGeneralToCart = (zone: Zone) => {
+  const setGeneralQuantity = (zone: Zone, quantity: number) => {
     const key = `general:${zone.id}`;
     setCart(prev => {
+      if (quantity <= 0) return prev.filter(l => l.key !== key);
       const existing = prev.find(l => l.key === key);
-      const max = zone.available ?? Infinity;
-      if ((existing?.quantity ?? 0) >= max) return prev;
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l));
-      return [...prev, { key, zoneId: zone.id, zoneName: zone.name, price: zone.price, quantity: 1 }];
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
+      return [...prev, { key, zoneId: zone.id, zoneName: zone.name, price: zone.price, quantity }];
     });
   };
 
@@ -161,7 +163,7 @@ export function RegisterForm({ slug }: Props) {
 
   const handleZoneClick = (zone: Zone) => {
     if (zone.type === 'SEATED') openSeatZone(zone);
-    else if (zone.type === 'GENERAL') addGeneralToCart(zone);
+    else if (zone.type === 'GENERAL') setQuantityModalZoneId(zone.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -215,6 +217,7 @@ export function RegisterForm({ slug }: Props) {
     (!namedGuests || guestNameInputs.every(g => g.trim()));
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
+  const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
@@ -244,7 +247,7 @@ export function RegisterForm({ slug }: Props) {
                   currency={currency}
                   cartSeatIds={cartSeatIds}
                   cartQuantityByZone={cartQuantityByZone}
-                  onZoneAdd={addGeneralToCart}
+                  onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                   onSeatToggle={toggleSeatInCart}
                 />
               </div>
@@ -487,6 +490,17 @@ export function RegisterForm({ slug }: Props) {
           </form>
         </div>
       </div>
+
+      {quantityModalZone && (
+        <QuantityModal
+          zone={quantityModalZone}
+          currency={currency}
+          quantity={cartQuantityByZone[quantityModalZone.id] ?? 0}
+          max={quantityModalZone.available ?? Infinity}
+          onChange={qty => setGeneralQuantity(quantityModalZone, qty)}
+          onClose={() => setQuantityModalZoneId(null)}
+        />
+      )}
     </div>
   );
 }
