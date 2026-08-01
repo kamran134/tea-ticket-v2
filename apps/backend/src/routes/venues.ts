@@ -103,7 +103,13 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: 'cells dimensions must match rows/cols' });
   }
 
-  const zones = await prisma.zone.findMany({ where: { venueId } });
+  const [existingVenue, zones] = await Promise.all([
+    prisma.venue.findUnique({ where: { id: venueId }, select: { gridLayout: true } }),
+    prisma.zone.findMany({ where: { venueId } }),
+  ]);
+  if (!existingVenue) {
+    return res.status(404).json({ success: false, error: 'Venue not found' });
+  }
   const zoneById = new Map(zones.map(z => [z.id, z]));
 
   const usedZoneIds = new Set<string>();
@@ -124,13 +130,27 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
     }
   }
 
-  // Zones whose seats need re-syncing: referenced now, or previously SEATED (to allow full erase)
+  // A zone is only "grid-managed" if it's painted now, or was painted in the
+  // previously saved layout — zones with seats from the old row/section
+  // generator (ZoneConfigurator) never appear in any gridLayout and must be
+  // left untouched here.
+  const previouslyGridZoneIds = new Set<string>();
+  const previousLayout = existingVenue.gridLayout as { cells?: string[][] } | null;
+  if (previousLayout?.cells) {
+    for (const row of previousLayout.cells) {
+      for (const cell of row) {
+        if (cell !== 'empty' && cell !== 'blocked') previouslyGridZoneIds.add(cell);
+      }
+    }
+  }
+
   const seatedZoneIds = new Set<string>();
   for (const id of usedZoneIds) {
     if (zoneById.get(id)!.type === 'SEATED') seatedZoneIds.add(id);
   }
-  for (const z of zones) {
-    if (z.type === 'SEATED') seatedZoneIds.add(z.id);
+  for (const id of previouslyGridZoneIds) {
+    const zone = zoneById.get(id);
+    if (zone?.type === 'SEATED') seatedZoneIds.add(id);
   }
 
   try {

@@ -1,21 +1,8 @@
-import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
-
 export function startCronJobs(): void {
-  // Every 5 minutes: expire bookings older than 1 hour that haven't been paid
-  cron.schedule('*/5 * * * *', async () => {
-    const expiredBefore = new Date(Date.now() - 60 * 60 * 1000);
-    const result = await prisma.ticket.updateMany({
-      where: {
-        status: 'BOOKED',
-        bookedAt: { lt: expiredBefore },
-      },
-      data: { status: 'EXPIRED' },
-    });
-    if (result.count > 0) {
-      console.log(`[cron] Expired ${result.count} old bookings`);
-    }
-  });
+  // Auto-expiring BOOKED tickets after 1 hour assumed the buyer would pay
+  // and upload a receipt within that window (BOOKED -> PENDING). With the
+  // online payment step stubbed out until acquiring is connected, admins
+  // confirm bookings manually and there's no more "unpaid" signal to expire
+  // on — so this job is disabled for now. Re-enable once real payment (and
+  // its own timeout policy) is back.
 }

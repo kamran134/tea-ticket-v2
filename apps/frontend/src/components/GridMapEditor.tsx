@@ -53,6 +53,8 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     buildCells(initial?.rows ?? 10, initial?.cols ?? 15, initial?.cells),
   );
   const [zones, setZones] = useState<Zone[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(true);
+  const [zonesError, setZonesError] = useState(false);
   const [activeTool, setActiveTool] = useState<Tool>('block');
   const [locked, setLocked] = useState(!!initial);
   const [saving, setSaving] = useState(false);
@@ -61,7 +63,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   // Zone creation form
   const [showZoneForm, setShowZoneForm] = useState(false);
   const [newZoneName, setNewZoneName] = useState('');
-  const [newZoneCardNumber, setNewZoneCardNumber] = useState('');
   const [newZonePrice, setNewZonePrice] = useState('');
   const [newZoneColor, setNewZoneColor] = useState(ZONE_COLORS[0]);
   const [newZoneNoSeats, setNewZoneNoSeats] = useState(false);
@@ -79,20 +80,32 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
   // Load real zones for this venue; drop any painted cell referencing a zone
   // that no longer exists (e.g. leftover ids from before this feature existed).
-  useEffect(() => {
+  const loadZones = useCallback(() => {
     let cancelled = false;
-    api.getZones(venue.id).then(zs => {
-      if (cancelled) return;
-      const relevant = zs.filter(z => z.type !== 'TABLE');
-      setZones(relevant);
-      const validIds = new Set(relevant.map(z => z.id));
-      setCells(prev =>
-        prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || validIds.has(c) ? c : 'empty'))),
-      );
-    });
+    setZonesLoading(true);
+    setZonesError(false);
+    api.getZones(venue.id)
+      .then(zs => {
+        if (cancelled) return;
+        const relevant = zs.filter(z => z.type !== 'TABLE');
+        setZones(relevant);
+        const validIds = new Set(relevant.map(z => z.id));
+        setCells(prev =>
+          prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || validIds.has(c) ? c : 'empty'))),
+        );
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setZonesError(true);
+        toast.error(errMsg(err, 'Не удалось загрузить зоны'));
+      })
+      .finally(() => {
+        if (!cancelled) setZonesLoading(false);
+      });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venue.id]);
+
+  useEffect(() => loadZones(), [loadZones]);
 
   const applyGridSize = () => {
     const r = Math.max(1, Math.min(100, pendingRows));
@@ -133,7 +146,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
   const resetZoneForm = () => {
     setNewZoneName('');
-    setNewZoneCardNumber('');
     setNewZonePrice('');
     setNewZoneNoSeats(false);
     setNewZoneCapacity('');
@@ -141,7 +153,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   };
 
   const addZone = async () => {
-    if (!newZoneName.trim() || !newZonePrice || !newZoneCardNumber.trim()) return;
+    if (!newZoneName.trim() || !newZonePrice) return;
     if (newZoneNoSeats && !newZoneCapacity) return;
 
     setAddingZone(true);
@@ -150,7 +162,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         venueId: venue.id,
         name: newZoneName.trim(),
         price: Number(newZonePrice),
-        cardNumber: newZoneCardNumber.trim(),
         capacity: newZoneNoSeats ? Number(newZoneCapacity) : 1,
         sortOrder: zones.length,
         type: newZoneNoSeats ? 'GENERAL' : 'SEATED',
@@ -250,6 +261,23 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           )}
         </div>
       </div>
+
+      {/* Zones load status */}
+      {zonesLoading && (
+        <p className="text-sm text-gray-400">Загрузка зон...</p>
+      )}
+      {!zonesLoading && zonesError && (
+        <div className="flex items-center gap-2 text-sm text-red-600">
+          <span>Не удалось загрузить зоны.</span>
+          <button
+            type="button"
+            onClick={loadZones}
+            className="underline hover:text-red-700"
+          >
+            Повторить
+          </button>
+        </div>
+      )}
 
       {/* Grid size controls */}
       {!locked && (
@@ -375,16 +403,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Номер карты</label>
-                <input
-                  type="text"
-                  value={newZoneCardNumber}
-                  onChange={e => setNewZoneCardNumber(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                  placeholder="0000 0000 0000"
-                />
-              </div>
-              <div>
                 <label className="block text-xs text-gray-500 mb-1">Цена ({currency})</label>
                 <input
                   type="number"
@@ -436,7 +454,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 <button
                   type="button"
                   onClick={addZone}
-                  disabled={addingZone || !newZoneName.trim() || !newZonePrice || !newZoneCardNumber.trim() || (newZoneNoSeats && !newZoneCapacity)}
+                  disabled={addingZone || !newZoneName.trim() || !newZonePrice || (newZoneNoSeats && !newZoneCapacity)}
                   className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
                 >
                   {addingZone ? '...' : 'Добавить'}

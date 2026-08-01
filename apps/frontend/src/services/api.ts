@@ -155,7 +155,7 @@ export const api = {
     });
   },
 
-  async createZone(data: Omit<Zone, 'id' | 'available'>): Promise<Zone> {
+  async createZone(data: Omit<Zone, 'id' | 'available' | 'cardNumber'> & { cardNumber?: string }): Promise<Zone> {
     return request('/api/zones', {
       method: 'POST',
       headers: authHeaders(),

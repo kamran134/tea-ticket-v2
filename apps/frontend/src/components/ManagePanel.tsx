@@ -16,6 +16,7 @@ type TicketFilter = TicketStatus | 'ALL';
 
 const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
   { value: 'ALL', label: 'Все' },
+  { value: 'BOOKED', label: 'Новые' },
   { value: 'PENDING', label: 'Ожидают' },
   { value: 'CONFIRMED', label: 'Подтверждены' },
   { value: 'REJECTED', label: 'Отклонены' },
@@ -40,7 +41,7 @@ function isTokenValid(): boolean {
   }
 }
 
-const ZONE_DEFAULTS = { name: '', price: '', cardNumber: '', capacity: '', sortOrder: '0' };
+const ZONE_DEFAULTS = { name: '', price: '', capacity: '', sortOrder: '0' };
 
 export function ManagePanel() {
   const [authenticated, setAuthenticated] = useState(isTokenValid);
@@ -63,7 +64,7 @@ export function ManagePanel() {
 
   // Tickets
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
-  const [ticketFilter, setTicketFilter] = useState<TicketFilter>('PENDING');
+  const [ticketFilter, setTicketFilter] = useState<TicketFilter>('BOOKED');
   const [filterVenueId, setFilterVenueId] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
 
@@ -158,7 +159,6 @@ export function ManagePanel() {
         venueId: selectedVenueId,
         name: newZone.name,
         price: Number(newZone.price),
-        cardNumber: newZone.cardNumber,
         capacity: Number(newZone.capacity),
         sortOrder: Number(newZone.sortOrder),
         type: 'GENERAL',
@@ -180,7 +180,6 @@ export function ManagePanel() {
       const updated = await api.updateZone(editingZone.id, {
         name: editingZone.name,
         price: editingZone.price,
-        cardNumber: editingZone.cardNumber,
         capacity: editingZone.capacity,
         sortOrder: editingZone.sortOrder,
       });
@@ -268,6 +267,7 @@ export function ManagePanel() {
 
   const ticketCounts = useMemo(() => ({
     ALL: allTickets.length,
+    BOOKED: allTickets.filter(t => t.status === 'BOOKED').length,
     PENDING: allTickets.filter(t => t.status === 'PENDING').length,
     CONFIRMED: allTickets.filter(t => t.status === 'CONFIRMED').length,
     REJECTED: allTickets.filter(t => t.status === 'REJECTED').length,
@@ -339,9 +339,9 @@ export function ManagePanel() {
               }`}
             >
               {TAB_LABELS[t]}
-              {t === 'tickets' && ticketCounts.PENDING > 0 && (
+              {t === 'tickets' && ticketCounts.BOOKED > 0 && (
                 <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
-                  {ticketCounts.PENDING}
+                  {ticketCounts.BOOKED}
                 </span>
               )}
             </button>
@@ -483,19 +483,6 @@ export function ManagePanel() {
                       editingZone
                         ? setEditingZone({ ...editingZone, name: e.target.value })
                         : setNewZone({ ...newZone, name: e.target.value })
-                    }
-                    required
-                  />
-
-                  <input
-                    type="text"
-                    placeholder="Номер карты для оплаты"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                    value={editingZone ? editingZone.cardNumber : newZone.cardNumber}
-                    onChange={e =>
-                      editingZone
-                        ? setEditingZone({ ...editingZone, cardNumber: e.target.value })
-                        : setNewZone({ ...newZone, cardNumber: e.target.value })
                     }
                     required
                   />
@@ -690,7 +677,7 @@ export function ManagePanel() {
                     )}
 
                     <div className="flex gap-2">
-                      {t.status === 'PENDING' && (
+                      {(t.status === 'PENDING' || t.status === 'BOOKED') && (
                         <>
                           <button
                             onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}

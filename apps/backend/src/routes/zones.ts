@@ -80,7 +80,7 @@ const createZoneSchema = z.object({
   venueId: z.string().min(1),
   name: z.string().min(1).max(200),
   price: z.number().positive(),
-  cardNumber: z.string().min(1),
+  cardNumber: z.string().min(1).optional(),
   capacity: z.number().int().positive(),
   sortOrder: z.number().int().default(0),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).default('GENERAL'),

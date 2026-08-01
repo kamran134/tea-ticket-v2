@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
 import { toast } from '../services/toast';
@@ -6,7 +6,7 @@ import type { Ticket, TicketStatus, Currency } from '../types';
 import { formatPrice } from '../types';
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
-  BOOKED: 'Ожидает оплаты',
+  BOOKED: 'Бронь оформлена',
   PENDING: 'Чек на проверке',
   CONFIRMED: 'Подтверждён',
   REJECTED: 'Отклонён',
@@ -21,24 +21,11 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
   EXPIRED: 'bg-gray-100 text-gray-600',
 };
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return '00:00';
-  const m = Math.floor(ms / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 export function TicketView() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [members, setMembers] = useState<Ticket[]>([]);
   const [currency, setCurrency] = useState<Currency>('₼');
-  const [countdown, setCountdown] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const ticketUrl = (() => {
     const id = new URLSearchParams(window.location.search).get('id');
@@ -64,45 +51,6 @@ export function TicketView() {
         .catch(() => {});
     }
   }, []);
-
-  // Countdown for BOOKED tickets
-  useEffect(() => {
-    if (!ticket || ticket.status !== 'BOOKED') return;
-    const expiry = new Date(ticket.bookedAt).getTime() + 60 * 60 * 1000;
-    const tick = () => {
-      const remaining = expiry - Date.now();
-      setCountdown(formatCountdown(remaining));
-      if (remaining <= 0) {
-        setTicket(t => (t ? { ...t, status: 'EXPIRED' } : null));
-      }
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [ticket?.status, ticket?.bookedAt]);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setSelectedFile(file);
-    setPreviewUrl(file.type.startsWith('image/') ? URL.createObjectURL(file) : null);
-  };
-
-  const handleUpload = async () => {
-    if (!ticket || !selectedFile) return;
-    setUploading(true);
-    setUploadError('');
-    try {
-      const updated = await api.uploadReceipt(ticket.id, selectedFile);
-      setTicket(updated);
-      setSelectedFile(null);
-      setPreviewUrl(null);
-    } catch (err: unknown) {
-      setUploadError(err instanceof Error ? err.message : 'Ошибка загрузки');
-    } finally {
-      setUploading(false);
-    }
-  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(ticketUrl).then(() => {
@@ -193,60 +141,14 @@ export function TicketView() {
           </div>
         )}
 
-        {/* BOOKED: payment instructions */}
+        {/* BOOKED: payment stub — online card payment isn't wired up yet */}
         {ticket.status === 'BOOKED' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 space-y-4">
-            <h2 className="font-semibold text-yellow-900">Оплатите билет</h2>
-
-            {countdown && (
-              <div className="text-center">
-                <div className="text-3xl font-mono font-bold text-yellow-800">{countdown}</div>
-                <div className="text-xs text-yellow-600 mt-0.5">осталось до истечения брони</div>
-              </div>
-            )}
-
-            {ticket.cardNumber && (
-              <div className="bg-white rounded-xl p-3 text-center border border-yellow-100">
-                <div className="text-xs text-gray-400 mb-1">Номер карты для перевода</div>
-                <div className="font-mono text-lg font-bold tracking-wider">
-                  {ticket.cardNumber}
-                </div>
-              </div>
-            )}
-
-            <div>
-              <p className="text-sm text-yellow-800 mb-2">После оплаты загрузите скриншот чека:</p>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,.pdf"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              <button
-                onClick={() => fileRef.current?.click()}
-                className="w-full py-2.5 border-2 border-dashed border-yellow-400 rounded-xl text-yellow-700 hover:bg-yellow-100 transition-colors text-sm"
-              >
-                {selectedFile ? selectedFile.name : 'Выбрать файл'}
-              </button>
-              {previewUrl && (
-                <img
-                  src={previewUrl}
-                  alt="preview"
-                  className="mt-2 rounded-lg max-h-40 object-contain mx-auto"
-                />
-              )}
-              {selectedFile && (
-                <button
-                  onClick={handleUpload}
-                  disabled={uploading}
-                  className="mt-2 w-full py-2.5 bg-yellow-500 text-white rounded-xl font-semibold hover:bg-yellow-600 disabled:opacity-50 transition-colors"
-                >
-                  {uploading ? 'Загрузка...' : 'Отправить чек'}
-                </button>
-              )}
-              {uploadError && <p className="mt-2 text-sm text-red-600">{uploadError}</p>}
-            </div>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center space-y-2">
+            <div className="text-4xl mb-1">🕐</div>
+            <h2 className="font-semibold text-yellow-900">Бронь оформлена</h2>
+            <p className="text-sm text-yellow-800">
+              Оплата картой скоро будет доступна прямо здесь. Пока с вами свяжется организатор для оплаты.
+            </p>
           </div>
         )}
 

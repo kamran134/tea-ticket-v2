@@ -44,7 +44,7 @@ model Zone {
   venueId    String
   name       String
   price      Float
-  cardNumber String
+  cardNumber String    @default("")
   capacity   Int
   sortOrder  Int       @default(0)
   type       ZoneType  @default(GENERAL)
