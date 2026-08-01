@@ -299,19 +299,15 @@ export function ManagePanel() {
   const deleteTicket = (ticket: Ticket) => {
     const isGroup = Boolean(ticket.groupId);
     requestConfirm(
-      isGroup ? 'Удалить групповой билет?' : 'Удалить билет?',
+      'Удалить билет?',
       isGroup
-        ? `Будут удалены все ${allTickets.filter(t => t.groupId === ticket.groupId).length} участника группы.`
+        ? `Билет «${ticket.name}» будет удалён безвозвратно. Остальные участники группы останутся.`
         : `Билет «${ticket.name}» будет удалён безвозвратно.`,
       async () => {
         try {
           await api.deleteTicket(ticket.id);
-          setAllTickets(ts =>
-            isGroup
-              ? ts.filter(t => t.groupId !== ticket.groupId)
-              : ts.filter(t => t.id !== ticket.id),
-          );
-          toast.success(isGroup ? 'Групповой билет удалён' : 'Билет удалён');
+          setAllTickets(ts => ts.filter(t => t.id !== ticket.id));
+          toast.success('Билет удалён');
         } catch (err) {
           toast.error(errMsg(err));
         }

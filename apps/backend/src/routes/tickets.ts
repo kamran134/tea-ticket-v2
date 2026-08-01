@@ -232,7 +232,6 @@ ticketsRouter.post('/register', async (req, res) => {
         venueId,
         zoneId: slot.zoneId,
         zoneName: slot.zone.name,
-        cardNumber: slot.zone.cardNumber,
         price: slot.zone.price,
         status: 'BOOKED' as const,
         bookedAt: now,
@@ -250,7 +249,7 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
-      return { id: mainTicket.id, groupId, totalPrice, cardNumber: mainTicket.cardNumber };
+      return { id: mainTicket.id, groupId, totalPrice };
     });
 
     return res.status(201).json({ success: true, data: result });
@@ -347,18 +346,14 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/tickets/:id  (admin: delete ticket or entire group)
+// DELETE /api/tickets/:id  (admin: delete a single ticket, even inside a group)
 ticketsRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     if (!ticket) {
       return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
-    if (ticket.groupId) {
-      await prisma.ticket.deleteMany({ where: { groupId: ticket.groupId } });
-    } else {
-      await prisma.ticket.delete({ where: { id: req.params.id } });
-    }
+    await prisma.ticket.delete({ where: { id: req.params.id } });
     return res.json({ success: true, data: { deleted: true } });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to delete ticket' });

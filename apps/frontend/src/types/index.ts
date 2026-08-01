@@ -76,7 +76,6 @@ export interface Zone {
   venueId: string;
   name: string;
   price: number;
-  cardNumber: string;
   capacity: number;
   sortOrder: number;
   type: ZoneType;
@@ -115,7 +114,6 @@ export interface Ticket {
   venueId: string;
   zoneId: string;
   zoneName: string;
-  cardNumber: string;
   price: number;
   receiptLink: string | null;
   status: TicketStatus;
@@ -138,7 +136,6 @@ export interface RegisterResult {
   id: string;
   groupId: string | null;
   totalPrice: number;
-  cardNumber: string;
 }
 
 export interface ApiResponse<T> {

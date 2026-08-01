@@ -80,7 +80,6 @@ const createZoneSchema = z.object({
   venueId: z.string().min(1),
   name: z.string().min(1).max(200),
   price: z.number().positive(),
-  cardNumber: z.string().min(1).optional(),
   capacity: z.number().int().positive(),
   sortOrder: z.number().int().default(0),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).default('GENERAL'),
@@ -113,7 +112,6 @@ zonesRouter.post('/', requireAuth, async (req, res) => {
 const updateZoneSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   price: z.number().positive().optional(),
-  cardNumber: z.string().min(1).optional(),
   capacity: z.number().int().positive().optional(),
   sortOrder: z.number().int().optional(),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).optional(),

@@ -57,6 +57,14 @@ export function VenueGridMap({
 }: Props) {
   const layout = venue.gridLayout;
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
   // Seats for every SEATED zone painted on the grid — loaded eagerly so any
@@ -302,14 +310,22 @@ export function VenueGridMap({
         <button
           type="button"
           onClick={onClose}
+          title="Закрыть (Esc)"
           className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          Готово ✕
+          Закрыть ✕
         </button>
       </div>
       {grid}
       {loadingSeats && <p className="text-xs text-gray-400">Загрузка мест...</p>}
       {legend}
+      <button
+        type="button"
+        onClick={onClose}
+        className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+      >
+        Готово
+      </button>
     </div>
   );
 }

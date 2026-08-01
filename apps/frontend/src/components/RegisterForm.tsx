@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable, CartItem } from '../types';
 import { formatPrice } from '../types';
@@ -20,16 +22,6 @@ interface CartLine {
   tableNumber?: number;
 }
 
-// Keeps only digits and a single leading "+", grouped in 3s for readability.
-function formatPhoneInput(raw: string): string {
-  let digits = raw.replace(/[^\d+]/g, '');
-  digits = digits[0] === '+' ? '+' + digits.slice(1).replace(/\+/g, '') : digits.replace(/\+/g, '');
-  const hasPlus = digits.startsWith('+');
-  const numDigits = digits.replace(/\+/g, '').slice(0, 15);
-  const groups = numDigits.match(/.{1,3}/g) ?? [];
-  return (hasPlus ? '+' : '') + groups.join(' ');
-}
-
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function pluralize(n: number, one: string, few: string, many: string): string {
@@ -49,7 +41,7 @@ export function RegisterForm({ slug }: Props) {
   const [venueNotFound, setVenueNotFound] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState<string | undefined>();
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -194,7 +186,7 @@ export function RegisterForm({ slug }: Props) {
       });
       const result = await api.register({
         name: name.trim(),
-        phone: phone.trim(),
+        phone: (phone ?? '').trim(),
         email: email.trim(),
         venueId: venue.id,
         items,
@@ -229,9 +221,8 @@ export function RegisterForm({ slug }: Props) {
     );
   }
 
-  const phoneDigitCount = phone.replace(/\D/g, '').length;
-  const canSubmit = cart.length > 0 && !!name.trim() && phoneDigitCount >= 7 && EMAIL_RE.test(email.trim()) &&
-    (!namedGuests || guestNameInputs.every(g => g.trim()));
+  const canSubmit = cart.length > 0 && !!name.trim() && !!phone && isValidPhoneNumber(phone) &&
+    EMAIL_RE.test(email.trim()) && (!namedGuests || guestNameInputs.every(g => g.trim()));
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
@@ -463,16 +454,17 @@ export function RegisterForm({ slug }: Props) {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Телефон *</label>
-              <input
-                type="tel"
-                inputMode="tel"
-                placeholder="+993 XX XXX XXX"
-                maxLength={20}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              <PhoneInput
+                international
+                defaultCountry="AZ"
+                placeholder="XX XXX XX XX"
                 value={phone}
-                onChange={e => setPhone(formatPhoneInput(e.target.value))}
+                onChange={setPhone}
                 required
               />
+              {!!phone && !isValidPhoneNumber(phone) && (
+                <p className="text-xs text-red-500 mt-1">Проверьте номер телефона</p>
+              )}
             </div>
 
             <div>

@@ -56,7 +56,6 @@ model Zone {
   venueId    String
   name       String
   price      Float
-  cardNumber String    @default("")
   capacity   Int
   sortOrder  Int       @default(0)
   type       ZoneType  @default(GENERAL)
@@ -106,7 +105,6 @@ model Ticket {
   venueId     String
   zoneId      String
   zoneName    String
-  cardNumber  String
   price       Float
   receiptLink String?
   status      TicketStatus @default(BOOKED)
