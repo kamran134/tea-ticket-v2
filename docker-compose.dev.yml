@@ -43,8 +43,31 @@ services:
     networks:
       - internal
 
+  birmanat-bank:
+    build:
+      context: ./apps/birmanat-bank
+      dockerfile: Dockerfile
+    ports:
+      - "8082:80"
+    environment:
+      BIRMANAT_BANK_PUBLIC_URL: ${BIRMANAT_BANK_PUBLIC_URL:-http://localhost:8082}
+      BIRMANAT_BANK_API_TOKEN: ${BIRMANAT_BANK_API_TOKEN:-dev-birmanat-bank-token}
+      BIRMANAT_BANK_WEBHOOK_SECRET: ${BIRMANAT_BANK_WEBHOOK_SECRET:-dev-birmanat-bank-webhook-secret}
+      BIRMANAT_BANK_ALLOWED_HOSTS: ${BIRMANAT_BANK_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,tickets.birmanat.band}
+      BIRMANAT_BANK_SQLITE_PATH: /var/www/html/var/bank.sqlite
+    volumes:
+      - birmanat_bank_data:/var/www/html/var
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
+  birmanat_bank_data:
 
 networks:
   internal:

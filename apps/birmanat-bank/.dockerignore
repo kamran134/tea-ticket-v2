@@ -1,0 +1,10 @@
+vendor
+var/*.sqlite
+var/*.sqlite-*
+var/.phpunit.cache
+.git
+.gitignore
+.env
+tests
+phpunit.xml
+README.md
