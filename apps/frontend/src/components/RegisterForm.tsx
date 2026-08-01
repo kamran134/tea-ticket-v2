@@ -20,6 +20,18 @@ interface CartLine {
   tableNumber?: number;
 }
 
+// Keeps only digits and a single leading "+", grouped in 3s for readability.
+function formatPhoneInput(raw: string): string {
+  let digits = raw.replace(/[^\d+]/g, '');
+  digits = digits[0] === '+' ? '+' + digits.slice(1).replace(/\+/g, '') : digits.replace(/\+/g, '');
+  const hasPlus = digits.startsWith('+');
+  const numDigits = digits.replace(/\+/g, '').slice(0, 15);
+  const groups = numDigits.match(/.{1,3}/g) ?? [];
+  return (hasPlus ? '+' : '') + groups.join(' ');
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
   const mod100 = n % 100;
@@ -38,6 +50,7 @@ export function RegisterForm({ slug }: Props) {
   const [zones, setZones] = useState<Zone[]>([]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -52,6 +65,7 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
 
   const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
+  const [gridMapOpen, setGridMapOpen] = useState(false);
 
   useEffect(() => {
     api.getVenueBySlug(slug)
@@ -98,6 +112,7 @@ export function RegisterForm({ slug }: Props) {
   }
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
   const cartTotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
+  const gridCartCount = cart.filter(l => gridZoneIds.has(l.zoneId)).reduce((s, l) => s + l.quantity, 0);
 
   // Keep the optional per-guest name inputs in sync with the cart size
   useEffect(() => {
@@ -180,6 +195,7 @@ export function RegisterForm({ slug }: Props) {
       const result = await api.register({
         name: name.trim(),
         phone: phone.trim(),
+        email: email.trim(),
         venueId: venue.id,
         items,
         ...(namedGuests && { guestNames: guestNameInputs.map(g => g.trim()) }),
@@ -213,7 +229,8 @@ export function RegisterForm({ slug }: Props) {
     );
   }
 
-  const canSubmit = cart.length > 0 && !!name.trim() && !!phone.trim() &&
+  const phoneDigitCount = phone.replace(/\D/g, '').length;
+  const canSubmit = cart.length > 0 && !!name.trim() && phoneDigitCount >= 7 && EMAIL_RE.test(email.trim()) &&
     (!namedGuests || guestNameInputs.every(g => g.trim()));
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
@@ -240,17 +257,36 @@ export function RegisterForm({ slug }: Props) {
             {/* Grid / schema map */}
             {hasGridZones && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Выберите места</label>
-                <VenueGridMap
-                  venue={venue}
-                  zones={zones}
-                  currency={currency}
-                  cartSeatIds={cartSeatIds}
-                  cartQuantityByZone={cartQuantityByZone}
-                  onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
-                  onSeatToggle={toggleSeatInCart}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Места</label>
+                <button
+                  type="button"
+                  onClick={() => setGridMapOpen(true)}
+                  className={[
+                    'w-full flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
+                    gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-emerald-300',
+                  ].join(' ')}
+                >
+                  <span className="font-medium text-gray-800">
+                    {gridCartCount > 0 ? 'Изменить выбор мест' : 'Выберите места'}
+                  </span>
+                  {gridCartCount > 0 && (
+                    <span className="text-emerald-700 font-semibold text-sm shrink-0">× {gridCartCount}</span>
+                  )}
+                </button>
               </div>
+            )}
+
+            {gridMapOpen && (
+              <VenueGridMap
+                venue={venue}
+                zones={zones}
+                currency={currency}
+                cartSeatIds={cartSeatIds}
+                cartQuantityByZone={cartQuantityByZone}
+                onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
+                onSeatToggle={toggleSeatInCart}
+                onClose={() => setGridMapOpen(false)}
+              />
             )}
 
             {hasSchemaZones && (
@@ -415,7 +451,7 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя *</label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
@@ -426,12 +462,27 @@ export function RegisterForm({ slug }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Телефон *</label>
               <input
                 type="tel"
+                inputMode="tel"
+                placeholder="+993 XX XXX XXX"
+                maxLength={20}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
+                onChange={e => setPhone(formatPhoneInput(e.target.value))}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 required
               />
             </div>

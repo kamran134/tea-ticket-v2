@@ -49,13 +49,13 @@ interface Props {
   cartQuantityByZone: Record<string, number>;
   onZoneOpen: (zone: Zone) => void;
   onSeatToggle: (zone: Zone, seat: Seat) => void;
+  onClose: () => void;
 }
 
 export function VenueGridMap({
-  venue, zones, currency, cartSeatIds, cartQuantityByZone, onZoneOpen, onSeatToggle,
+  venue, zones, currency, cartSeatIds, cartQuantityByZone, onZoneOpen, onSeatToggle, onClose,
 }: Props) {
   const layout = venue.gridLayout;
-  const [expanded, setExpanded] = useState(false);
 
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
@@ -111,21 +111,12 @@ export function VenueGridMap({
   const usedZones = zones.filter(z => layout.cells.some(row => row.includes(z.id)));
   if (usedZones.length === 0) return null;
 
-  const handleSeatClick = (zone: Zone, seat: Seat) => {
-    if (!expanded) setExpanded(true);
-    onSeatToggle(zone, seat);
-  };
-
   const grid = (
-    <div
-      className={`relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none ${
-        expanded ? 'overflow-auto' : 'overflow-hidden'
-      }`}
-    >
+    <div className="relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none overflow-auto">
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${layout.cols}, minmax(${expanded ? '28px' : '0'}, 1fr))`,
+          gridTemplateColumns: `repeat(${layout.cols}, minmax(28px, 1fr))`,
         }}
       >
         {layout.cells.map((row, r) =>
@@ -169,7 +160,7 @@ export function VenueGridMap({
               return (
                 <div
                   key={`${r}-${c}`}
-                  onClick={() => !isOccupied && handleSeatClick(zone, seat)}
+                  onClick={() => !isOccupied && onSeatToggle(zone, seat)}
                   title={`${zone.name} · ${seat.label ?? `Место ${seat.number}`} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
                   style={{
                     aspectRatio: '1',
@@ -200,8 +191,8 @@ export function VenueGridMap({
             return (
               <div
                 key={`${r}-${c}`}
-                onClick={() => onZoneOpen(zone)}
-                title={`${zone.name} · ${formatPrice(zone.price, currency)}`}
+                onClick={() => !isEmpty && onZoneOpen(zone)}
+                title={`${zone.name} · ${formatPrice(zone.price, currency)}${isEmpty ? ' · мест нет' : ''}`}
                 style={{
                   aspectRatio: '1',
                   backgroundColor: inCart > 0 ? color : `${color}99`,
@@ -211,7 +202,7 @@ export function VenueGridMap({
                   borderBottomColor: sameZoneNeighbor(layout.cells, r + 1, c, zone.id) ? 'transparent' : GRID_LINE,
                   borderLeftColor: sameZoneNeighbor(layout.cells, r, c - 1, zone.id) ? 'transparent' : GRID_LINE,
                   borderRightColor: sameZoneNeighbor(layout.cells, r, c + 1, zone.id) ? 'transparent' : GRID_LINE,
-                  cursor: 'pointer',
+                  cursor: isEmpty ? 'not-allowed' : 'pointer',
                   opacity: isEmpty ? 0.5 : 1,
                   minWidth: 4,
                   minHeight: 4,
@@ -226,10 +217,12 @@ export function VenueGridMap({
       {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
         const zone = zones.find(z => z.id === zoneId);
         if (!zone) return null;
+        const inCart = cartQuantityByZone[zone.id] ?? 0;
+        const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
         return (
           <div
             key={zoneId}
-            className="absolute flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+            className="absolute flex flex-col items-center justify-center text-center font-semibold pointer-events-none px-1"
             style={{
               left: `${(box.minCol / layout.cols) * 100}%`,
               top: `${(box.minRow / layout.rows) * 100}%`,
@@ -241,7 +234,12 @@ export function VenueGridMap({
               lineHeight: 1.2,
             }}
           >
-            {zone.name}
+            <span>{zone.name}</span>
+            {zone.available !== undefined && (
+              <span style={{ fontSize: 'clamp(7px, 1.8cqw, 12px)', fontWeight: 500 }}>
+                {isEmpty ? 'мест нет' : `осталось: ${zone.available}`}
+              </span>
+            )}
           </div>
         );
       })}
@@ -284,8 +282,9 @@ export function VenueGridMap({
           <button
             key={zone.id}
             type="button"
+            disabled={isEmpty}
             onClick={() => onZoneOpen(zone)}
-            className={`${className} hover:border-emerald-300`}
+            className={`${className} ${isEmpty ? 'cursor-not-allowed' : 'hover:border-emerald-300'}`}
           >
             {content}
           </button>
@@ -296,39 +295,19 @@ export function VenueGridMap({
     </div>
   );
 
-  if (expanded) {
-    return (
-      <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
-        <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
-          <span className="font-semibold text-gray-800">Выбор мест</span>
-          <button
-            type="button"
-            onClick={() => setExpanded(false)}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Свернуть ✕
-          </button>
-        </div>
-        {grid}
-        {loadingSeats && <p className="text-xs text-gray-400">Загрузка мест...</p>}
-        {legend}
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-3">
-      <div className="relative">
-        {grid}
+    <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
+      <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
+        <span className="font-semibold text-gray-800">Выбор мест</span>
         <button
           type="button"
-          onClick={() => setExpanded(true)}
-          title="На весь экран"
-          className="absolute top-2 right-2 w-8 h-8 rounded-lg bg-white/90 shadow border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-white"
+          onClick={onClose}
+          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          ⤢
+          Готово ✕
         </button>
       </div>
+      {grid}
       {loadingSeats && <p className="text-xs text-gray-400">Загрузка мест...</p>}
       {legend}
     </div>

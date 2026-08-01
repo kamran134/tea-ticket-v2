@@ -120,6 +120,7 @@ export const api = {
   async register(payload: {
     name: string;
     phone: string;
+    email: string;
     venueId: string;
     items: CartItem[];
     guestNames?: string[];

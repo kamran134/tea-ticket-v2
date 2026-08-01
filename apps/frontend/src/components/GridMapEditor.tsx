@@ -122,9 +122,8 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
 
-  // Large grids are cramped inline — offer a fullscreen view for them
+  // Large grids are cramped inline — always offer a fullscreen view
   const [expanded, setExpanded] = useState(false);
-  const showExpandToggle = cols > 15 || rows > 15;
 
   // Drawing
   const isDrawing = useRef(false);
@@ -521,15 +520,13 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-gray-800">Схема зала</h3>
         <div className="flex gap-2 items-center flex-wrap">
-          {showExpandToggle && (
-            <button
-              type="button"
-              onClick={() => setExpanded(e => !e)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              {expanded ? 'Свернуть' : 'На весь экран'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            {expanded ? 'Свернуть' : 'На весь экран'}
+          </button>
           {!locked && (
             <button
               type="button"

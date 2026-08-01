@@ -844,7 +844,7 @@ export function ManagePanel() {
                       <div>
                         <div className="font-semibold text-gray-800">{t.name}</div>
                         <div className="text-sm text-gray-500">
-                          {t.phone} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                          {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
                         </div>
                         {t.groupId && (
                           <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>

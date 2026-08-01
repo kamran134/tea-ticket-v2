@@ -97,6 +97,7 @@ const cartItemSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(7).max(20),
+  email: z.string().trim().email().max(200),
   venueId: z.string().min(1),
   items: z.array(cartItemSchema).min(1),
   guestNames: z.array(z.string().max(200)).optional().default([]),
@@ -115,7 +116,7 @@ ticketsRouter.post('/register', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { name, phone, venueId, items, guestNames } = parsed.data;
+  const { name, phone, email, venueId, items, guestNames } = parsed.data;
   const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
   const now = new Date();
 
@@ -227,6 +228,7 @@ ticketsRouter.post('/register', async (req, res) => {
       const ticketRows = slots.map((slot, i) => ({
         name: names[i],
         phone,
+        email,
         venueId,
         zoneId: slot.zoneId,
         zoneName: slot.zone.name,

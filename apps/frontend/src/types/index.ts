@@ -111,6 +111,7 @@ export interface Ticket {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   venueId: string;
   zoneId: string;
   zoneName: string;

@@ -89,6 +89,7 @@ export function TicketView() {
           </div>
           <div className="text-sm text-gray-600 space-y-0.5 mt-1">
             <div>Телефон: {ticket.phone}</div>
+            {ticket.email && <div>Email: {ticket.email}</div>}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
             <span className="text-sm text-gray-500">
