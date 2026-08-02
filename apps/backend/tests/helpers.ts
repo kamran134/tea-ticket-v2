@@ -53,6 +53,7 @@ export async function registerTicket(
     .send({
       name: 'Test Buyer',
       phone: '+994501234567',
+      email: 'buyer@example.com',
       venueId,
       items: [{ zoneId, quantity: 1 }],
     })

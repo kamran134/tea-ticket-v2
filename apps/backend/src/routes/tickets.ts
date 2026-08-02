@@ -254,7 +254,7 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
-      return { id: mainTicket.id, groupId, totalPrice };
+      return { id: mainTicket.id, groupId, totalPrice, expiresAt: expiresAt.toISOString() };
     });
 
     return res.status(201).json({ success: true, data: result });

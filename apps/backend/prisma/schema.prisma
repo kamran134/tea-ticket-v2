@@ -120,26 +120,30 @@ model ZoneTable {
 }
 
 model Ticket {
-  id          String       @id @default(cuid())
-  name        String
-  phone       String
-  email       String?
-  venueId     String
-  zoneId      String
-  zoneName    String
-  price       Float
-  receiptLink String?
-  status      TicketStatus @default(BOOKED)
-  checkedIn   Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  bookedAt    DateTime     @default(now())
-  groupId     String?
-  seatId      String?      @unique
-  tableId     String?
-  venue       Venue        @relation(fields: [venueId], references: [id])
-  zone        Zone         @relation(fields: [zoneId], references: [id])
-  seat        Seat?        @relation(fields: [seatId], references: [id])
-  table       ZoneTable?   @relation(fields: [tableId], references: [id])
+  id                 String              @id @default(cuid())
+  name               String
+  phone              String
+  email              String?
+  venueId            String
+  zoneId             String
+  zoneName           String
+  price              Float
+  receiptLink        String?
+  status             TicketStatus        @default(BOOKED)
+  checkedIn          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  bookedAt           DateTime            @default(now())
+  expiresAt          DateTime?
+  groupId            String?
+  seatId             String?             @unique
+  tableId            String?
+  confirmationSource ConfirmationSource?
+  confirmedAt        DateTime?
+  confirmationNote   String?
+  venue              Venue               @relation(fields: [venueId], references: [id])
+  zone               Zone                @relation(fields: [zoneId], references: [id])
+  seat               Seat?               @relation(fields: [seatId], references: [id])
+  table              ZoneTable?          @relation(fields: [tableId], references: [id])
 
   @@index([groupId])
   @@index([status])
