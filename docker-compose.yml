@@ -33,15 +33,21 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       UPLOADS_DIR: /app/uploads
       PORT: 3000
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-bank}
       PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-30}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3001}
-      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:8080}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tickets.birmanat.band}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tickets.birmanat.band}
+      PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
       MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
+      BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
+      BANK_API_KEY: ${BANK_API_KEY}
+      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET}
     volumes:
       - ${UPLOADS_PATH}:/app/uploads
     depends_on:
       db:
+        condition: service_healthy
+      birmanat-bank:
         condition: service_healthy
     networks:
       - internal
