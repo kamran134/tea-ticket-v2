@@ -25,6 +25,7 @@ export function AdminScanner() {
   const [stats, setStats] = useState<{ purchased: number; checkedIn: number } | null>(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef('');
 
@@ -81,19 +82,27 @@ export function AdminScanner() {
   const handleScan = async (scannedId: string) => {
     if (scannedId === lastScanRef.current) return;
     lastScanRef.current = scannedId;
-    setTimeout(() => {
-      lastScanRef.current = '';
-    }, 2000);
 
     setStats(null);
+    stopScanning();
     try {
       const { ticket, members } = await api.getTicket(scannedId);
       setTicket(ticket);
       setMembers(members ?? []);
+      const groupMembers = members ?? [];
+      const allDone = groupMembers.length > 0 ? groupMembers.every(m => m.checkedIn) : ticket.checkedIn;
+      setSelectedMemberIds(new Set(
+        groupMembers.filter(m => !m.checkedIn && m.status === 'CONFIRMED').map(m => m.id),
+      ));
+      if (allDone) {
+        showMessage('По этому билету все уже прошли', 'success');
+      }
     } catch {
       setTicket(null);
       setMembers([]);
       showMessage('Билет не найден', 'error');
+    } finally {
+      lastScanRef.current = '';
     }
   };
 
@@ -105,18 +114,29 @@ export function AdminScanner() {
     : 0;
   const allCheckedIn = ticket ? (isGroup ? members.every(m => m.checkedIn) : ticket.checkedIn) : false;
 
+  const toggleMember = (id: string) => {
+    setSelectedMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const confirmEntry = async () => {
-    if (!ticket || remainingToCheckIn === 0) return;
+    if (!ticket) return;
+    if (isGroup && selectedMemberIds.size === 0) return;
+    if (!isGroup && remainingToCheckIn === 0) return;
     setConfirming(true);
     try {
       let updated = ticket;
       let passedCount = 1;
       if (isGroup && ticket.groupId) {
-        const ids = members.filter(m => !m.checkedIn && m.status === 'CONFIRMED').map(m => m.id);
+        const ids = [...selectedMemberIds];
         const { members: updatedMembers } = await api.checkinGroup(ticket.groupId, ids);
         setMembers(updatedMembers);
         updated = updatedMembers.find(m => m.id === ticket.id) ?? ticket;
         passedCount = ids.length;
+        setSelectedMemberIds(new Set());
       } else {
         updated = await api.checkin(ticket.id);
       }
@@ -193,7 +213,7 @@ export function AdminScanner() {
             scanning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
           }`}
         >
-          {scanning ? 'Остановить сканер' : 'Запустить сканер'}
+          {scanning ? 'Остановить сканер' : 'Сканировать'}
         </button>
 
         {ticket && (
@@ -215,13 +235,41 @@ export function AdminScanner() {
             ) : remainingToCheckIn === 0 ? (
               <div className="text-center text-amber-400 text-sm font-medium py-1">Билет не подтверждён</div>
             ) : (
-              <button
-                onClick={confirmEntry}
-                disabled={confirming}
-                className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-xl font-semibold transition-colors"
-              >
-                {confirming ? '...' : isGroup ? `Подтвердить вход (${remainingToCheckIn} чел.)` : 'Подтвердить вход'}
-              </button>
+              <>
+                {isGroup && (
+                  <div className="space-y-1">
+                    {members.map(m => (
+                      <label
+                        key={m.id}
+                        className={`flex items-center gap-2 py-1 px-2 rounded-lg text-sm ${
+                          m.checkedIn ? 'text-gray-500' : 'text-white'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={m.checkedIn || selectedMemberIds.has(m.id)}
+                          disabled={m.checkedIn || m.status !== 'CONFIRMED'}
+                          onChange={() => toggleMember(m.id)}
+                          className="rounded border-gray-500"
+                        />
+                        <span className="flex-1 truncate">{m.name}</span>
+                        {m.checkedIn && <span className="text-xs text-green-400">вошёл</span>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={confirmEntry}
+                  disabled={confirming || (isGroup && selectedMemberIds.size === 0)}
+                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-xl font-semibold transition-colors"
+                >
+                  {confirming
+                    ? '...'
+                    : isGroup
+                      ? `Подтвердить вход (${selectedMemberIds.size} чел.)`
+                      : 'Подтвердить вход'}
+                </button>
+              </>
             )}
 
             {stats && (
