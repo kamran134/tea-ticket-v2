@@ -3,6 +3,7 @@ import { PrismaClient, TicketStatus as PrismaTicketStatus } from '@prisma/client
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
+import { getPaymentHoldMinutes } from '../services/payments/payment-service';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -220,6 +221,9 @@ ticketsRouter.post('/register', async (req, res) => {
         }
       }
 
+      const holdMinutes = getPaymentHoldMinutes();
+      const expiresAt = new Date(now.getTime() + holdMinutes * 60 * 1000);
+
       const names = [
         name,
         ...Array.from({ length: slots.length - 1 }, (_, i) => guestNames[i]?.trim() || `Гость ${i + 1}`),
@@ -234,6 +238,7 @@ ticketsRouter.post('/register', async (req, res) => {
         price: slot.zone.price,
         status: 'BOOKED' as const,
         bookedAt: now,
+        expiresAt,
         seatId: slot.seatId,
         tableId: slot.tableId,
       }));
@@ -248,7 +253,7 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
-      return { id: mainTicket.id, groupId, totalPrice, cardNumber: mainTicket.cardNumber };
+      return { id: mainTicket.id, groupId, totalPrice, cardNumber: mainTicket.cardNumber, expiresAt: expiresAt.toISOString() };
     });
 
     return res.status(201).json({ success: true, data: result });
@@ -258,6 +263,83 @@ ticketsRouter.post('/register', async (req, res) => {
     }
     console.error('[register] error:', err);
     return res.status(500).json({ success: false, error: 'Failed to register' });
+  }
+});
+
+// POST /api/tickets/:id/confirm-manually  (admin: gift / giveaway)
+const confirmManuallySchema = z.object({
+  reason: z.string().min(3).max(500),
+  confirmGroup: z.boolean().optional().default(true),
+});
+
+ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
+  const parsed = confirmManuallySchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
+  }
+  const { reason, confirmGroup } = parsed.data;
+  const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
+
+  try {
+    const result = await prisma.$transaction(async tx => {
+      const ticket = await tx.ticket.findUnique({ where: { id: req.params.id } });
+      if (!ticket) {
+        throw new RegisterError(404, 'Ticket not found');
+      }
+      if (ticket.status === 'CONFIRMED' && ticket.confirmationSource === 'MANUAL') {
+        return { ticket, alreadyConfirmed: true };
+      }
+      if (ticket.status !== 'BOOKED') {
+        throw new RegisterError(409, 'Only booked tickets can be confirmed manually');
+      }
+
+      const checkoutId = ticket.groupId ?? ticket.id;
+      const filter = confirmGroup && ticket.groupId
+        ? { groupId: ticket.groupId }
+        : { id: ticket.id };
+
+      const targets = await tx.ticket.findMany({ where: filter });
+      if (targets.some(t => t.status !== 'BOOKED')) {
+        throw new RegisterError(409, 'Not all tickets in the group are booked');
+      }
+
+      for (const target of targets) {
+        if (target.seatId) {
+          const conflict = await tx.ticket.findFirst({
+            where: {
+              seatId: target.seatId,
+              status: { in: activeStatuses },
+              id: { not: target.id },
+            },
+          });
+          if (conflict) {
+            throw new RegisterError(409, 'Seat is no longer available');
+          }
+        }
+      }
+
+      const now = new Date();
+      await tx.ticket.updateMany({
+        where: { id: { in: targets.map(t => t.id) } },
+        data: {
+          status: 'CONFIRMED',
+          confirmationSource: 'MANUAL',
+          confirmedAt: now,
+          confirmationNote: reason,
+        },
+      });
+
+      const updated = await tx.ticket.findUnique({ where: { id: req.params.id } });
+      return { ticket: updated, alreadyConfirmed: false, checkoutId };
+    });
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof RegisterError) {
+      return res.status(err.status).json({ success: false, error: err.message });
+    }
+    console.error('[confirm-manually] error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to confirm manually' });
   }
 });
 
