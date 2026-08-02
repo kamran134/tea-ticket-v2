@@ -17,6 +17,7 @@ export interface PaymentServiceDeps {
   prisma: PrismaClient;
   provider: PaymentProvider;
   publicAppUrl: string;
+  webhookBaseUrl: string;
   paymentHoldMinutes: number;
 }
 
@@ -97,7 +98,7 @@ export class PaymentService {
         currency: 'AZN',
         description: `Tea Ticket checkout ${checkoutId}`,
         returnUrl: `${this.deps.publicAppUrl}/api/payments/return/${returnToken}`,
-        webhookUrl: `${this.deps.publicAppUrl}/api/webhooks/payments/${this.deps.provider.name}`,
+        webhookUrl: `${this.deps.webhookBaseUrl}/api/webhooks/payments/${this.deps.provider.name}`,
       });
 
       const updated = await this.deps.prisma.payment.update({
@@ -128,6 +129,7 @@ export class PaymentService {
     }
     const frontendUrl = process.env.PUBLIC_FRONTEND_URL ?? process.env.PUBLIC_APP_URL ?? 'http://localhost:5173';
     const url = new URL(`${frontendUrl}/ticket`);
+    url.searchParams.set('id', payment.checkoutId);
     url.searchParams.set('paymentId', payment.id);
     url.searchParams.set('returnToken', returnToken);
     url.searchParams.set('checkoutId', payment.checkoutId);

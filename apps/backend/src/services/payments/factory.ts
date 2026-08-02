@@ -1,10 +1,11 @@
 import { MockPaymentProvider } from './mock-provider';
-import { BankProvider } from './bank-provider';
+import { BankProvider, loadBankProviderConfig } from './bank-provider';
 import type { PaymentProvider } from './payment-provider';
 
 export interface PaymentProviderConfig {
   provider: 'mock' | 'bank';
   publicAppUrl: string;
+  webhookBaseUrl: string;
   mockWebhookSecret: string;
 }
 
@@ -14,9 +15,12 @@ export function loadPaymentProviderConfig(): PaymentProviderConfig {
     throw new Error(`Unknown PAYMENT_PROVIDER: ${provider}`);
   }
 
+  const publicAppUrl = process.env.PUBLIC_APP_URL ?? 'http://localhost:3001';
+
   return {
     provider,
-    publicAppUrl: process.env.PUBLIC_APP_URL ?? 'http://localhost:3001',
+    publicAppUrl,
+    webhookBaseUrl: process.env.PAYMENT_WEBHOOK_BASE_URL ?? publicAppUrl,
     mockWebhookSecret: process.env.MOCK_WEBHOOK_SECRET ?? 'dev-mock-webhook-secret',
   };
 }
@@ -30,8 +34,10 @@ export function createPaymentProvider(config?: PaymentProviderConfig): PaymentPr
       globalThis.__mockPaymentProvider = mock;
       return mock;
     }
-    case 'bank':
-      return new BankProvider();
+    case 'bank': {
+      const bankCfg = loadBankProviderConfig();
+      return new BankProvider(bankCfg.apiBaseUrl, bankCfg.apiToken, bankCfg.webhookSecret);
+    }
     default:
       throw new Error(`Unknown PAYMENT_PROVIDER: ${cfg.provider as string}`);
   }

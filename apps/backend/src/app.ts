@@ -34,6 +34,7 @@ export function createApp(options?: {
     prisma,
     provider,
     publicAppUrl: providerConfig.publicAppUrl,
+    webhookBaseUrl: providerConfig.webhookBaseUrl,
     paymentHoldMinutes: getPaymentHoldMinutes(),
   });
 

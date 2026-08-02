@@ -18,6 +18,7 @@ export function startCronJobs(): void {
     prisma,
     provider,
     publicAppUrl: config.publicAppUrl,
+    webhookBaseUrl: config.webhookBaseUrl,
     paymentHoldMinutes: getPaymentHoldMinutes(),
   });
 

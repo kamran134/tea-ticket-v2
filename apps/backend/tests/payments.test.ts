@@ -3,7 +3,7 @@ import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { BankProvider } from '../src/services/payments/bank-provider';
+import { BankProvider, loadBankProviderConfig } from '../src/services/payments/bank-provider';
 import {
   createPayment,
   postMockWebhook,
@@ -212,16 +212,37 @@ describe('Payment API', () => {
   });
 });
 
-describe('BankProvider stub', () => {
-  it('throws until real bank adapter is implemented', async () => {
-    const bank = new BankProvider();
-    await expect(bank.createPayment({
-      orderId: 'x',
-      amount: '1.0000',
+describe('BankProvider', () => {
+  it('rejects webhook with invalid signature', () => {
+    const bank = new BankProvider('http://localhost:8082', 'token', 'secret');
+    const body = Buffer.from(JSON.stringify({
+      eventId: 'evt_1',
+      paymentId: 'bmp_1',
+      orderId: 'pay_1',
+      amount: '10.0000',
       currency: 'AZN',
-      description: 'test',
-      returnUrl: 'http://localhost/return',
-      webhookUrl: 'http://localhost/webhook',
-    })).rejects.toThrow(/not configured/i);
+      status: 'PAID',
+    }));
+    expect(() => bank.verifyAndParseWebhook(body, { 'x-birmanatbank-signature': 'bad' }))
+      .toThrow(/signature/i);
+  });
+
+  it('throws when bank credentials are missing', () => {
+    const saved = {
+      base: process.env.BANK_API_BASE_URL,
+      key: process.env.BANK_API_KEY,
+      secret: process.env.BANK_WEBHOOK_SECRET,
+    };
+    delete process.env.BANK_API_BASE_URL;
+    delete process.env.BANK_API_KEY;
+    delete process.env.BIRMANAT_BANK_API_TOKEN;
+    delete process.env.BANK_WEBHOOK_SECRET;
+    delete process.env.BIRMANAT_BANK_WEBHOOK_SECRET;
+
+    expect(() => loadBankProviderConfig()).toThrow(/requires/i);
+
+    process.env.BANK_API_BASE_URL = saved.base;
+    process.env.BANK_API_KEY = saved.key;
+    process.env.BANK_WEBHOOK_SECRET = saved.secret;
   });
 });
