@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { isNonZoneCell } from '../services/gridCells';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -10,8 +11,16 @@ const templateZoneSchema = z.object({
   slotId: z.string().min(1),
   name: z.string().min(1).max(200),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
-  type: z.enum(['GENERAL', 'SEATED']),
+  type: z.enum(['GENERAL', 'SEATED', 'TABLE']),
   capacity: z.number().int().positive().optional(),
+  tableChairs: z.number().int().positive().optional(),
+  tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).optional(),
+}).refine(d => d.type !== 'TABLE' || !!d.tableChairs, {
+  message: 'tableChairs is required for TABLE zone slots',
+  path: ['tableChairs'],
+}).refine(d => d.type !== 'TABLE' || !!d.tableShape, {
+  message: 'tableShape is required for TABLE zone slots',
+  path: ['tableShape'],
 });
 
 const createTemplateSchema = z.object({
@@ -70,7 +79,7 @@ gridTemplatesRouter.post('/', requireAuth, async (req, res) => {
   const slotIds = new Set(zones.map(z => z.slotId));
   for (const row of cells) {
     for (const cell of row) {
-      if (cell !== 'empty' && cell !== 'blocked' && !slotIds.has(cell)) {
+      if (!isNonZoneCell(cell) && !slotIds.has(cell)) {
         return res.status(400).json({ success: false, error: `Unknown slot id in cells: ${cell}` });
       }
     }

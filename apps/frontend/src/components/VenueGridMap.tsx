@@ -258,7 +258,7 @@ export function VenueGridMap({
                 <div
                   key={`${r}-${c}`}
                   onClick={() => !isOccupied && onSeatToggle(zone, seat)}
-                  title={`${zone.name} · ${seat.label ?? `Место ${seat.number}`} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
+                  title={`${zone.name} · Место ${seat.number} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
                   style={{
                     aspectRatio: '1',
                     backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? color : `${color}55`,
@@ -277,7 +277,7 @@ export function VenueGridMap({
                     minHeight: 4,
                   }}
                 >
-                  {seat.label ?? seat.number}
+                  {seat.number}
                 </div>
               );
             }

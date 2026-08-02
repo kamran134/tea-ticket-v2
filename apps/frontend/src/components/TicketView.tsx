@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
 import { toast } from '../services/toast';
-import type { Ticket, TicketStatus, Currency } from '../types';
+import type { PublicTicket, TicketStatus, Currency } from '../types';
 import { formatPrice } from '../types';
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
@@ -10,7 +10,6 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   PENDING: 'Чек на проверке',
   CONFIRMED: 'Подтверждён',
   REJECTED: 'Отклонён',
-  EXPIRED: 'Истёк',
 };
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
@@ -18,12 +17,11 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
   PENDING: 'bg-amber-100 text-amber-800',
   CONFIRMED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
-  EXPIRED: 'bg-gray-100 text-gray-600',
 };
 
 export function TicketView() {
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [members, setMembers] = useState<Ticket[]>([]);
+  const [ticket, setTicket] = useState<PublicTicket | null>(null);
+  const [members, setMembers] = useState<PublicTicket[]>([]);
   const [currency, setCurrency] = useState<Currency>('₼');
   const [copied, setCopied] = useState(false);
 
@@ -186,17 +184,6 @@ export function TicketView() {
             <h2 className="font-semibold text-red-800">Билет отклонён</h2>
             <p className="text-sm text-red-600 mt-1">
               Свяжитесь с организаторами для уточнения деталей.
-            </p>
-          </div>
-        )}
-
-        {/* EXPIRED */}
-        {ticket.status === 'EXPIRED' && (
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
-            <div className="text-4xl mb-2">⌛</div>
-            <h2 className="font-semibold text-gray-700">Бронь истекла</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Время оплаты вышло. Пожалуйста, зарегистрируйтесь снова.
             </p>
           </div>
         )}

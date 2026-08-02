@@ -68,7 +68,7 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
                         type="button"
                         disabled={!canSelect}
                         onClick={() => onToggle(seat)}
-                        title={seat.label ?? `Место ${seat.number}`}
+                        title={`Место ${seat.number}`}
                         className={[
                           'w-7 h-7 rounded text-xs font-bold transition-colors border relative',
                           isSelected
@@ -78,7 +78,7 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
                               : 'bg-white border-gray-300 text-gray-700 hover:bg-emerald-50 hover:border-emerald-400',
                         ].join(' ')}
                       >
-                        {seat.label ?? seat.number}
+                        {seat.number}
                       </button>
                     );
                   })}

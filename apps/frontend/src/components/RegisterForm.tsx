@@ -6,7 +6,6 @@ import type { Venue, Zone, Seat, ZoneTable, CartItem } from '../types';
 import { formatPrice } from '../types';
 import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
-import { VenueMap } from './VenueMap';
 import { VenueGridMap } from './VenueGridMap';
 import { QuantityModal } from './QuantityModal';
 
@@ -90,13 +89,11 @@ export function RegisterForm({ slug }: Props) {
       for (const cell of row) if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') gridZoneIds.add(cell);
     }
   }
-  const schemaZoneIds = new Set(zones.filter(z => z.layoutData !== null).map(z => z.id));
   const hasGridZones = gridZoneIds.size > 0;
-  const hasSchemaZones = !hasGridZones && schemaZoneIds.size > 0;
   // Grid-placed table zones are picked directly on the map; only legacy
   // (un-positioned) table zones fall back to the flat TablePicker list.
   const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
-  const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id) && !schemaZoneIds.has(z.id));
+  const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id));
 
   const cartSeatIds = cart.filter(l => l.seatId).map(l => l.seatId!);
   const cartQuantityByZone: Record<string, number> = {};
@@ -126,7 +123,7 @@ export function RegisterForm({ slug }: Props) {
       if (prev.some(l => l.key === key)) return prev.filter(l => l.key !== key);
       return [...prev, {
         key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        seatId: seat.id, seatLabel: seat.label ?? String(seat.number), quantity: 1,
+        seatId: seat.id, seatLabel: String(seat.number), quantity: 1,
       }];
     });
   };
@@ -307,24 +304,11 @@ export function RegisterForm({ slug }: Props) {
               />
             )}
 
-            {hasSchemaZones && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Зона</label>
-                <VenueMap
-                  venue={venue}
-                  zones={zones}
-                  selectedZoneId={legacySeatZoneId}
-                  currency={currency}
-                  onZoneClick={handleZoneClick}
-                />
-              </div>
-            )}
-
             {/* Zones without any visual layout — plain cards */}
             {cardZones.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {hasGridZones || hasSchemaZones ? 'Другие зоны' : 'Зона'}
+                  {hasGridZones ? 'Другие зоны' : 'Зона'}
                 </label>
                 <div className="grid grid-cols-1 gap-2">
                   {cardZones.map(z => {

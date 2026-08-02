@@ -1,11 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { env } from '../env';
 
-export interface AuthRequest extends Request {
-  admin?: boolean;
-}
-
-export function requireAuth(req: AuthRequest, res: Response, next: NextFunction): void {
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -14,8 +11,7 @@ export function requireAuth(req: AuthRequest, res: Response, next: NextFunction)
 
   const token = header.slice(7);
   try {
-    jwt.verify(token, process.env.JWT_SECRET!);
-    req.admin = true;
+    jwt.verify(token, env.JWT_SECRET);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });

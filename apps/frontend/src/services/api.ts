@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem } from '../types';
+import type { Ticket, PublicTicket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -32,7 +32,8 @@ export const api = {
     if (opts.all) params.set('all', 'true');
     if (opts.upcoming) params.set('upcoming', 'true');
     const qs = params.toString();
-    return request(`/api/venues${qs ? `?${qs}` : ''}`);
+    // all=true is admin-only server-side now; harmless no-op header otherwise.
+    return request(`/api/venues${qs ? `?${qs}` : ''}`, { headers: authHeaders() });
   },
 
   async getVenueBySlug(slug: string): Promise<Venue> {
@@ -109,11 +110,11 @@ export const api = {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },
 
-  async getTicket(id: string): Promise<{ ticket: Ticket; members: Ticket[] | null; currency: Currency }> {
+  async getTicket(id: string): Promise<{ ticket: PublicTicket; members: PublicTicket[] | null; currency: Currency }> {
     return request(`/api/tickets/${encodeURIComponent(id)}`);
   },
 
-  async getTicketGroup(groupId: string): Promise<{ ticket: Ticket; members: Ticket[]; currency: Currency }> {
+  async getTicketGroup(groupId: string): Promise<{ ticket: PublicTicket; members: PublicTicket[]; currency: Currency }> {
     return request(`/api/tickets/group/${encodeURIComponent(groupId)}`);
   },
 
@@ -131,16 +132,18 @@ export const api = {
     });
   },
 
-  async uploadReceipt(id: string, file: File): Promise<Ticket> {
-    const formData = new FormData();
-    formData.append('receipt', file);
-    const res = await fetch(`${API_URL}/api/tickets/${encodeURIComponent(id)}/upload-receipt`, {
-      method: 'POST',
-      body: formData,
+  // Receipts are no longer plain static files — this hits the authenticated
+  // GET /:id/receipt route and hands back the raw bytes for the caller to
+  // open as a blob URL, since a plain <a href> can't carry an auth header.
+  async getReceiptBlob(id: string): Promise<Blob> {
+    const res = await fetch(`${API_URL}/api/tickets/${encodeURIComponent(id)}/receipt`, {
+      headers: authHeaders(),
     });
-    const json: ApiResponse<Ticket> = await res.json();
-    if (!json.success || !json.data) throw new Error(json.error ?? 'Upload failed');
-    return json.data;
+    if (!res.ok) {
+      const json = (await res.json().catch(() => null)) as ApiResponse<never> | null;
+      throw new Error(json?.error ?? 'Failed to load receipt');
+    }
+    return res.blob();
   },
 
   async checkin(id: string): Promise<Ticket> {
@@ -221,53 +224,8 @@ export const api = {
     return request(`/api/zones/${encodeURIComponent(zoneId)}/seats`);
   },
 
-  async generateSeats(
-    zoneId: string,
-    payload: {
-      sections: { label: string; rows: number; seatsPerRow: number }[];
-      numberingOrder?: 'row-first' | 'section-first';
-      startFrom?: number;
-    },
-  ): Promise<{ count: number }> {
-    return request(`/api/zones/${encodeURIComponent(zoneId)}/generate-seats`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async deleteSeats(zoneId: string): Promise<{ deleted: number }> {
-    return request(`/api/zones/${encodeURIComponent(zoneId)}/seats`, {
-      method: 'DELETE',
-      headers: authHeaders(),
-    });
-  },
-
   async getTables(zoneId: string): Promise<ZoneTable[]> {
     return request(`/api/zones/${encodeURIComponent(zoneId)}/tables`);
-  },
-
-  async generateTables(
-    zoneId: string,
-    payload: { count: number; shape?: 'ROUND' | 'RECT'; chairCount: number },
-  ): Promise<{ count: number; totalSeats: number }> {
-    return request(`/api/zones/${encodeURIComponent(zoneId)}/generate-tables`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(payload),
-    });
-  },
-
-  async updateZoneLayout(
-    id: string,
-    layoutData: ZoneLayoutData | null,
-    type?: ZoneType,
-  ): Promise<Zone> {
-    return request(`/api/zones/${encodeURIComponent(id)}`, {
-      method: 'PUT',
-      headers: authHeaders(),
-      body: JSON.stringify({ layoutData, ...(type && { type }) }),
-    });
   },
 
   async saveGridLayout(venueId: string, layout: GridLayout): Promise<{ venue: Venue; zones: Zone[] }> {

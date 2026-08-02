@@ -4,6 +4,7 @@ import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
 import { generateVenueSlug, slugify } from '../services/slug';
+import { isNonZoneCell } from '../services/gridCells';
 import { z } from 'zod';
 
 const upload = multer({
@@ -20,16 +21,27 @@ export const venuesRouter = Router();
 venuesRouter.get('/', async (req, res) => {
   const all = req.query.all === 'true';
   const upcoming = req.query.upcoming === 'true';
-  try {
-    const venues = await prisma.venue.findMany({
-      where: upcoming
-        ? { active: true, date: { gte: new Date() } }
-        : (all ? undefined : { active: true }),
-      orderBy: { date: upcoming ? 'asc' : 'desc' },
-    });
-    return res.json({ success: true, data: venues });
-  } catch {
-    return res.status(500).json({ success: false, error: 'Failed to fetch venues' });
+
+  const respond = async () => {
+    try {
+      const venues = await prisma.venue.findMany({
+        where: upcoming
+          ? { active: true, date: { gte: new Date() } }
+          : (all ? undefined : { active: true }),
+        orderBy: { date: upcoming ? 'asc' : 'desc' },
+      });
+      res.json({ success: true, data: venues });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch venues' });
+    }
+  };
+
+  // all=true also surfaces hidden/past venues — admin only. The default and
+  // upcoming=true modes (Afisha, event pages) stay public.
+  if (all) {
+    requireAuth(req, res, respond);
+  } else {
+    await respond();
   }
 });
 
@@ -211,7 +223,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const usedZoneIds = new Set<string>();
   for (const row of cells) {
     for (const cell of row) {
-      if (cell === 'empty' || cell === 'blocked' || cell === 'stage') continue;
+      if (isNonZoneCell(cell)) continue;
       const zone = zoneById.get(cell);
       if (!zone) {
         return res.status(400).json({ success: false, error: `Unknown zone id in grid: ${cell}` });
@@ -229,7 +241,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   if (previousLayout?.cells) {
     for (const row of previousLayout.cells) {
       for (const cell of row) {
-        if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') previouslyGridZoneIds.add(cell);
+        if (!isNonZoneCell(cell)) previouslyGridZoneIds.add(cell);
       }
     }
   }
@@ -331,15 +343,43 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         const existingByAnchor = new Map(gridTables.map(t => [`${t.row}-${t.col}`, t]));
 
         const toRemove = gridTables.filter(t => !desiredByAnchor.has(`${t.row}-${t.col}`));
-        const blocked = toRemove.find(t => t.tickets.length > 0);
-        if (blocked) {
+        const blockedRemove = toRemove.find(t => t.tickets.length > 0);
+        if (blockedRemove) {
           throw new GridConflictError(
-            `Zone "${zone.name}": table at row ${blocked.row! + 1}, col ${blocked.col! + 1} has active tickets and cannot be removed`,
+            `Zone "${zone.name}": table at row ${blockedRemove.row! + 1}, col ${blockedRemove.col! + 1} has active tickets and cannot be removed`,
+          );
+        }
+
+        // Tables kept at the same anchor still need chairCount/shape (and the
+        // footprint, if the admin resized the painted area without moving its
+        // top-left corner) refreshed to the zone's current settings — these
+        // otherwise get copied onto ZoneTable only once, at creation, so an
+        // edit to the zone's table config would never reach tables already
+        // placed on the grid.
+        const toKeep = gridTables.filter(t => desiredByAnchor.has(`${t.row}-${t.col}`));
+        const blockedShrink = toKeep.find(t => t.tickets.length > chairCount);
+        if (blockedShrink) {
+          throw new GridConflictError(
+            `Zone "${zone.name}": table at row ${blockedShrink.row! + 1}, col ${blockedShrink.col! + 1} ` +
+            `has ${blockedShrink.tickets.length} active ticket(s) and cannot be reduced to ${chairCount} chairs`,
           );
         }
 
         if (toRemove.length > 0) {
           await tx.zoneTable.deleteMany({ where: { id: { in: toRemove.map(t => t.id) } } });
+        }
+
+        for (const table of toKeep) {
+          const blob = desiredByAnchor.get(`${table.row}-${table.col}`)!;
+          if (
+            table.chairCount !== chairCount || table.shape !== shape ||
+            table.rows !== blob.rows || table.cols !== blob.cols
+          ) {
+            await tx.zoneTable.update({
+              where: { id: table.id },
+              data: { chairCount, shape, rows: blob.rows, cols: blob.cols },
+            });
+          }
         }
 
         const toAdd = desiredBlobs
@@ -381,13 +421,34 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   }
 });
 
+// req.params.id ends up in a filesystem path below (posters/floorplans/<id>/...) —
+// pin it to the shape a real cuid always has before it ever touches a path,
+// instead of trusting whatever was in the URL segment.
+const VENUE_ID_PATTERN = /^[a-z0-9]{20,32}$/;
+
+// Extension from the upload's mimetype (a small, server-controlled set —
+// multer's fileFilter above already restricts it to these three), not from
+// the client-supplied original filename.
+const IMAGE_EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
 // POST /api/venues/:id/upload-floor-plan
 venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPlan'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+  if (!VENUE_ID_PATTERN.test(req.params.id)) {
+    return res.status(400).json({ success: false, error: 'Invalid venue id' });
+  }
   try {
-    const ext = req.file.originalname.split('.').pop() ?? 'jpg';
+    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!exists) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `floorplans/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
     const venue = await prisma.venue.update({
@@ -406,8 +467,15 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+  if (!VENUE_ID_PATTERN.test(req.params.id)) {
+    return res.status(400).json({ success: false, error: 'Invalid venue id' });
+  }
   try {
-    const ext = req.file.originalname.split('.').pop() ?? 'jpg';
+    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!exists) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `posters/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
     const venue = await prisma.venue.update({

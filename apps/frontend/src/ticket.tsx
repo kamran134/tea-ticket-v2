@@ -1,10 +1,4 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
 import { TicketView } from './components/TicketView';
-import './styles/main.css';
+import { renderApp } from './renderApp';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <TicketView />
-  </React.StrictMode>,
-);
+renderApp(<TicketView />);

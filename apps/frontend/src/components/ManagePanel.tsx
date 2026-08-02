@@ -1,18 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, Ticket, TicketStatus } from '../types';
+import type { Venue, Ticket, TicketStatus } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { generateVenueSlug, slugify } from '../utils/slug';
 import { StatsTab } from './StatsTab';
-import { ZoneConfigurator } from './ZoneConfigurator';
-import { ZoneMapEditor } from './ZoneMapEditor';
 import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
-type Tab = 'venues' | 'zones' | 'map' | 'gridmap' | 'tickets' | 'stats';
+type Tab = 'venues' | 'gridmap' | 'tickets' | 'stats';
 type TicketFilter = TicketStatus | 'ALL';
 
 const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
@@ -28,7 +26,6 @@ const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> =
   PENDING:   { label: 'Ожидает',      className: 'bg-amber-100 text-amber-700' },
   CONFIRMED: { label: 'Подтверждён',  className: 'bg-green-100 text-green-700' },
   REJECTED:  { label: 'Отклонён',     className: 'bg-red-100 text-red-600' },
-  EXPIRED:   { label: 'Истёк',        className: 'bg-gray-100 text-gray-500' },
 };
 
 function isTokenValid(): boolean {
@@ -41,8 +38,6 @@ function isTokenValid(): boolean {
     return false;
   }
 }
-
-const ZONE_DEFAULTS = { name: '', price: '', capacity: '', sortOrder: '0' };
 
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -71,12 +66,8 @@ export function ManagePanel() {
   const [editVenueDate, setEditVenueDate] = useState('');
   const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
-  // Zones
+  // Schema (grid map) — which venue is selected for editing
   const [selectedVenueId, setSelectedVenueId] = useState('');
-  const [zones, setZones] = useState<Zone[]>([]);
-  const [zoneTickets, setZoneTickets] = useState<Ticket[]>([]);
-  const [editingZone, setEditingZone] = useState<Zone | null>(null);
-  const [newZone, setNewZone] = useState(ZONE_DEFAULTS);
 
   // Tickets
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
@@ -111,12 +102,6 @@ export function ManagePanel() {
     if (!authenticated) return;
     api.getVenues({ all: true }).then(setVenues);
   }, [authenticated]);
-
-  useEffect(() => {
-    if (!selectedVenueId) { setZones([]); setZoneTickets([]); return; }
-    Promise.all([api.getZones(selectedVenueId), api.getTickets(selectedVenueId)])
-      .then(([z, t]) => { setZones(z); setZoneTickets(t); });
-  }, [selectedVenueId]);
 
   // Auto-suggest a slug from name+date until the admin edits it by hand
   useEffect(() => {
@@ -241,61 +226,6 @@ export function ManagePanel() {
     }
   };
 
-  // --- Zone handlers ---
-
-  const createZone = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const zone = await api.createZone({
-        venueId: selectedVenueId,
-        name: newZone.name,
-        price: Number(newZone.price),
-        capacity: Number(newZone.capacity),
-        sortOrder: Number(newZone.sortOrder),
-        type: 'GENERAL',
-        color: null,
-        layoutData: null,
-        tableChairs: null,
-        tableShape: null,
-      });
-      setZones(z => [...z, zone]);
-      setNewZone(ZONE_DEFAULTS);
-      toast.success('Зона добавлена');
-    } catch (err) {
-      toast.error(errMsg(err));
-    }
-  };
-
-  const saveZone = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingZone) return;
-    try {
-      const updated = await api.updateZone(editingZone.id, {
-        name: editingZone.name,
-        price: editingZone.price,
-        capacity: editingZone.capacity,
-        sortOrder: editingZone.sortOrder,
-      });
-      setZones(z => z.map(zone => (zone.id === updated.id ? updated : zone)));
-      setEditingZone(null);
-      toast.success('Зона сохранена');
-    } catch (err) {
-      toast.error(errMsg(err));
-    }
-  };
-
-  const deleteZone = (id: string) => {
-    requestConfirm('Удалить зону?', 'Билеты в этой зоне не будут удалены.', async () => {
-      try {
-        await api.deleteZone(id);
-        setZones(z => z.filter(zone => zone.id !== id));
-        toast.success('Зона удалена');
-      } catch (err) {
-        toast.error(errMsg(err));
-      }
-    });
-  };
-
   // --- Ticket handlers ---
 
   const deleteTicket = (ticket: Ticket) => {
@@ -315,6 +245,20 @@ export function ManagePanel() {
         }
       },
     );
+  };
+
+  // Receipts are served via an authenticated endpoint now, not a plain static
+  // URL — a bare <a href> can't carry the admin token, so fetch it as a blob
+  // and open that instead.
+  const openReceipt = async (ticketId: string) => {
+    try {
+      const blob = await api.getReceiptBlob(ticketId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (err) {
+      toast.error(errMsg(err));
+    }
   };
 
   const handleTicketStatus = async (id: string, status: 'CONFIRMED' | 'REJECTED') => {
@@ -337,19 +281,6 @@ export function ManagePanel() {
   // --- Derived state ---
 
   const selectedVenue = venues.find(v => v.id === selectedVenueId);
-  const zoneCurrency = selectedVenue?.currency ?? '₼';
-
-  const zoneRevenue = useMemo(() => {
-    if (!zones.length || !zoneTickets.length) return null;
-    let confirmed = 0;
-    let pending = 0;
-    for (const z of zones) {
-      const zt = zoneTickets.filter(t => t.zoneId === z.id);
-      confirmed += zt.filter(t => t.status === 'CONFIRMED').length * z.price;
-      pending += zt.filter(t => t.status === 'PENDING').length * z.price;
-    }
-    return { confirmed, pending };
-  }, [zones, zoneTickets]);
 
   const filterVenue = venues.find(v => v.id === filterVenueId);
   const ticketCurrency = filterVenue?.currency ?? '₼';
@@ -369,8 +300,6 @@ export function ManagePanel() {
 
   const TAB_LABELS: Record<Tab, string> = {
     venues: 'Мероприятия',
-    zones: 'Зоны',
-    map: 'Схема (старая)',
     gridmap: 'Схема',
     tickets: 'Билеты',
     stats: 'Статистика',
@@ -638,146 +567,6 @@ export function ManagePanel() {
           </div>
         )}
 
-        {/* ZONES TAB */}
-        {tab === 'zones' && (
-          <div className="space-y-4">
-            <select
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-              value={selectedVenueId}
-              onChange={e => setSelectedVenueId(e.target.value)}
-            >
-              <option value="">Выберите мероприятие</option>
-              {venues.map(v => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
-            </select>
-
-            {selectedVenueId && (
-              <>
-                <form
-                  onSubmit={editingZone ? saveZone : createZone}
-                  className="bg-white rounded-2xl shadow-sm p-4 space-y-3"
-                >
-                  <h2 className="font-semibold text-gray-800">
-                    {editingZone ? 'Редактировать зону' : 'Новая зона'}
-                  </h2>
-
-                  <input
-                    type="text"
-                    placeholder="Название зоны"
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                    value={editingZone ? editingZone.name : newZone.name}
-                    onChange={e =>
-                      editingZone
-                        ? setEditingZone({ ...editingZone, name: e.target.value })
-                        : setNewZone({ ...newZone, name: e.target.value })
-                    }
-                    required
-                  />
-
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { field: 'price', label: `Цена (${zoneCurrency})` },
-                      { field: 'capacity', label: 'Мест' },
-                      { field: 'sortOrder', label: 'Порядок' },
-                    ].map(({ field, label }) => (
-                      <input
-                        key={field}
-                        type="number"
-                        placeholder={label}
-                        min="0"
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                        value={
-                          editingZone
-                            ? String(editingZone[field as keyof Zone])
-                            : newZone[field as keyof typeof newZone]
-                        }
-                        onChange={e =>
-                          editingZone
-                            ? setEditingZone({ ...editingZone, [field]: Number(e.target.value) })
-                            : setNewZone({ ...newZone, [field]: e.target.value })
-                        }
-                        required
-                      />
-                    ))}
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      className="flex-1 py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-                    >
-                      {editingZone ? 'Сохранить' : 'Добавить'}
-                    </button>
-                    {editingZone && (
-                      <button
-                        type="button"
-                        onClick={() => setEditingZone(null)}
-                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors"
-                      >
-                        Отмена
-                      </button>
-                    )}
-                  </div>
-                </form>
-
-                {zoneRevenue && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-                      <div className="text-xs text-emerald-600">Подтверждённая выручка</div>
-                      <div className="text-base font-bold text-emerald-700 mt-0.5">
-                        {formatPrice(zoneRevenue.confirmed, zoneCurrency)}
-                      </div>
-                    </div>
-                    <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-                      <div className="text-xs text-amber-600">Ожидаемая выручка</div>
-                      <div className="text-base font-bold text-amber-700 mt-0.5">
-                        {formatPrice(zoneRevenue.pending, zoneCurrency)}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  {zones.map(z => (
-                    <div key={z.id} className="bg-white rounded-xl shadow-sm p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="font-medium text-gray-800">{z.name}</div>
-                          <div className="text-sm text-gray-500">
-                            {formatPrice(z.price, zoneCurrency)} ·{' '}
-                            {z.available !== undefined ? `${z.available}/` : ''}{z.capacity} мест
-                          </div>
-                        </div>
-                        <div className="flex gap-3 shrink-0 ml-4">
-                          <button
-                            onClick={() => setEditingZone(z)}
-                            className="text-sm text-emerald-700 hover:underline"
-                          >
-                            Ред.
-                          </button>
-                          <button
-                            onClick={() => deleteZone(z.id)}
-                            className="text-sm text-red-600 hover:underline"
-                          >
-                            Удал.
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-2">
-                        <ZoneConfigurator
-                          zone={z}
-                          onUpdated={updated => setZones(zs => zs.map(z2 => z2.id === updated.id ? updated : z2))}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
         {/* TICKETS TAB */}
         {tab === 'tickets' && (
           <div className="space-y-4">
@@ -854,14 +643,13 @@ export function ManagePanel() {
                     </div>
 
                     {t.receiptLink && (
-                      <a
-                        href={t.receiptLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-emerald-700 hover:underline block"
+                      <button
+                        type="button"
+                        onClick={() => openReceipt(t.id)}
+                        className="text-sm text-emerald-700 hover:underline block text-left"
                       >
                         Открыть чек →
-                      </a>
+                      </button>
                     )}
 
                     <button
@@ -900,46 +688,6 @@ export function ManagePanel() {
                 );
               })}
             </div>
-          </div>
-        )}
-
-        {/* MAP TAB */}
-        {tab === 'map' && (
-          <div className="space-y-4">
-            <select
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-              value={selectedVenueId}
-              onChange={e => setSelectedVenueId(e.target.value)}
-            >
-              <option value="">Выберите мероприятие</option>
-              {venues.map(v => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
-            </select>
-
-            {selectedVenueId && zones.length > 0 && (
-              <div className="bg-emerald-50 rounded-xl px-4 py-3 border border-emerald-100 flex justify-between items-center">
-                <span className="text-sm text-emerald-700">Выручка при полной продаже</span>
-                <span className="font-bold text-emerald-800">
-                  {formatPrice(zones.reduce((s, z) => s + z.capacity * z.price, 0), zoneCurrency)}
-                </span>
-              </div>
-            )}
-
-            {selectedVenueId && selectedVenue && (
-              <ZoneMapEditor
-                venue={selectedVenue}
-                zones={zones}
-                onVenueUpdated={updated => setVenues(vs => vs.map(v => v.id === updated.id ? updated : v))}
-                onZoneUpdated={updated => setZones(zs => zs.map(z => z.id === updated.id ? updated : z))}
-              />
-            )}
-
-            {selectedVenueId && !zones.length && (
-              <p className="text-sm text-gray-400 text-center py-8">
-                Сначала создайте зоны во вкладке «Зоны»
-              </p>
-            )}
           </div>
         )}
 
