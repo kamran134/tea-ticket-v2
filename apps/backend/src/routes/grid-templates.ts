@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { isNonZoneCell } from '../services/gridCells';
+import { prisma } from '../db';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 export const gridTemplatesRouter = Router();
 
 const templateZoneSchema = z.object({

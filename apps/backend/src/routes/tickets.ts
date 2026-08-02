@@ -1,11 +1,10 @@
 import { Router } from 'express';
-import { Prisma, PrismaClient, Ticket, TicketStatus as PrismaTicketStatus } from '@prisma/client';
+import { Prisma, Ticket, TicketStatus as PrismaTicketStatus } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { requireAuth } from '../middleware/auth';
 import { resolveUploadPath } from '../services/storage';
+import { prisma } from '../db';
 import { z } from 'zod';
-
-const prisma = new PrismaClient();
 
 export const ticketsRouter = Router();
 
@@ -16,6 +15,7 @@ export const ticketsRouter = Router();
 function withoutContactInfo<T extends { phone: string; email: string | null }>(
   ticket: T,
 ): Omit<T, 'phone' | 'email'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit them
   const { phone, email, ...rest } = ticket;
   return rest;
 }

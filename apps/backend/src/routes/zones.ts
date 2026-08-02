@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { Prisma, PrismaClient, TicketStatus } from '@prisma/client';
+import { Prisma, TicketStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { prisma } from '../db';
 import { z } from 'zod';
 
-const prisma = new PrismaClient();
 export const zonesRouter = Router();
 
 // GET /api/zones?venueId=xxx
@@ -28,15 +28,6 @@ zonesRouter.get('/', async (req, res) => {
       _count: { _all: true },
     });
     const ticketCountMap = Object.fromEntries(ticketCounts.map(c => [c.zoneId, c._count._all]));
-
-    const tableOccupied = await prisma.ticket.groupBy({
-      by: ['tableId'],
-      where: { ...activeWhere, tableId: { not: null } },
-      _count: { _all: true },
-    });
-    const tableTicketMap = Object.fromEntries(
-      tableOccupied.filter(t => t.tableId).map(t => [t.tableId!, t._count._all]),
-    );
 
     const tableSums = await prisma.zoneTable.groupBy({
       by: ['zoneId'],

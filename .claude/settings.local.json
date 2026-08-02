@@ -98,7 +98,31 @@
       "Bash('/c/Program Files/PostgreSQL/15/bin/pg_ctl.exe' -D C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/pgtest_data stop -m fast)",
       "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
       "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=22952\")",
-      "PowerShell(Stop-Process -Id 22952 -Force)"
+      "PowerShell(Stop-Process -Id 22952 -Force)",
+      "Bash(grep -A2 \"^[a-z@/-]* *$\\\\|Severity\")",
+      "Bash(node -e \"const p = require\\('eslint-plugin-react-hooks'\\); console.log\\(Object.keys\\(p\\)\\); console.log\\(Object.keys\\(p.configs || {}\\)\\);\")",
+      "Bash(node -e \"const p = require\\('eslint-plugin-react-hooks'\\); console.log\\(JSON.stringify\\(p.configs['recommended-latest'], null, 2\\).slice\\(0, 500\\)\\)\")",
+      "Bash(node -e \"const p = require\\('eslint-plugin-react-hooks'\\); console.log\\(JSON.stringify\\(Object.keys\\(p.configs.flat || {}\\)\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(grep -n \"const { phone, email, ...rest }\" apps/backend/src/routes/tickets.ts)",
+      "Bash(grep -n \"const { phone, email, ...rest }\" src/routes/tickets.ts)",
+      "Bash(echo \"backend lint exit=$?\")",
+      "Bash(echo \"lint exit=$?\")",
+      "Bash(sed -i '133s/.*/XXXPLACEHOLDERXXX/' src/components/ManagePanel.tsx)",
+      "Bash(npx eslint *)",
+      "Bash(npx vitest *)",
+      "Bash(echo \"tsc exit=$?\")",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/deploy.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(python -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/deploy.yml'\\)\\); print\\('YAML OK'\\)\")",
+      "Bash(echo \"tsc=$?\")",
+      "Bash(echo \"lint=$?\")",
+      "Bash(npm ci *)",
+      "Bash(rm -rf node_modules)",
+      "Bash(rm -rf C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_backend C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_frontend)",
+      "Bash(mkdir -p C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_backend C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_frontend)",
+      "Bash(cp /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/backend/package.json /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/backend/package-lock.json C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_backend/)",
+      "Bash(cp /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/frontend/package.json /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/frontend/package-lock.json C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_frontend/)",
+      "Bash(echo \"check-ignore exit=$?\")"
     ]
   }
 }
