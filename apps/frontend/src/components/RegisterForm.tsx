@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
+import 'react-phone-number-input/style.css';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable, CartItem } from '../types';
 import { formatPrice } from '../types';
@@ -6,6 +8,7 @@ import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueMap } from './VenueMap';
 import { VenueGridMap } from './VenueGridMap';
+import { QuantityModal } from './QuantityModal';
 
 interface CartLine {
   key: string;
@@ -18,6 +21,8 @@ interface CartLine {
   tableId?: string;
   tableNumber?: number;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function pluralize(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
@@ -36,7 +41,8 @@ export function RegisterForm({ slug }: Props) {
   const [venueNotFound, setVenueNotFound] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState<string | undefined>();
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -49,6 +55,10 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatZoneId, setLegacySeatZoneId] = useState<string | null>(null);
   const [legacySeatsCache, setLegacySeatsCache] = useState<Record<string, Seat[]>>({});
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
+
+  const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
+  const [quantityModalTableId, setQuantityModalTableId] = useState<string | null>(null);
+  const [gridMapOpen, setGridMapOpen] = useState(false);
 
   useEffect(() => {
     api.getVenueBySlug(slug)
@@ -77,13 +87,15 @@ export function RegisterForm({ slug }: Props) {
   const gridZoneIds = new Set<string>();
   if (venue?.gridLayout) {
     for (const row of venue.gridLayout.cells) {
-      for (const cell of row) if (cell !== 'empty' && cell !== 'blocked') gridZoneIds.add(cell);
+      for (const cell of row) if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') gridZoneIds.add(cell);
     }
   }
   const schemaZoneIds = new Set(zones.filter(z => z.layoutData !== null).map(z => z.id));
   const hasGridZones = gridZoneIds.size > 0;
   const hasSchemaZones = !hasGridZones && schemaZoneIds.size > 0;
-  const tableZones = zones.filter(z => z.type === 'TABLE');
+  // Grid-placed table zones are picked directly on the map; only legacy
+  // (un-positioned) table zones fall back to the flat TablePicker list.
+  const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
   const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id) && !schemaZoneIds.has(z.id));
 
   const cartSeatIds = cart.filter(l => l.seatId).map(l => l.seatId!);
@@ -95,6 +107,7 @@ export function RegisterForm({ slug }: Props) {
   }
   const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
   const cartTotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
+  const gridCartCount = cart.filter(l => gridZoneIds.has(l.zoneId)).reduce((s, l) => s + l.quantity, 0);
 
   // Keep the optional per-guest name inputs in sync with the cart size
   useEffect(() => {
@@ -118,14 +131,13 @@ export function RegisterForm({ slug }: Props) {
     });
   };
 
-  const addGeneralToCart = (zone: Zone) => {
+  const setGeneralQuantity = (zone: Zone, quantity: number) => {
     const key = `general:${zone.id}`;
     setCart(prev => {
+      if (quantity <= 0) return prev.filter(l => l.key !== key);
       const existing = prev.find(l => l.key === key);
-      const max = zone.available ?? Infinity;
-      if ((existing?.quantity ?? 0) >= max) return prev;
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l));
-      return [...prev, { key, zoneId: zone.id, zoneName: zone.name, price: zone.price, quantity: 1 }];
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
+      return [...prev, { key, zoneId: zone.id, zoneName: zone.name, price: zone.price, quantity }];
     });
   };
 
@@ -138,6 +150,19 @@ export function RegisterForm({ slug }: Props) {
       return [...prev, {
         key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
         tableId: table.id, tableNumber: table.number, quantity: 1,
+      }];
+    });
+  };
+
+  const setTableQuantity = (zone: Zone, table: ZoneTable, quantity: number) => {
+    const key = `table:${table.id}`;
+    setCart(prev => {
+      if (quantity <= 0) return prev.filter(l => l.key !== key);
+      const existing = prev.find(l => l.key === key);
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
+      return [...prev, {
+        key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
+        tableId: table.id, tableNumber: table.number, quantity,
       }];
     });
   };
@@ -161,7 +186,7 @@ export function RegisterForm({ slug }: Props) {
 
   const handleZoneClick = (zone: Zone) => {
     if (zone.type === 'SEATED') openSeatZone(zone);
-    else if (zone.type === 'GENERAL') addGeneralToCart(zone);
+    else if (zone.type === 'GENERAL') setQuantityModalZoneId(zone.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -177,7 +202,8 @@ export function RegisterForm({ slug }: Props) {
       });
       const result = await api.register({
         name: name.trim(),
-        phone: phone.trim(),
+        phone: (phone ?? '').trim(),
+        email: email.trim(),
         venueId: venue.id,
         items,
         ...(namedGuests && { guestNames: guestNameInputs.map(g => g.trim()) }),
@@ -211,10 +237,20 @@ export function RegisterForm({ slug }: Props) {
     );
   }
 
-  const canSubmit = cart.length > 0 && !!name.trim() && !!phone.trim() &&
-    (!namedGuests || guestNameInputs.every(g => g.trim()));
+  const canSubmit = cart.length > 0 && !!name.trim() && !!phone && isValidPhoneNumber(phone) &&
+    EMAIL_RE.test(email.trim()) && (!namedGuests || guestNameInputs.every(g => g.trim()));
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
+  const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
+  const quantityModalTableInfo = (() => {
+    if (!quantityModalTableId) return undefined;
+    for (const zone of zones) {
+      if (zone.type !== 'TABLE') continue;
+      const table = (tablesByZone[zone.id] ?? []).find(t => t.id === quantityModalTableId);
+      if (table) return { zone, table };
+    }
+    return undefined;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
@@ -237,17 +273,38 @@ export function RegisterForm({ slug }: Props) {
             {/* Grid / schema map */}
             {hasGridZones && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Выберите места</label>
-                <VenueGridMap
-                  venue={venue}
-                  zones={zones}
-                  currency={currency}
-                  cartSeatIds={cartSeatIds}
-                  cartQuantityByZone={cartQuantityByZone}
-                  onZoneAdd={addGeneralToCart}
-                  onSeatToggle={toggleSeatInCart}
-                />
+                <label className="block text-sm font-medium text-gray-700 mb-2">Места</label>
+                <button
+                  type="button"
+                  onClick={() => setGridMapOpen(true)}
+                  className={[
+                    'w-full flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
+                    gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-emerald-300',
+                  ].join(' ')}
+                >
+                  <span className="font-medium text-gray-800">
+                    {gridCartCount > 0 ? 'Изменить выбор мест' : 'Выберите места'}
+                  </span>
+                  {gridCartCount > 0 && (
+                    <span className="text-emerald-700 font-semibold text-sm shrink-0">× {gridCartCount}</span>
+                  )}
+                </button>
               </div>
+            )}
+
+            {gridMapOpen && (
+              <VenueGridMap
+                venue={venue}
+                zones={zones}
+                currency={currency}
+                cartSeatIds={cartSeatIds}
+                cartQuantityByZone={cartQuantityByZone}
+                cartQuantityByTable={cartQuantityByTable}
+                onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
+                onSeatToggle={toggleSeatInCart}
+                onTableOpen={(_zone, table) => setQuantityModalTableId(table.id)}
+                onClose={() => setGridMapOpen(false)}
+              />
             )}
 
             {hasSchemaZones && (
@@ -412,7 +469,7 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя *</label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
@@ -423,12 +480,28 @@ export function RegisterForm({ slug }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Телефон</label>
-              <input
-                type="tel"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Телефон *</label>
+              <PhoneInput
+                international
+                defaultCountry="AZ"
+                placeholder="XX XXX XX XX"
                 value={phone}
-                onChange={e => setPhone(e.target.value)}
+                onChange={setPhone}
+                required
+              />
+              {!!phone && !isValidPhoneNumber(phone) && (
+                <p className="text-xs text-red-500 mt-1">Проверьте номер телефона</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email"
+                placeholder="you@example.com"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
                 required
               />
             </div>
@@ -467,12 +540,12 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             {cartTotal > 0 && (
-              <div className="p-4 bg-emerald-600 rounded-xl text-white">
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm opacity-90">
+                  <span className="text-sm text-emerald-700">
                     Итого · {cartCount} {pluralize(cartCount, 'билет', 'билета', 'билетов')}
                   </span>
-                  <span className="text-2xl font-bold">{formatPrice(cartTotal, currency)}</span>
+                  <span className="text-2xl font-bold text-emerald-800">{formatPrice(cartTotal, currency)}</span>
                 </div>
               </div>
             )}
@@ -482,11 +555,35 @@ export function RegisterForm({ slug }: Props) {
               disabled={loading || !canSubmit}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+              {loading ? 'Покупка...' : 'Купить'}
             </button>
           </form>
         </div>
       </div>
+
+      {quantityModalZone && (
+        <QuantityModal
+          title={quantityModalZone.name}
+          price={quantityModalZone.price}
+          currency={currency}
+          quantity={cartQuantityByZone[quantityModalZone.id] ?? 0}
+          max={quantityModalZone.available ?? Infinity}
+          onChange={qty => setGeneralQuantity(quantityModalZone, qty)}
+          onClose={() => setQuantityModalZoneId(null)}
+        />
+      )}
+
+      {quantityModalTableInfo && (
+        <QuantityModal
+          title={`Стол ${quantityModalTableInfo.table.number}`}
+          price={quantityModalTableInfo.zone.price}
+          currency={currency}
+          quantity={cartQuantityByTable[quantityModalTableInfo.table.id] ?? 0}
+          max={quantityModalTableInfo.table.available}
+          onChange={qty => setTableQuantity(quantityModalTableInfo.zone, quantityModalTableInfo.table, qty)}
+          onClose={() => setQuantityModalTableId(null)}
+        />
+      )}
     </div>
   );
 }

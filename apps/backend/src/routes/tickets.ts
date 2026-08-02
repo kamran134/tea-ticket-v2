@@ -98,6 +98,7 @@ const cartItemSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(7).max(20),
+  email: z.string().trim().email().max(200),
   venueId: z.string().min(1),
   items: z.array(cartItemSchema).min(1),
   guestNames: z.array(z.string().max(200)).optional().default([]),
@@ -116,7 +117,7 @@ ticketsRouter.post('/register', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { name, phone, venueId, items, guestNames } = parsed.data;
+  const { name, phone, email, venueId, items, guestNames } = parsed.data;
   const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
   const now = new Date();
 
@@ -231,10 +232,10 @@ ticketsRouter.post('/register', async (req, res) => {
       const ticketRows = slots.map((slot, i) => ({
         name: names[i],
         phone,
+        email,
         venueId,
         zoneId: slot.zoneId,
         zoneName: slot.zone.name,
-        cardNumber: slot.zone.cardNumber,
         price: slot.zone.price,
         status: 'BOOKED' as const,
         bookedAt: now,
@@ -253,7 +254,7 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
-      return { id: mainTicket.id, groupId, totalPrice, cardNumber: mainTicket.cardNumber, expiresAt: expiresAt.toISOString() };
+      return { id: mainTicket.id, groupId, totalPrice };
     });
 
     return res.status(201).json({ success: true, data: result });
@@ -427,18 +428,14 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/tickets/:id  (admin: delete ticket or entire group)
+// DELETE /api/tickets/:id  (admin: delete a single ticket, even inside a group)
 ticketsRouter.delete('/:id', requireAuth, async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     if (!ticket) {
       return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
-    if (ticket.groupId) {
-      await prisma.ticket.deleteMany({ where: { groupId: ticket.groupId } });
-    } else {
-      await prisma.ticket.delete({ where: { id: req.params.id } });
-    }
+    await prisma.ticket.delete({ where: { id: req.params.id } });
     return res.json({ success: true, data: { deleted: true } });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to delete ticket' });

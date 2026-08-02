@@ -8,7 +8,7 @@ export function formatPrice(amount: number, currency: Currency | string): string
   return `${formatted} ${currency}`;
 }
 
-export type GridCellState = 'empty' | 'blocked' | string;
+export type GridCellState = 'empty' | 'blocked' | 'stage' | string;
 
 export interface GridLayout {
   rows: number;
@@ -20,8 +20,10 @@ export interface GridTemplateZoneSlot {
   slotId: string;
   name: string;
   color: string | null;
-  type: 'GENERAL' | 'SEATED';
+  type: ZoneType;
   capacity?: number;
+  tableChairs?: number;
+  tableShape?: TableShape;
 }
 
 export interface GridTemplateSummary {
@@ -51,7 +53,7 @@ export interface Venue {
 }
 
 export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';
-export type TableShape = 'ROUND' | 'RECT';
+export type TableShape = 'ROUND' | 'RECT' | 'SOFA';
 
 export interface ZoneSectionLayout {
   sectionIndex: number;
@@ -76,12 +78,13 @@ export interface Zone {
   venueId: string;
   name: string;
   price: number;
-  cardNumber: string;
   capacity: number;
   sortOrder: number;
   type: ZoneType;
   color: string | null;
   layoutData: ZoneLayoutData | null;
+  tableChairs: number | null;
+  tableShape: TableShape | null;
   available?: number;
 }
 
@@ -103,6 +106,10 @@ export interface ZoneTable {
   shape: TableShape;
   chairCount: number;
   layoutData: Record<string, unknown> | null;
+  row: number | null;
+  col: number | null;
+  rows: number | null;
+  cols: number | null;
   occupied: number;
   available: number;
 }
@@ -111,10 +118,10 @@ export interface Ticket {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   venueId: string;
   zoneId: string;
   zoneName: string;
-  cardNumber: string;
   price: number;
   receiptLink: string | null;
   status: TicketStatus;
@@ -137,7 +144,6 @@ export interface RegisterResult {
   id: string;
   groupId: string | null;
   totalPrice: number;
-  cardNumber: string;
 }
 
 export interface ApiResponse<T> {

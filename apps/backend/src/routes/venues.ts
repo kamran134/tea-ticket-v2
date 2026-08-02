@@ -148,6 +148,45 @@ const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'
 
 class GridConflictError extends Error {}
 
+interface TableBlob { row: number; col: number; rows: number; cols: number }
+
+// A table now spans a rectangular footprint (drawn as a "stamp" by the
+// frontend), not a single cell — group same-zone-id cells into their
+// connected components (4-directional flood fill) and reject anything that
+// isn't a solid rectangle, since row/col/rows/cols can only represent that.
+function findTableBlobs(cells: string[][], rows: number, cols: number, zoneId: string): TableBlob[] | null {
+  const seen: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
+  const blobs: TableBlob[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (seen[r][c] || cells[r][c] !== zoneId) continue;
+      let minRow = r, maxRow = r, minCol = c, maxCol = c, cellCount = 0;
+      const stack: [number, number][] = [[r, c]];
+      seen[r][c] = true;
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        cellCount++;
+        minRow = Math.min(minRow, cr);
+        maxRow = Math.max(maxRow, cr);
+        minCol = Math.min(minCol, cc);
+        maxCol = Math.max(maxCol, cc);
+        for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !seen[nr][nc] && cells[nr][nc] === zoneId) {
+            seen[nr][nc] = true;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      const footprintRows = maxRow - minRow + 1;
+      const footprintCols = maxCol - minCol + 1;
+      if (cellCount !== footprintRows * footprintCols) return null; // not a solid rectangle
+      blobs.push({ row: minRow, col: minCol, rows: footprintRows, cols: footprintCols });
+    }
+  }
+  return blobs;
+}
+
 venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const parsed = gridLayoutSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -172,16 +211,10 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const usedZoneIds = new Set<string>();
   for (const row of cells) {
     for (const cell of row) {
-      if (cell === 'empty' || cell === 'blocked') continue;
+      if (cell === 'empty' || cell === 'blocked' || cell === 'stage') continue;
       const zone = zoneById.get(cell);
       if (!zone) {
         return res.status(400).json({ success: false, error: `Unknown zone id in grid: ${cell}` });
-      }
-      if (zone.type === 'TABLE') {
-        return res.status(400).json({
-          success: false,
-          error: `Zone "${zone.name}" is a table zone and cannot be painted on the grid`,
-        });
       }
       usedZoneIds.add(cell);
     }
@@ -196,18 +229,38 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   if (previousLayout?.cells) {
     for (const row of previousLayout.cells) {
       for (const cell of row) {
-        if (cell !== 'empty' && cell !== 'blocked') previouslyGridZoneIds.add(cell);
+        if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') previouslyGridZoneIds.add(cell);
       }
     }
   }
 
   const seatedZoneIds = new Set<string>();
+  const tableZoneIds = new Set<string>();
   for (const id of usedZoneIds) {
-    if (zoneById.get(id)!.type === 'SEATED') seatedZoneIds.add(id);
+    const type = zoneById.get(id)!.type;
+    if (type === 'SEATED') seatedZoneIds.add(id);
+    if (type === 'TABLE') tableZoneIds.add(id);
   }
   for (const id of previouslyGridZoneIds) {
     const zone = zoneById.get(id);
     if (zone?.type === 'SEATED') seatedZoneIds.add(id);
+    if (zone?.type === 'TABLE') tableZoneIds.add(id);
+  }
+
+  for (const id of tableZoneIds) {
+    const zone = zoneById.get(id)!;
+    if (!zone.tableChairs || !zone.tableShape) {
+      return res.status(400).json({
+        success: false,
+        error: `Zone "${zone.name}" has no chairs-per-table/shape configured`,
+      });
+    }
+    if (findTableBlobs(cells, rows, cols, id) === null) {
+      return res.status(400).json({
+        success: false,
+        error: `Zone "${zone.name}": tables must be painted as solid rectangles`,
+      });
+    }
   }
 
   try {
@@ -259,6 +312,51 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         }
 
         await tx.zone.update({ where: { id: zoneId }, data: { capacity: desired.size } });
+      }
+
+      for (const zoneId of tableZoneIds) {
+        const zone = zoneById.get(zoneId)!;
+        const chairCount = zone.tableChairs!;
+        const shape = zone.tableShape!;
+        const desiredBlobs = findTableBlobs(cells, rows, cols, zoneId) ?? [];
+        const desiredByAnchor = new Map(desiredBlobs.map(b => [`${b.row}-${b.col}`, b]));
+
+        // Only diff grid-placed tables (row/col set) — tables from the old
+        // bulk "generate tables" flow (row/col null) are left untouched.
+        const allZoneTables = await tx.zoneTable.findMany({
+          where: { zoneId },
+          include: { tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } }, select: { status: true } } },
+        });
+        const gridTables = allZoneTables.filter(t => t.row !== null && t.col !== null);
+        const existingByAnchor = new Map(gridTables.map(t => [`${t.row}-${t.col}`, t]));
+
+        const toRemove = gridTables.filter(t => !desiredByAnchor.has(`${t.row}-${t.col}`));
+        const blocked = toRemove.find(t => t.tickets.length > 0);
+        if (blocked) {
+          throw new GridConflictError(
+            `Zone "${zone.name}": table at row ${blocked.row! + 1}, col ${blocked.col! + 1} has active tickets and cannot be removed`,
+          );
+        }
+
+        if (toRemove.length > 0) {
+          await tx.zoneTable.deleteMany({ where: { id: { in: toRemove.map(t => t.id) } } });
+        }
+
+        const toAdd = desiredBlobs
+          .filter(b => !existingByAnchor.has(`${b.row}-${b.col}`))
+          .sort((a, b) => a.row - b.row || a.col - b.col);
+
+        if (toAdd.length > 0) {
+          let counter = allZoneTables.reduce((m, t) => Math.max(m, t.number), 0) + 1;
+          await tx.zoneTable.createMany({
+            data: toAdd.map(b => ({
+              zoneId, number: counter++, chairCount, shape,
+              row: b.row, col: b.col, rows: b.rows, cols: b.cols,
+            })),
+          });
+        }
+
+        await tx.zone.update({ where: { id: zoneId }, data: { capacity: desiredBlobs.length * chairCount } });
       }
 
       const venue = await tx.venue.update({

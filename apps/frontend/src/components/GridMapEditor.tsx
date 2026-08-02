@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, ZoneType, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
+import type { Venue, Zone, ZoneType, TableShape, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
+import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 
 const ZONE_COLORS = [
   '#059669', '#0284c7', '#d97706', '#dc2626',
@@ -21,7 +22,7 @@ function buildCells(rows: number, cols: number, existing?: GridCellState[][]): G
 function countCellsByZone(cells: GridCellState[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const cell of cells) {
-    if (cell !== 'empty' && cell !== 'blocked') {
+    if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') {
       counts[cell] = (counts[cell] ?? 0) + 1;
     }
   }
@@ -32,8 +33,111 @@ function zoneColor(zone: Zone, index: number): string {
   return zone.color ?? ZONE_COLORS[index % ZONE_COLORS.length];
 }
 
+const GRID_LINE = '#e5e7eb';
+
+// Cells painted with the same GENERAL zone should read as one filled area,
+// not a grid — so the border between two such neighbours is hidden.
+function sameZoneNeighbor(cells: GridCellState[][], r: number, c: number, zoneId: string): boolean {
+  return cells[r]?.[c] === zoneId;
+}
+
+interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
+
+function zoneBoundingBoxes(cells: GridCellState[][], zoneIds: Set<string>): Map<string, ZoneBox> {
+  const boxes = new Map<string, ZoneBox>();
+  cells.forEach((row, r) => {
+    row.forEach((cell, c) => {
+      if (!zoneIds.has(cell)) return;
+      const box = boxes.get(cell);
+      if (!box) {
+        boxes.set(cell, { minRow: r, maxRow: r, minCol: c, maxCol: c });
+      } else {
+        box.minRow = Math.min(box.minRow, r);
+        box.maxRow = Math.max(box.maxRow, r);
+        box.minCol = Math.min(box.minCol, c);
+        box.maxCol = Math.max(box.maxCol, c);
+      }
+    });
+  });
+  return boxes;
+}
+
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
+}
+
+// Tables occupy a rectangular footprint (not a single cell) — placing/removing
+// one is a discrete "stamp" operation, grouped by 4-directional connectivity.
+const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+function connectedBoxes(cells: GridCellState[][], matches: Set<string>): { zoneId: string; box: ZoneBox }[] {
+  const rowsLen = cells.length;
+  const colsLen = cells[0]?.length ?? 0;
+  const seen: boolean[][] = Array.from({ length: rowsLen }, () => Array(colsLen).fill(false));
+  const result: { zoneId: string; box: ZoneBox }[] = [];
+  for (let r = 0; r < rowsLen; r++) {
+    for (let c = 0; c < colsLen; c++) {
+      if (seen[r][c] || !matches.has(cells[r][c])) continue;
+      const target = cells[r][c];
+      let minRow = r, maxRow = r, minCol = c, maxCol = c;
+      const stack: [number, number][] = [[r, c]];
+      seen[r][c] = true;
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        minRow = Math.min(minRow, cr);
+        maxRow = Math.max(maxRow, cr);
+        minCol = Math.min(minCol, cc);
+        maxCol = Math.max(maxCol, cc);
+        for (const [dr, dc] of NEIGHBORS) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < rowsLen && nc >= 0 && nc < colsLen && !seen[nr][nc] && cells[nr][nc] === target) {
+            seen[nr][nc] = true;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      result.push({ zoneId: target, box: { minRow, maxRow, minCol, maxCol } });
+    }
+  }
+  return result;
+}
+
+function tryPlaceFootprint(
+  cells: GridCellState[][], totalRows: number, totalCols: number,
+  anchorRow: number, anchorCol: number, size: Footprint, zoneId: string,
+): GridCellState[][] | null {
+  if (anchorRow + size.rows > totalRows || anchorCol + size.cols > totalCols) return null;
+  for (let r = anchorRow; r < anchorRow + size.rows; r++) {
+    for (let c = anchorCol; c < anchorCol + size.cols; c++) {
+      if (cells[r][c] !== 'empty') return null;
+    }
+  }
+  const next = cells.map(row => [...row]);
+  for (let r = anchorRow; r < anchorRow + size.rows; r++) {
+    for (let c = anchorCol; c < anchorCol + size.cols; c++) {
+      next[r][c] = zoneId;
+    }
+  }
+  return next;
+}
+
+function removeConnectedBlob(cells: GridCellState[][], totalRows: number, totalCols: number, row: number, col: number): GridCellState[][] {
+  const target = cells[row][col];
+  const next = cells.map(r => [...r]);
+  const stack: [number, number][] = [[row, col]];
+  const seen = new Set<string>([`${row}-${col}`]);
+  while (stack.length > 0) {
+    const [r, c] = stack.pop()!;
+    next[r][c] = 'empty';
+    for (const [dr, dc] of NEIGHBORS) {
+      const nr = r + dr, nc = c + dc, key = `${nr}-${nc}`;
+      if (nr >= 0 && nr < totalRows && nc >= 0 && nc < totalCols && !seen.has(key) && cells[nr][nc] === target) {
+        seen.add(key);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return next;
 }
 
 interface Props {
@@ -53,7 +157,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     buildCells(initial?.rows ?? 10, initial?.cols ?? 15, initial?.cells),
   );
   const [zones, setZones] = useState<Zone[]>([]);
-  const [tableZones, setTableZones] = useState<Zone[]>([]);
   const [zonesLoading, setZonesLoading] = useState(true);
   const [zonesError, setZonesError] = useState(false);
   const [activeTool, setActiveTool] = useState<Tool>('block');
@@ -66,25 +169,20 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [newZoneName, setNewZoneName] = useState('');
   const [newZonePrice, setNewZonePrice] = useState('');
   const [newZoneColor, setNewZoneColor] = useState(ZONE_COLORS[0]);
-  const [newZoneNoSeats, setNewZoneNoSeats] = useState(false);
+  const [newZoneType, setNewZoneType] = useState<ZoneType>('SEATED');
   const [newZoneCapacity, setNewZoneCapacity] = useState('');
+  const [newZoneTableChairs, setNewZoneTableChairs] = useState('');
+  const [newZoneTableShape, setNewZoneTableShape] = useState<TableShape>('ROUND');
 
-  // Zone editing (name/price/capacity/color) — for both grid zones and tables
+  // Zone editing (name/price/capacity/color) — for any zone type, incl. tables
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
   const [editZoneName, setEditZoneName] = useState('');
   const [editZonePrice, setEditZonePrice] = useState('');
   const [editZoneCapacity, setEditZoneCapacity] = useState('');
+  const [editZoneTableChairs, setEditZoneTableChairs] = useState('');
+  const [editZoneTableShape, setEditZoneTableShape] = useState<TableShape>('ROUND');
   const [editZoneColor, setEditZoneColor] = useState(ZONE_COLORS[0]);
   const [savingZoneEdit, setSavingZoneEdit] = useState(false);
-
-  // Tables (not painted on the grid — managed here since "Зоны" tab is hidden)
-  const [showTableForm, setShowTableForm] = useState(false);
-  const [newTableZoneName, setNewTableZoneName] = useState('');
-  const [newTableZonePrice, setNewTableZonePrice] = useState('');
-  const [configuringTableZoneId, setConfiguringTableZoneId] = useState<string | null>(null);
-  const [tableCount, setTableCount] = useState('10');
-  const [tableChairCount, setTableChairCount] = useState('8');
-  const [savingTables, setSavingTables] = useState(false);
 
   // Grid templates
   const [templates, setTemplates] = useState<GridTemplateSummary[]>([]);
@@ -92,6 +190,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+
+  // Large grids are cramped inline — always offer a fullscreen view
+  const [expanded, setExpanded] = useState(false);
 
   // Drawing
   const isDrawing = useRef(false);
@@ -112,12 +213,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     api.getZones(venue.id)
       .then(zs => {
         if (cancelled) return;
-        const gridZones = zs.filter(z => z.type !== 'TABLE');
-        setZones(gridZones);
-        setTableZones(zs.filter(z => z.type === 'TABLE'));
-        const validIds = new Set(gridZones.map(z => z.id));
+        setZones(zs);
+        const validIds = new Set(zs.map(z => z.id));
         setCells(prev =>
-          prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || validIds.has(c) ? c : 'empty'))),
+          prev.map(row => row.map(c => (c === 'empty' || c === 'blocked' || c === 'stage' || validIds.has(c) ? c : 'empty'))),
         );
       })
       .catch(err => {
@@ -149,42 +248,82 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
   const handleCellMouseDown = useCallback((row: number, col: number) => {
     if (locked) return;
+
+    const currentValue = cells[row][col];
+    const currentZone = currentValue !== 'empty' && currentValue !== 'blocked' && currentValue !== 'stage'
+      ? zones.find(z => z.id === currentValue)
+      : undefined;
+    const activeZone = zones.find(z => z.id === activeTool);
+
+    // A table footprint must stay a solid rectangle — clearing any part of it
+    // always clears the whole table, regardless of which tool triggered it.
+    if (currentZone?.type === 'TABLE') {
+      if (activeTool === 'erase' || activeTool === currentValue) {
+        setCells(prev => removeConnectedBlob(prev, rows, cols, row, col));
+      } else {
+        toast.error('Сначала уберите стол инструментом «Стереть»');
+      }
+      return;
+    }
+
+    if (activeZone?.type === 'TABLE') {
+      if (currentValue !== 'empty') {
+        toast.error('Здесь уже занято');
+        return;
+      }
+      const size = tableFootprint(activeZone.tableShape ?? 'ROUND', activeZone.tableChairs ?? 1);
+      const placed = tryPlaceFootprint(cells, rows, cols, row, col, size, activeTool);
+      if (!placed) {
+        toast.error('Недостаточно места для стола здесь');
+        return;
+      }
+      setCells(placed);
+      return;
+    }
+
     isDrawing.current = true;
     setCells(prev => {
-      const currentValue = prev[row][col];
+      const cv = prev[row][col];
       const paintValue: GridCellState =
         activeTool === 'erase' ? 'empty' :
-        currentValue === activeTool ? 'empty' : activeTool;
+        activeTool === 'block' ?
+          (cv === 'blocked' ? 'empty' : 'blocked') :
+        cv === activeTool ? 'empty' : activeTool;
       drawValue.current = paintValue;
       const next = [...prev];
       next[row] = [...prev[row]];
       next[row][col] = paintValue;
       return next;
     });
-  }, [locked, activeTool]);
+  }, [locked, activeTool, zones, cells, rows, cols]);
 
   const handleCellMouseEnter = useCallback((row: number, col: number) => {
     if (!isDrawing.current || locked) return;
     setCells(prev => {
       if (prev[row][col] === drawValue.current) return prev;
+      const cellZone = zones.find(z => z.id === prev[row][col]);
+      if (cellZone?.type === 'TABLE') return prev; // never drag-overwrite a table footprint
       const next = [...prev];
       next[row] = [...prev[row]];
       next[row][col] = drawValue.current;
       return next;
     });
-  }, [locked]);
+  }, [locked, zones]);
 
   const resetZoneForm = () => {
     setNewZoneName('');
     setNewZonePrice('');
-    setNewZoneNoSeats(false);
+    setNewZoneType('SEATED');
     setNewZoneCapacity('');
+    setNewZoneTableChairs('');
+    setNewZoneTableShape('ROUND');
     setNewZoneColor(ZONE_COLORS[zones.length % ZONE_COLORS.length]);
   };
 
   const addZone = async () => {
     if (!newZoneName.trim() || !newZonePrice) return;
-    if (newZoneNoSeats && !newZoneCapacity) return;
+    if (newZoneType === 'GENERAL' && !newZoneCapacity) return;
+    if (newZoneType === 'TABLE' && !newZoneTableChairs) return;
 
     setAddingZone(true);
     try {
@@ -192,11 +331,13 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         venueId: venue.id,
         name: newZoneName.trim(),
         price: Number(newZonePrice),
-        capacity: newZoneNoSeats ? Number(newZoneCapacity) : 1,
+        capacity: newZoneType === 'GENERAL' ? Number(newZoneCapacity) : 1,
         sortOrder: zones.length,
-        type: newZoneNoSeats ? 'GENERAL' : 'SEATED',
+        type: newZoneType,
         color: newZoneColor,
         layoutData: null,
+        tableChairs: newZoneType === 'TABLE' ? Number(newZoneTableChairs) : null,
+        tableShape: newZoneType === 'TABLE' ? newZoneTableShape : null,
       });
       setZones(prev => [...prev, zone]);
       setActiveTool(zone.id);
@@ -213,13 +354,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const removeZone = useCallback(async (zone: Zone) => {
     try {
       await api.deleteZone(zone.id);
-      if (zone.type === 'TABLE') {
-        setTableZones(prev => prev.filter(z => z.id !== zone.id));
-      } else {
-        setZones(prev => prev.filter(z => z.id !== zone.id));
-        setCells(prev => prev.map(row => row.map(c => (c === zone.id ? 'empty' : c))));
-        setActiveTool(t => (t === zone.id ? 'block' : t));
-      }
+      setZones(prev => prev.filter(z => z.id !== zone.id));
+      setCells(prev => prev.map(row => row.map(c => (c === zone.id ? 'empty' : c))));
+      setActiveTool(t => (t === zone.id ? 'block' : t));
       toast.success('Зона удалена');
     } catch (err) {
       toast.error(errMsg(err, 'Не удалось удалить зону — возможно, на неё уже есть билеты'));
@@ -231,6 +368,8 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     setEditZoneName(zone.name);
     setEditZonePrice(String(zone.price));
     setEditZoneCapacity(zone.type === 'GENERAL' ? String(zone.capacity) : '');
+    setEditZoneTableChairs(zone.type === 'TABLE' ? String(zone.tableChairs ?? '') : '');
+    setEditZoneTableShape(zone.tableShape ?? 'ROUND');
     setEditZoneColor(zone.color ?? ZONE_COLORS[0]);
   };
 
@@ -241,62 +380,18 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       const updated = await api.updateZone(zone.id, {
         name: editZoneName.trim(),
         price: Number(editZonePrice),
-        ...(zone.type !== 'TABLE' && { color: editZoneColor }),
+        color: editZoneColor,
         ...(zone.type === 'GENERAL' && editZoneCapacity && { capacity: Number(editZoneCapacity) }),
+        ...(zone.type === 'TABLE' && editZoneTableChairs && { tableChairs: Number(editZoneTableChairs) }),
+        ...(zone.type === 'TABLE' && { tableShape: editZoneTableShape }),
       });
-      const apply = (list: Zone[]) => list.map(z => (z.id === updated.id ? updated : z));
-      if (zone.type === 'TABLE') setTableZones(apply); else setZones(apply);
+      setZones(prev => prev.map(z => (z.id === updated.id ? updated : z)));
       setEditingZoneId(null);
       toast.success('Зона обновлена');
     } catch (err) {
       toast.error(errMsg(err, 'Не удалось сохранить зону'));
     } finally {
       setSavingZoneEdit(false);
-    }
-  };
-
-  const addTableZone = async () => {
-    if (!newTableZoneName.trim() || !newTableZonePrice) return;
-    setAddingZone(true);
-    try {
-      const zone = await api.createZone({
-        venueId: venue.id,
-        name: newTableZoneName.trim(),
-        price: Number(newTableZonePrice),
-        capacity: 1,
-        sortOrder: zones.length + tableZones.length,
-        type: 'TABLE',
-        color: null,
-        layoutData: null,
-      });
-      setTableZones(prev => [...prev, zone]);
-      setShowTableForm(false);
-      setNewTableZoneName('');
-      setNewTableZonePrice('');
-      setConfiguringTableZoneId(zone.id);
-      toast.success('Зона-стол создана — настройте количество столов');
-    } catch (err) {
-      toast.error(errMsg(err, 'Не удалось создать зону'));
-    } finally {
-      setAddingZone(false);
-    }
-  };
-
-  const generateTablesForZone = async (zoneId: string) => {
-    const count = Number(tableCount);
-    const chairCount = Number(tableChairCount);
-    if (!count || !chairCount) return;
-    setSavingTables(true);
-    try {
-      const result = await api.generateTables(zoneId, { count, chairCount });
-      toast.success(`Создано ${result.count} столов (${result.totalSeats} мест)`);
-      const fresh = await api.getZones(venue.id);
-      setTableZones(fresh.filter(z => z.type === 'TABLE'));
-      setConfiguringTableZoneId(null);
-    } catch (err) {
-      toast.error(errMsg(err, 'Не удалось создать столы'));
-    } finally {
-      setSavingTables(false);
     }
   };
 
@@ -314,8 +409,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         slotId: `slot-${i}`,
         name: z.name,
         color: z.color,
-        type: z.type as 'GENERAL' | 'SEATED',
+        type: z.type,
         ...(z.type === 'GENERAL' && { capacity: z.capacity }),
+        ...(z.type === 'TABLE' && { tableChairs: z.tableChairs ?? undefined, tableShape: z.tableShape ?? undefined }),
       }));
       const created = await api.saveGridTemplate({
         name: templateName.trim(), rows, cols, cells: templateCells, zones: templateZones,
@@ -352,6 +448,8 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           type: slot.type as ZoneType,
           color: slot.color,
           layoutData: null,
+          tableChairs: slot.type === 'TABLE' ? (slot.tableChairs ?? 4) : null,
+          tableShape: slot.type === 'TABLE' ? (slot.tableShape ?? 'ROUND') : null,
         });
         slotToRealId.set(slot.slotId, zone.id);
         createdZones.push(zone);
@@ -362,7 +460,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       setPendingRows(template.rows);
       setPendingCols(template.cols);
       setCells(template.cells.map(row =>
-        row.map(c => (c === 'empty' || c === 'blocked' ? c : (slotToRealId.get(c) ?? 'empty'))),
+        row.map(c => (c === 'empty' || c === 'blocked' || c === 'stage' ? c : (slotToRealId.get(c) ?? 'empty'))),
       ));
       setLocked(false);
       toast.success('Шаблон применён — проставьте цены зон и сохраните сетку');
@@ -373,19 +471,41 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
   };
 
+  const generalZoneBoxes = useMemo(() => {
+    const generalIds = new Set(zones.filter(z => z.type === 'GENERAL').map(z => z.id));
+    return zoneBoundingBoxes(cells, generalIds);
+  }, [cells, zones]);
+
+  const stageBox = useMemo(() => zoneBoundingBoxes(cells, new Set(['stage'])).get('stage'), [cells]);
+
+  // Each table now spans multiple cells, so "how many tables are painted"
+  // requires grouping same-zone-id cells into connected components — one
+  // component per physical table — instead of just counting raw cells.
+  const tableZoneIdSet = useMemo(() => new Set(zones.filter(z => z.type === 'TABLE').map(z => z.id)), [zones]);
+  const tableBoxes = useMemo(() => connectedBoxes(cells, tableZoneIdSet), [cells, tableZoneIdSet]);
+  const tableCountByZone = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const { zoneId } of tableBoxes) counts[zoneId] = (counts[zoneId] ?? 0) + 1;
+    return counts;
+  }, [tableBoxes]);
+
   const revenue = useMemo(() => {
     const flat = cells.flat();
     const countsByZone = countCellsByZone(flat);
     let total = 0;
     const details = zones.map(zone => {
-      // GENERAL zones sell by declared capacity, not by painted cell count
-      const count = zone.type === 'GENERAL' ? zone.capacity : (countsByZone[zone.id] ?? 0);
+      // GENERAL zones sell by declared capacity, not by painted cell count;
+      // TABLE zones sell by chairs × number of tables, not by painted cells
+      const count =
+        zone.type === 'GENERAL' ? zone.capacity :
+        zone.type === 'TABLE' ? (tableCountByZone[zone.id] ?? 0) * (zone.tableChairs ?? 1) :
+        (countsByZone[zone.id] ?? 0);
       const amount = count * zone.price;
       total += amount;
       return { zone, count, amount };
     });
     return { total, details };
-  }, [cells, zones]);
+  }, [cells, zones, tableCountByZone]);
 
   const save = async () => {
     setSaving(true);
@@ -393,7 +513,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       const layout: GridLayout = { rows, cols, cells };
       const { venue: updatedVenue, zones: updatedZones } = await api.saveGridLayout(venue.id, layout);
       onVenueUpdated(updatedVenue);
-      setZones(updatedZones.filter(z => z.type !== 'TABLE'));
+      setZones(updatedZones);
       setLocked(true);
       toast.success('Схема сохранена');
     } catch (err) {
@@ -437,24 +557,48 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           />
         </div>
       )}
-      {zone.type !== 'TABLE' && (
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Цвет</label>
-          <div className="flex gap-1 flex-wrap max-w-[160px]">
-            {ZONE_COLORS.map(c => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setEditZoneColor(c)}
-                style={{ backgroundColor: c }}
-                className={`w-6 h-6 rounded-full border-2 transition-transform ${
-                  editZoneColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-105'
-                }`}
-              />
-            ))}
+      {zone.type === 'TABLE' && (
+        <>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Мест за столом</label>
+            <input
+              type="number"
+              value={editZoneTableChairs}
+              onChange={e => setEditZoneTableChairs(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              min="1"
+            />
           </div>
-        </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Форма</label>
+            <select
+              value={editZoneTableShape}
+              onChange={e => setEditZoneTableShape(e.target.value as TableShape)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            >
+              <option value="ROUND">Круглый</option>
+              <option value="RECT">Прямоугольный</option>
+              <option value="SOFA">Диван</option>
+            </select>
+          </div>
+        </>
       )}
+      <div>
+        <label className="block text-xs text-gray-500 mb-1">Цвет</label>
+        <div className="flex gap-1 flex-wrap max-w-[160px]">
+          {ZONE_COLORS.map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setEditZoneColor(c)}
+              style={{ backgroundColor: c }}
+              className={`w-6 h-6 rounded-full border-2 transition-transform ${
+                editZoneColor === c ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-105'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
       <div className="flex gap-2">
         <button
           type="button"
@@ -476,11 +620,18 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className={expanded ? 'fixed inset-0 z-50 bg-white overflow-auto p-4 space-y-4' : 'space-y-4'}>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h3 className="font-semibold text-gray-800">Схема зала</h3>
         <div className="flex gap-2 items-center flex-wrap">
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            {expanded ? 'Свернуть' : 'На весь экран'}
+          </button>
           {!locked && (
             <button
               type="button"
@@ -650,6 +801,20 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               Стереть
             </button>
 
+            {/* Stage tool — decorative only, not sellable */}
+            <button
+              type="button"
+              onClick={() => setActiveTool('stage')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border-2 ${
+                activeTool === 'stage'
+                  ? 'border-gray-700 bg-gray-700 text-white'
+                  : 'border-transparent bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <span className="w-3 h-3 rounded-sm bg-slate-800 shrink-0" />
+              Сцена
+            </button>
+
             {/* Divider */}
             {zones.length > 0 && <span className="w-px h-6 bg-gray-200" />}
 
@@ -675,6 +840,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     <span className="text-gray-400 text-xs">{formatPrice(zone.price, currency)}</span>
                     {zone.type === 'GENERAL' && (
                       <span className="text-gray-400 text-xs">· без мест</span>
+                    )}
+                    {zone.type === 'TABLE' && (
+                      <span className="text-gray-400 text-xs">· {zone.tableChairs} мест/стол</span>
                     )}
                   </button>
                   <button
@@ -733,24 +901,46 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 />
               </div>
               <div>
-                <label className="flex items-center gap-1.5 text-xs text-gray-500 mb-1.5 whitespace-nowrap">
-                  <input
-                    type="checkbox"
-                    checked={newZoneNoSeats}
-                    onChange={e => setNewZoneNoSeats(e.target.checked)}
-                    className="rounded border-gray-300"
-                  />
-                  Без конкретных мест
-                </label>
-                {newZoneNoSeats && (
+                <label className="block text-xs text-gray-500 mb-1">Тип зоны</label>
+                <select
+                  value={newZoneType}
+                  onChange={e => setNewZoneType(e.target.value as ZoneType)}
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                >
+                  <option value="SEATED">Места на сетке</option>
+                  <option value="GENERAL">Без конкретных мест</option>
+                  <option value="TABLE">Столы</option>
+                </select>
+                {newZoneType === 'GENERAL' && (
                   <input
                     type="number"
                     value={newZoneCapacity}
                     onChange={e => setNewZoneCapacity(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                    className="mt-1.5 border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
                     placeholder="Вместимость"
                     min="1"
                   />
+                )}
+                {newZoneType === 'TABLE' && (
+                  <div className="mt-1.5 flex gap-1.5">
+                    <input
+                      type="number"
+                      value={newZoneTableChairs}
+                      onChange={e => setNewZoneTableChairs(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                      placeholder="Мест за столом"
+                      min="1"
+                    />
+                    <select
+                      value={newZoneTableShape}
+                      onChange={e => setNewZoneTableShape(e.target.value as TableShape)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                    >
+                      <option value="ROUND">Круглый</option>
+                      <option value="RECT">Прямоугольный</option>
+                      <option value="SOFA">Диван</option>
+                    </select>
+                  </div>
                 )}
               </div>
               <div>
@@ -773,7 +963,11 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 <button
                   type="button"
                   onClick={addZone}
-                  disabled={addingZone || !newZoneName.trim() || !newZonePrice || (newZoneNoSeats && !newZoneCapacity)}
+                  disabled={
+                    addingZone || !newZoneName.trim() || !newZonePrice ||
+                    (newZoneType === 'GENERAL' && !newZoneCapacity) ||
+                    (newZoneType === 'TABLE' && !newZoneTableChairs)
+                  }
                   className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
                 >
                   {addingZone ? '...' : 'Добавить'}
@@ -793,22 +987,26 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
       {/* Grid canvas */}
       <div
-        className="w-full rounded-xl overflow-hidden border border-gray-200 bg-gray-100 select-none"
+        className={`relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none ${
+          expanded ? 'overflow-auto' : 'overflow-hidden'
+        }`}
         onMouseLeave={() => { isDrawing.current = false; }}
       >
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gap: '1px',
+            gridTemplateColumns: `repeat(${cols}, minmax(${expanded ? '28px' : '0'}, 1fr))`,
           }}
         >
           {cells.map((row, r) =>
             row.map((cell, c) => {
-              const zoneIndex = cell !== 'empty' && cell !== 'blocked'
+              const isStage = cell === 'stage';
+              const zoneIndex = cell !== 'empty' && cell !== 'blocked' && !isStage
                 ? zones.findIndex(z => z.id === cell)
                 : -1;
               const zone = zoneIndex >= 0 ? zones[zoneIndex] : null;
+              const mergeFill = zone?.type === 'GENERAL' || zone?.type === 'TABLE' || isStage;
+              const mergeId = isStage ? 'stage' : zone?.id;
               return (
                 <div
                   key={`${r}-${c}`}
@@ -816,10 +1014,18 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     aspectRatio: '1',
                     backgroundColor:
                       cell === 'blocked' ? '#9ca3af' :
+                      isStage ? '#1e293b' :
+                      zone?.type === 'TABLE' ? '#ffffff' :
                       zone ? zoneColor(zone, zoneIndex) + 'cc' : '#ffffff',
                     cursor: locked ? 'default' : 'crosshair',
                     minWidth: 4,
                     minHeight: 4,
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderTopColor: mergeFill && sameZoneNeighbor(cells, r - 1, c, mergeId!) ? 'transparent' : GRID_LINE,
+                    borderBottomColor: mergeFill && sameZoneNeighbor(cells, r + 1, c, mergeId!) ? 'transparent' : GRID_LINE,
+                    borderLeftColor: mergeFill && sameZoneNeighbor(cells, r, c - 1, mergeId!) ? 'transparent' : GRID_LINE,
+                    borderRightColor: mergeFill && sameZoneNeighbor(cells, r, c + 1, mergeId!) ? 'transparent' : GRID_LINE,
                   }}
                   onMouseDown={() => handleCellMouseDown(r, c)}
                   onMouseEnter={() => handleCellMouseEnter(r, c)}
@@ -828,6 +1034,73 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             }),
           )}
         </div>
+
+        {/* Zone name overlay for GENERAL areas — sits on top, clicks pass through to cells */}
+        {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          return (
+            <div
+              key={zoneId}
+              className="absolute flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+              style={{
+                left: `${(box.minCol / cols) * 100}%`,
+                top: `${(box.minRow / rows) * 100}%`,
+                width: `${((box.maxCol - box.minCol + 1) / cols) * 100}%`,
+                height: `${((box.maxRow - box.minRow + 1) / rows) * 100}%`,
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                lineHeight: 1.2,
+              }}
+            >
+              {zone.name}
+            </div>
+          );
+        })}
+
+        {/* Stage label overlay — decorative, not a real zone */}
+        {stageBox && (
+          <div
+            className="absolute flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
+            style={{
+              left: `${(stageBox.minCol / cols) * 100}%`,
+              top: `${(stageBox.minRow / rows) * 100}%`,
+              width: `${((stageBox.maxCol - stageBox.minCol + 1) / cols) * 100}%`,
+              height: `${((stageBox.maxRow - stageBox.minRow + 1) / rows) * 100}%`,
+              color: '#ffffff',
+              fontSize: 'clamp(8px, 2.2cqw, 15px)',
+              lineHeight: 1.2,
+            }}
+          >
+            Сцена
+          </div>
+        )}
+
+        {/* Table icons — one per connected footprint, not per cell */}
+        {tableBoxes.map(({ zoneId, box }, i) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
+          return (
+            <div
+              key={`${zoneId}-${i}`}
+              className="absolute pointer-events-none p-0.5"
+              style={{
+                left: `${(box.minCol / cols) * 100}%`,
+                top: `${(box.minRow / rows) * 100}%`,
+                width: `${(footprint.cols / cols) * 100}%`,
+                height: `${(footprint.rows / rows) * 100}%`,
+              }}
+            >
+              <TableIcon
+                shape={zone.tableShape ?? 'ROUND'}
+                chairs={zone.tableChairs ?? 1}
+                footprint={footprint}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend when locked */}
@@ -879,154 +1152,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         </div>
       )}
 
-      {/* Tables — not painted on the grid, managed here since "Зоны" is hidden */}
-      {(tableZones.length > 0 || !locked) && (
-        <div className="space-y-2 border-t border-gray-100 pt-4">
-          <h4 className="text-sm font-semibold text-gray-700">Столы</h4>
-          <div className="flex flex-wrap gap-2">
-            {tableZones.map(zone => (
-              editingZoneId === zone.id ? (
-                <div key={zone.id} className="w-full">{zoneEditForm(zone)}</div>
-              ) : (
-                <div key={zone.id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm bg-white">
-                  <div>
-                    <div className="font-medium text-gray-800">{zone.name}</div>
-                    <div className="text-xs text-gray-400">
-                      {formatPrice(zone.price, currency)} · {zone.capacity} мест
-                      {zone.available !== undefined && ` · ${zone.available} свободно`}
-                    </div>
-                  </div>
-                  {!locked && (
-                    <div className="flex items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => startEditZone(zone)}
-                        className="text-gray-300 hover:text-emerald-600 px-1 py-1 text-xs transition-colors"
-                        title="Редактировать"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfiguringTableZoneId(t => (t === zone.id ? null : zone.id))}
-                        className="text-gray-300 hover:text-emerald-600 px-1 py-1 text-xs transition-colors"
-                        title="Настроить столы"
-                      >
-                        ⚙
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removeZone(zone)}
-                        className="text-gray-300 hover:text-red-400 px-1 py-1 text-xs transition-colors"
-                        title="Удалить"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            ))}
-
-            {!locked && (
-              <button
-                type="button"
-                onClick={() => setShowTableForm(s => !s)}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 border-2 border-dashed border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
-              >
-                + Стол-зона
-              </button>
-            )}
-          </div>
-
-          {showTableForm && (
-            <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Название</label>
-                <input
-                  type="text"
-                  value={newTableZoneName}
-                  onChange={e => setNewTableZoneName(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                  placeholder="Банкетные столы"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Цена за место ({currency})</label>
-                <input
-                  type="number"
-                  value={newTableZonePrice}
-                  onChange={e => setNewTableZonePrice(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                  placeholder="5000"
-                  min="0"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={addTableZone}
-                  disabled={addingZone || !newTableZoneName.trim() || !newTableZonePrice}
-                  className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
-                >
-                  {addingZone ? '...' : 'Создать'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowTableForm(false); setNewTableZoneName(''); setNewTableZonePrice(''); }}
-                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Отмена
-                </button>
-              </div>
-            </div>
-          )}
-
-          {configuringTableZoneId && (
-            <div className="bg-gray-50 rounded-xl p-3 flex flex-wrap items-end gap-3 border border-gray-200">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Количество столов</label>
-                <input
-                  type="number"
-                  value={tableCount}
-                  onChange={e => setTableCount(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                  min="1"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">Стульев за столом</label>
-                <input
-                  type="number"
-                  value={tableChairCount}
-                  onChange={e => setTableChairCount(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                  min="1"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => generateTablesForZone(configuringTableZoneId)}
-                  disabled={savingTables}
-                  className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
-                >
-                  {savingTables ? '...' : 'Сгенерировать'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfiguringTableZoneId(null)}
-                  className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Отмена
-                </button>
-              </div>
-              <p className="text-xs text-gray-400 w-full">Перезапишет текущие столы этой зоны (если на них ещё нет билетов).</p>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .PhoneInput {
+    @apply flex items-center gap-2 w-full border border-gray-300 rounded-lg px-4 py-2.5;
+  }
+  .PhoneInput--focus {
+    @apply ring-2 ring-emerald-200 border-emerald-500;
+  }
+  .PhoneInputCountry {
+    @apply flex items-center gap-1.5 shrink-0;
+  }
+  .PhoneInputCountrySelect {
+    @apply text-sm bg-transparent focus:outline-none;
+  }
+  .PhoneInputCountryIcon {
+    @apply w-5 h-auto shrink-0;
+  }
+  .PhoneInputInput {
+    @apply flex-1 min-w-0 border-0 p-0 focus:outline-none focus:ring-0;
+  }
+}

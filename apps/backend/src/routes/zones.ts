@@ -80,12 +80,19 @@ const createZoneSchema = z.object({
   venueId: z.string().min(1),
   name: z.string().min(1).max(200),
   price: z.number().positive(),
-  cardNumber: z.string().min(1).optional(),
   capacity: z.number().int().positive(),
   sortOrder: z.number().int().default(0),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).default('GENERAL'),
   color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
+  tableChairs: z.number().int().positive().nullable().optional(),
+  tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).nullable().optional(),
+}).refine(d => d.type !== 'TABLE' || !!d.tableChairs, {
+  message: 'tableChairs is required for TABLE zones',
+  path: ['tableChairs'],
+}).refine(d => d.type !== 'TABLE' || !!d.tableShape, {
+  message: 'tableShape is required for TABLE zones',
+  path: ['tableShape'],
 });
 
 function toJsonValue(v: Record<string, unknown> | null | undefined): Prisma.InputJsonValue | typeof Prisma.DbNull | undefined {
@@ -113,12 +120,13 @@ zonesRouter.post('/', requireAuth, async (req, res) => {
 const updateZoneSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   price: z.number().positive().optional(),
-  cardNumber: z.string().min(1).optional(),
   capacity: z.number().int().positive().optional(),
   sortOrder: z.number().int().optional(),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']).optional(),
   color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
+  tableChairs: z.number().int().positive().nullable().optional(),
+  tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).nullable().optional(),
 });
 
 zonesRouter.put('/:id', requireAuth, async (req, res) => {

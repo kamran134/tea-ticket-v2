@@ -89,6 +89,7 @@ export function TicketView() {
           </div>
           <div className="text-sm text-gray-600 space-y-0.5 mt-1">
             <div>Телефон: {ticket.phone}</div>
+            {ticket.email && <div>Email: {ticket.email}</div>}
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
             <span className="text-sm text-gray-500">
@@ -104,7 +105,7 @@ export function TicketView() {
         </div>
 
         {/* Save link bar */}
-        {(ticket.status === 'BOOKED' || ticket.status === 'PENDING') && (
+        {(ticket.status === 'BOOKED' || ticket.status === 'PENDING' || ticket.status === 'CONFIRMED') && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-700">Сохраните ссылку на билет</p>

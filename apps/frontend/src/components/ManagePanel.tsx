@@ -210,6 +210,11 @@ export function ManagePanel() {
     navigator.clipboard.writeText(url).then(() => toast.success('Ссылка скопирована'));
   };
 
+  const copyTicketLink = (id: string) => {
+    const url = `${window.location.origin}/ticket?id=${id}`;
+    navigator.clipboard.writeText(url).then(() => toast.success('Ссылка на билет скопирована'));
+  };
+
   const saveVenueSlug = async (id: string) => {
     const slug = slugify(editingSlugValue);
     if (!slug) { toast.error('Пустой слаг'); return; }
@@ -250,6 +255,8 @@ export function ManagePanel() {
         type: 'GENERAL',
         color: null,
         layoutData: null,
+        tableChairs: null,
+        tableShape: null,
       });
       setZones(z => [...z, zone]);
       setNewZone(ZONE_DEFAULTS);
@@ -294,19 +301,15 @@ export function ManagePanel() {
   const deleteTicket = (ticket: Ticket) => {
     const isGroup = Boolean(ticket.groupId);
     requestConfirm(
-      isGroup ? 'Удалить групповой билет?' : 'Удалить билет?',
+      'Удалить билет?',
       isGroup
-        ? `Будут удалены все ${allTickets.filter(t => t.groupId === ticket.groupId).length} участника группы.`
+        ? `Билет «${ticket.name}» будет удалён безвозвратно. Остальные участники группы останутся.`
         : `Билет «${ticket.name}» будет удалён безвозвратно.`,
       async () => {
         try {
           await api.deleteTicket(ticket.id);
-          setAllTickets(ts =>
-            isGroup
-              ? ts.filter(t => t.groupId !== ticket.groupId)
-              : ts.filter(t => t.id !== ticket.id),
-          );
-          toast.success(isGroup ? 'Групповой билет удалён' : 'Билет удалён');
+          setAllTickets(ts => ts.filter(t => t.id !== ticket.id));
+          toast.success('Билет удалён');
         } catch (err) {
           toast.error(errMsg(err));
         }
@@ -407,9 +410,14 @@ export function ManagePanel() {
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Управление</h1>
-          <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
-            Выйти
-          </button>
+          <div className="flex items-center gap-3">
+            <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
+              Сканер
+            </a>
+            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+              Выйти
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -834,7 +842,7 @@ export function ManagePanel() {
                       <div>
                         <div className="font-semibold text-gray-800">{t.name}</div>
                         <div className="text-sm text-gray-500">
-                          {t.phone} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                          {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
                         </div>
                         {t.groupId && (
                           <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
@@ -855,6 +863,13 @@ export function ManagePanel() {
                         Открыть чек →
                       </a>
                     )}
+
+                    <button
+                      onClick={() => copyTicketLink(t.id)}
+                      className="text-sm text-emerald-700 hover:underline block"
+                    >
+                      Скопировать ссылку на билет
+                    </button>
 
                     <div className="flex gap-2">
                       {(t.status === 'PENDING' || t.status === 'BOOKED') && (

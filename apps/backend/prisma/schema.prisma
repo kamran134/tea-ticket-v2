@@ -39,6 +39,7 @@ enum ZoneType {
 enum TableShape {
   ROUND
   RECT
+  SOFA
 }
 
 model Venue {
@@ -67,20 +68,21 @@ model GridTemplate {
 }
 
 model Zone {
-  id         String    @id @default(cuid())
-  venueId    String
-  name       String
-  price      Float
-  cardNumber String    @default("")
-  capacity   Int
-  sortOrder  Int       @default(0)
-  type       ZoneType  @default(GENERAL)
-  color      String?
-  layoutData Json?
-  venue      Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  tickets    Ticket[]
-  seats      Seat[]
-  tables     ZoneTable[]
+  id          String      @id @default(cuid())
+  venueId     String
+  name        String
+  price       Float
+  capacity    Int
+  sortOrder   Int         @default(0)
+  type        ZoneType    @default(GENERAL)
+  color       String?
+  layoutData  Json?
+  tableChairs Int?
+  tableShape  TableShape?
+  venue       Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+  seats       Seat[]
+  tables      ZoneTable[]
 }
 
 model Seat {
@@ -106,6 +108,10 @@ model ZoneTable {
   shape      TableShape @default(ROUND)
   chairCount Int
   layoutData Json?
+  row        Int?
+  col        Int?
+  rows       Int?
+  cols       Int?
   zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
 
@@ -114,30 +120,26 @@ model ZoneTable {
 }
 
 model Ticket {
-  id                 String              @id @default(cuid())
-  name               String
-  phone              String
-  venueId            String
-  zoneId             String
-  zoneName           String
-  cardNumber         String
-  price              Float
-  receiptLink        String?
-  status             TicketStatus        @default(BOOKED)
-  checkedIn          Boolean             @default(false)
-  createdAt          DateTime            @default(now())
-  bookedAt           DateTime            @default(now())
-  expiresAt          DateTime?
-  groupId            String?
-  seatId             String?             @unique
-  tableId            String?
-  confirmationSource ConfirmationSource?
-  confirmedAt        DateTime?
-  confirmationNote   String?
-  venue              Venue               @relation(fields: [venueId], references: [id])
-  zone               Zone                @relation(fields: [zoneId], references: [id])
-  seat               Seat?               @relation(fields: [seatId], references: [id])
-  table              ZoneTable?          @relation(fields: [tableId], references: [id])
+  id          String       @id @default(cuid())
+  name        String
+  phone       String
+  email       String?
+  venueId     String
+  zoneId      String
+  zoneName    String
+  price       Float
+  receiptLink String?
+  status      TicketStatus @default(BOOKED)
+  checkedIn   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  bookedAt    DateTime     @default(now())
+  groupId     String?
+  seatId      String?      @unique
+  tableId     String?
+  venue       Venue        @relation(fields: [venueId], references: [id])
+  zone        Zone         @relation(fields: [zoneId], references: [id])
+  seat        Seat?        @relation(fields: [seatId], references: [id])
+  table       ZoneTable?   @relation(fields: [tableId], references: [id])
 
   @@index([groupId])
   @@index([status])
