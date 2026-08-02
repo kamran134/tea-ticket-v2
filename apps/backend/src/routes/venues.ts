@@ -488,3 +488,49 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
     return res.status(500).json({ success: false, error: 'Failed to upload poster' });
   }
 });
+
+// GET /api/venues/:id/grid-data
+// Seats and tables for every SEATED/TABLE zone of this venue in one call —
+// the buyer's grid map used to fetch these one zone at a time (N+1), same
+// shape as zones.ts's per-zone /seats and /tables, just batched by venueId.
+venuesRouter.get('/:id/grid-data', async (req, res) => {
+  try {
+    const zones = await prisma.zone.findMany({
+      where: { venueId: req.params.id },
+      select: { id: true, type: true },
+    });
+    const seatedZoneIds = zones.filter(z => z.type === 'SEATED').map(z => z.id);
+    const tableZoneIds = zones.filter(z => z.type === 'TABLE').map(z => z.id);
+
+    const [seats, tables] = await Promise.all([
+      seatedZoneIds.length > 0
+        ? prisma.seat.findMany({
+            where: { zoneId: { in: seatedZoneIds } },
+            orderBy: [{ row: 'asc' }, { sectionIndex: 'asc' }, { posInSection: 'asc' }],
+            include: {
+              ticket: { select: { id: true, status: true }, where: { status: { in: ACTIVE_TICKET_STATUSES } } },
+            },
+          })
+        : Promise.resolve([]),
+      tableZoneIds.length > 0
+        ? prisma.zoneTable.findMany({
+            where: { zoneId: { in: tableZoneIds } },
+            orderBy: { number: 'asc' },
+            include: {
+              _count: { select: { tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } } } } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        seats: seats.map(s => ({ ...s, occupied: s.ticket !== null })),
+        tables: tables.map(t => ({ ...t, occupied: t._count.tickets, available: t.chairCount - t._count.tickets })),
+      },
+    });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to fetch grid data' });
+  }
+});

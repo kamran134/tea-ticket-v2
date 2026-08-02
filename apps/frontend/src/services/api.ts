@@ -228,6 +228,12 @@ export const api = {
     return request(`/api/zones/${encodeURIComponent(zoneId)}/tables`);
   },
 
+  // Seats+tables for every zone of the venue in one call — used by the grid
+  // map instead of one getSeats/getTables request per zone.
+  async getGridData(venueId: string): Promise<{ seats: Seat[]; tables: ZoneTable[] }> {
+    return request(`/api/venues/${encodeURIComponent(venueId)}/grid-data`);
+  },
+
   async saveGridLayout(venueId: string, layout: GridLayout): Promise<{ venue: Venue; zones: Zone[] }> {
     return request(`/api/venues/${encodeURIComponent(venueId)}/grid-layout`, {
       method: 'PUT',

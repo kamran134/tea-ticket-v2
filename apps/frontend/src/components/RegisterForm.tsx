@@ -70,16 +70,6 @@ export function RegisterForm({ slug }: Props) {
     api.getZones(venue.id).then(setZones);
   }, [venue]);
 
-  // Tables live outside the grid — fetch them for every table zone up front.
-  useEffect(() => {
-    const tableZoneIds = zones.filter(z => z.type === 'TABLE').map(z => z.id);
-    if (tableZoneIds.length === 0) { setTablesByZone({}); return; }
-    let cancelled = false;
-    Promise.all(tableZoneIds.map(id => api.getTables(id).then(tables => [id, tables] as const)))
-      .then(entries => { if (!cancelled) setTablesByZone(Object.fromEntries(entries)); });
-    return () => { cancelled = true; };
-  }, [zones]);
-
   const currency = venue?.currency ?? '₼';
   const zoneById = new Map(zones.map(z => [z.id, z]));
 
@@ -94,6 +84,18 @@ export function RegisterForm({ slug }: Props) {
   // (un-positioned) table zones fall back to the flat TablePicker list.
   const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
   const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id));
+
+  // Only legacy (non-grid) table zones need fetching here — grid-placed ones
+  // are fetched once by VenueGridMap itself via getGridData (see P3 in the audit).
+  const legacyTableZoneKey = tableZones.map(z => z.id).join(',');
+  useEffect(() => {
+    const tableZoneIds = legacyTableZoneKey ? legacyTableZoneKey.split(',') : [];
+    if (tableZoneIds.length === 0) { setTablesByZone({}); return; }
+    let cancelled = false;
+    Promise.all(tableZoneIds.map(id => api.getTables(id).then(tables => [id, tables] as const)))
+      .then(entries => { if (!cancelled) setTablesByZone(Object.fromEntries(entries)); });
+    return () => { cancelled = true; };
+  }, [legacyTableZoneKey]);
 
   const cartSeatIds = cart.filter(l => l.seatId).map(l => l.seatId!);
   const cartQuantityByZone: Record<string, number> = {};

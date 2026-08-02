@@ -3,44 +3,8 @@ import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
 import { TableIcon, type Footprint } from './TableIcon';
-
-const FALLBACK_COLORS = [
-  '#059669', '#0284c7', '#d97706', '#dc2626',
-  '#7c3aed', '#db2777', '#0891b2', '#65a30d',
-];
-
-const GRID_LINE = '#e5e7eb';
-
-function zoneColor(zone: Zone, index: number): string {
-  return zone.color ?? FALLBACK_COLORS[index % FALLBACK_COLORS.length];
-}
-
-// Cells painted with the same GENERAL zone should read as one filled area,
-// not a grid — so the border between two such neighbours is hidden.
-function sameZoneNeighbor(cells: string[][], r: number, c: number, zoneId: string): boolean {
-  return cells[r]?.[c] === zoneId;
-}
-
-interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
-
-function zoneBoundingBoxes(cells: string[][], zoneIds: Set<string>): Map<string, ZoneBox> {
-  const boxes = new Map<string, ZoneBox>();
-  cells.forEach((row, r) => {
-    row.forEach((cell, c) => {
-      if (!zoneIds.has(cell)) return;
-      const box = boxes.get(cell);
-      if (!box) {
-        boxes.set(cell, { minRow: r, maxRow: r, minCol: c, maxCol: c });
-      } else {
-        box.minRow = Math.min(box.minRow, r);
-        box.maxRow = Math.max(box.maxRow, r);
-        box.minCol = Math.min(box.minCol, c);
-        box.maxCol = Math.max(box.maxCol, c);
-      }
-    });
-  });
-  return boxes;
-}
+import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, type ZoneBox } from './grid/gridGeometry';
+import { zoneColor } from './grid/zoneColors';
 
 interface Props {
   venue: Venue;
@@ -71,36 +35,28 @@ export function VenueGridMap({
 
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
-  // Seats for every SEATED zone painted on the grid — loaded eagerly so any
-  // seat can be clicked directly, without a separate "pick zone first" step.
-  const seatedZoneIds = useMemo(() => {
-    if (!layout) return [] as string[];
-    const ids = new Set<string>();
-    for (const row of layout.cells) {
-      for (const cell of row) {
-        if (zoneById.get(cell)?.zone.type === 'SEATED') ids.add(cell);
-      }
-    }
-    return [...ids];
-  }, [layout, zoneById]);
-  const seatedZoneKey = seatedZoneIds.join(',');
-
+  // Seats and tables for every zone of the venue, in one call — was one
+  // getSeats/getTables request per SEATED/TABLE zone (see P3 in the audit).
   const [seatsByZone, setSeatsByZone] = useState<Record<string, Seat[]>>({});
-  const [loadingSeats, setLoadingSeats] = useState(false);
+  const [tablesByZone, setTablesByZone] = useState<Record<string, ZoneTable[]>>({});
+  const [loadingGrid, setLoadingGrid] = useState(false);
 
   useEffect(() => {
-    if (seatedZoneIds.length === 0) { setSeatsByZone({}); return; }
     let cancelled = false;
-    setLoadingSeats(true);
-    Promise.all(seatedZoneIds.map(id => api.getSeats(id).then(seats => [id, seats] as const)))
-      .then(entries => {
+    setLoadingGrid(true);
+    api.getGridData(venue.id)
+      .then(({ seats, tables }) => {
         if (cancelled) return;
-        setSeatsByZone(Object.fromEntries(entries));
+        const seatsGrouped: Record<string, Seat[]> = {};
+        for (const seat of seats) (seatsGrouped[seat.zoneId] ??= []).push(seat);
+        const tablesGrouped: Record<string, ZoneTable[]> = {};
+        for (const table of tables) (tablesGrouped[table.zoneId] ??= []).push(table);
+        setSeatsByZone(seatsGrouped);
+        setTablesByZone(tablesGrouped);
       })
-      .finally(() => { if (!cancelled) setLoadingSeats(false); });
+      .finally(() => { if (!cancelled) setLoadingGrid(false); });
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seatedZoneKey]);
+  }, [venue.id]);
 
   const seatByCell = useMemo(() => {
     const map = new Map<string, Seat>();
@@ -109,36 +65,6 @@ export function VenueGridMap({
     }
     return map;
   }, [seatsByZone]);
-
-  // Tables for every TABLE zone painted on the grid — same eager-load pattern as seats.
-  const tableZoneIds = useMemo(() => {
-    if (!layout) return [] as string[];
-    const ids = new Set<string>();
-    for (const row of layout.cells) {
-      for (const cell of row) {
-        if (zoneById.get(cell)?.zone.type === 'TABLE') ids.add(cell);
-      }
-    }
-    return [...ids];
-  }, [layout, zoneById]);
-  const tableZoneKey = tableZoneIds.join(',');
-
-  const [tablesByZone, setTablesByZone] = useState<Record<string, ZoneTable[]>>({});
-  const [loadingTables, setLoadingTables] = useState(false);
-
-  useEffect(() => {
-    if (tableZoneIds.length === 0) { setTablesByZone({}); return; }
-    let cancelled = false;
-    setLoadingTables(true);
-    Promise.all(tableZoneIds.map(id => api.getTables(id).then(tables => [id, tables] as const)))
-      .then(entries => {
-        if (cancelled) return;
-        setTablesByZone(Object.fromEntries(entries));
-      })
-      .finally(() => { if (!cancelled) setLoadingTables(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableZoneKey]);
 
   // Maps every cell inside a table's footprint (not just its anchor) to that
   // table, so a click anywhere on the drawn shape — not one specific cell —
@@ -494,7 +420,7 @@ export function VenueGridMap({
         </button>
       </div>
       {grid}
-      {(loadingSeats || loadingTables) && <p className="text-xs text-gray-400">Загрузка мест...</p>}
+      {loadingGrid && <p className="text-xs text-gray-400">Загрузка мест...</p>}
       {legend}
       <button
         type="button"
