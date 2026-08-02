@@ -7,25 +7,35 @@ import {
   expireStalePayments,
   getExpiryCronExpression,
 } from './booking-expiry';
+import {
+  createEmailRuntime,
+  type EmailJobProcessor,
+} from './email';
 
 let started = false;
 
-export function startCronJobs(): void {
+export function startCronJobs(options?: {
+  prisma?: PrismaClient;
+  paymentService?: PaymentService;
+  emailJobProcessor?: EmailJobProcessor;
+}): void {
   if (started || process.env.NODE_ENV === 'test') {
     return;
   }
   started = true;
 
-  const prisma = new PrismaClient();
+  const prisma = options?.prisma ?? new PrismaClient();
   const config = loadPaymentProviderConfig();
   const provider = createPaymentProvider(config);
-  const paymentService = new PaymentService({
+  const paymentService = options?.paymentService ?? new PaymentService({
     prisma,
     provider,
     publicAppUrl: config.publicAppUrl,
     webhookBaseUrl: config.webhookBaseUrl,
     paymentHoldMs: getPaymentHoldMs(),
   });
+  const emailJobProcessor =
+    options?.emailJobProcessor ?? createEmailRuntime(prisma).processor;
 
   const expiryCron = getExpiryCronExpression();
   cron.schedule(expiryCron, () => {
@@ -40,6 +50,15 @@ export function startCronJobs(): void {
   cron.schedule('*/10 * * * *', () => {
     void paymentService.reconcileProcessingPayments().then(count => {
       if (count > 0) console.log(`[cron] reconciled ${count} payments`);
+    });
+  });
+
+  // Fallback for EmailJob outbox (primary kick is after payment webhook response)
+  cron.schedule('* * * * *', () => {
+    void emailJobProcessor.processBatch().then(result => {
+      if (result.processed > 0) {
+        console.log(`[cron] processed ${result.processed} email jobs`);
+      }
     });
   });
 }

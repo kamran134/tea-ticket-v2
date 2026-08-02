@@ -11,6 +11,7 @@ import type { PaymentProvider } from './payment-provider';
 import type { ProviderPaymentStatus, WebhookEvent } from './types';
 import { ACTIVE_PAYMENT_STATUSES } from './types';
 import { expireStaleBookings as expireBookings, expireStalePayments as expirePayments } from '../booking-expiry';
+import { enqueueTicketConfirmedEmail } from '../email';
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
 
@@ -375,7 +376,7 @@ export class PaymentService {
       },
     });
 
-    await tx.ticket.updateMany({
+    const updated = await tx.ticket.updateMany({
       where: {
         OR: [{ id: checkoutId }, { groupId: checkoutId }],
         status: 'BOOKED',
@@ -386,6 +387,10 @@ export class PaymentService {
         confirmedAt: now,
       },
     });
+
+    if (updated.count > 0) {
+      await enqueueTicketConfirmedEmail(tx, checkoutId, tickets);
+    }
   }
 
   private async checkInventoryAvailable(

@@ -5,7 +5,22 @@ import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
 import { getPaymentHoldMs } from '../services/payments/payment-service';
 import { expireStaleBookings } from '../services/booking-expiry';
+import { enqueueTicketConfirmedEmail, kickEmailJobProcessing } from '../services/email';
+import type { EmailJobProcessor } from '../services/email';
 import { z } from 'zod';
+
+let emailJobProcessor: EmailJobProcessor | null = null;
+
+/** Optional post-response kick; set from createApp when available. */
+export function setTicketsEmailProcessor(processor: EmailJobProcessor): void {
+  emailJobProcessor = processor;
+}
+
+function kickEmailJobs(): void {
+  if (emailJobProcessor) {
+    kickEmailJobProcessing(emailJobProcessor);
+  }
+}
 
 const prisma = new PrismaClient();
 const upload = multer({
@@ -297,7 +312,6 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
         throw new RegisterError(409, 'Only booked tickets can be confirmed manually');
       }
 
-      const checkoutId = ticket.groupId ?? ticket.id;
       const filter = confirmGroup && ticket.groupId
         ? { groupId: ticket.groupId }
         : { id: ticket.id };
@@ -333,9 +347,17 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
         },
       });
 
+      const emailCheckoutId =
+        confirmGroup && ticket.groupId ? ticket.groupId : ticket.id;
+      await enqueueTicketConfirmedEmail(tx, emailCheckoutId, targets);
+
       const updated = await tx.ticket.findUnique({ where: { id: req.params.id } });
-      return { ticket: updated, alreadyConfirmed: false, checkoutId };
+      return { ticket: updated, alreadyConfirmed: false, checkoutId: emailCheckoutId };
     });
+
+    if (!result.alreadyConfirmed) {
+      kickEmailJobs();
+    }
 
     return res.json({ success: true, data: result });
   } catch (err) {
@@ -456,18 +478,64 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
   try {
-    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
-    if (!ticket) {
-      return res.status(404).json({ success: false, error: 'Ticket not found' });
+    if (parsed.data.status === 'REJECTED') {
+      const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+      if (!ticket) {
+        return res.status(404).json({ success: false, error: 'Ticket not found' });
+      }
+      const updateFilter = ticket.groupId ? { groupId: ticket.groupId } : { id: ticket.id };
+      await prisma.ticket.updateMany({
+        where: updateFilter,
+        data: { status: 'REJECTED' },
+      });
+      const updated = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+      return res.json({ success: true, data: updated });
     }
-    const updateFilter = ticket.groupId ? { groupId: ticket.groupId } : { id: ticket.id };
-    await prisma.ticket.updateMany({
-      where: updateFilter,
-      data: { status: parsed.data.status },
+
+    const result = await prisma.$transaction(async tx => {
+      const ticket = await tx.ticket.findUnique({ where: { id: req.params.id } });
+      if (!ticket) {
+        throw new RegisterError(404, 'Ticket not found');
+      }
+
+      const checkoutId = ticket.groupId ?? ticket.id;
+      const group = await tx.ticket.findMany({
+        where: {
+          OR: [{ id: checkoutId }, { groupId: checkoutId }],
+        },
+      });
+
+      const toConfirm = group.filter(t => t.status !== 'CONFIRMED');
+      if (toConfirm.length === 0) {
+        const updated = await tx.ticket.findUnique({ where: { id: req.params.id } });
+        return { ticket: updated, newlyConfirmed: false, checkoutId };
+      }
+
+      const now = new Date();
+      await tx.ticket.updateMany({
+        where: { id: { in: toConfirm.map(t => t.id) } },
+        data: {
+          status: 'CONFIRMED',
+          confirmationSource: 'MANUAL',
+          confirmedAt: now,
+        },
+      });
+
+      await enqueueTicketConfirmedEmail(tx, checkoutId, group);
+
+      const updated = await tx.ticket.findUnique({ where: { id: req.params.id } });
+      return { ticket: updated, newlyConfirmed: true, checkoutId };
     });
-    const updated = await prisma.ticket.findUnique({ where: { id: req.params.id } });
-    return res.json({ success: true, data: updated });
-  } catch {
+
+    if (result.newlyConfirmed) {
+      kickEmailJobs();
+    }
+
+    return res.json({ success: true, data: result.ticket });
+  } catch (err) {
+    if (err instanceof RegisterError) {
+      return res.status(err.status).json({ success: false, error: err.message });
+    }
     return res.status(500).json({ success: false, error: 'Failed to update status' });
   }
 });

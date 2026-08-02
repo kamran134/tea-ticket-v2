@@ -6,6 +6,8 @@ import type { Express } from 'express';
 export const TEST_WEBHOOK_SECRET = process.env.MOCK_WEBHOOK_SECRET ?? 'test-mock-webhook-secret';
 
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
+  await prisma.emailWebhookEvent.deleteMany();
+  await prisma.emailJob.deleteMany();
   await prisma.paymentWebhookEvent.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.ticket.deleteMany();

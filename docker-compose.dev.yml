@@ -47,6 +47,12 @@ services:
       BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
       BANK_API_KEY: ${BANK_API_KEY:-dev-birmanat-bank-token}
       BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET:-dev-birmanat-bank-webhook-secret}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      EMAIL_FROM: ${EMAIL_FROM:-BirManat Tickets <no-reply@tickets.birmanat.band>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@birmanat.band}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
     depends_on:
       db:
         condition: service_healthy

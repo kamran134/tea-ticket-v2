@@ -3,28 +3,38 @@ import cors from 'cors';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { authRouter } from './routes/auth';
-import { ticketsRouter } from './routes/tickets';
+import { ticketsRouter, setTicketsEmailProcessor } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
 import { zonesRouter } from './routes/zones';
 import { gridTemplatesRouter } from './routes/grid-templates';
 import { paymentsRouter } from './routes/payments';
 import { createWebhookHandler } from './routes/webhooks';
+import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { createPaymentProvider, loadPaymentProviderConfig } from './services/payments/factory';
 import {
   getPaymentHoldMs,
   PaymentService,
 } from './services/payments/payment-service';
+import {
+  createEmailRuntime,
+  type EmailConfig,
+  type EmailJobProcessor,
+  type TicketEmailSender,
+} from './services/email';
 
 export interface AppContext {
   app: Express;
   prisma: PrismaClient;
   paymentService: PaymentService;
+  emailJobProcessor: EmailJobProcessor;
+  emailConfig: EmailConfig;
 }
 
 export function createApp(options?: {
   prisma?: PrismaClient;
   paymentService?: PaymentService;
+  emailSender?: TicketEmailSender;
 }): AppContext {
   const prisma = options?.prisma ?? new PrismaClient();
   const providerConfig = loadPaymentProviderConfig();
@@ -38,6 +48,11 @@ export function createApp(options?: {
     paymentHoldMs: getPaymentHoldMs(),
   });
 
+  const emailRuntime = createEmailRuntime(prisma, {
+    sender: options?.emailSender,
+  });
+  setTicketsEmailProcessor(emailRuntime.processor);
+
   const app = express();
   const UPLOADS_DIR = process.env.UPLOADS_DIR ?? '/app/uploads';
 
@@ -47,7 +62,13 @@ export function createApp(options?: {
   app.post(
     '/api/webhooks/payments/:provider',
     express.raw({ type: 'application/json', limit: '1mb' }),
-    createWebhookHandler(paymentService),
+    createWebhookHandler(paymentService, emailRuntime.processor),
+  );
+
+  app.post(
+    '/api/webhooks/resend',
+    express.raw({ type: 'application/json', limit: '1mb' }),
+    createResendWebhookHandler(prisma, emailRuntime.config),
   );
 
   app.use(express.json({ limit: '10mb' }));
@@ -69,5 +90,11 @@ export function createApp(options?: {
     app.use('/api/mock-payments', mockPaymentsRouter());
   }
 
-  return { app, prisma, paymentService };
+  return {
+    app,
+    prisma,
+    paymentService,
+    emailJobProcessor: emailRuntime.processor,
+    emailConfig: emailRuntime.config,
+  };
 }

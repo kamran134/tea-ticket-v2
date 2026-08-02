@@ -187,3 +187,49 @@ model PaymentWebhookEvent {
   @@unique([provider, providerEventId])
   @@index([paymentId])
 }
+
+enum EmailJobType {
+  TICKET_CONFIRMED
+}
+
+enum EmailJobStatus {
+  PENDING
+  PROCESSING
+  ACCEPTED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+model EmailJob {
+  id                String         @id @default(cuid())
+  type              EmailJobType
+  status            EmailJobStatus @default(PENDING)
+  checkoutId        String
+  recipient         String
+  attempts          Int            @default(0)
+  nextAttemptAt     DateTime       @default(now())
+  lockedAt          DateTime?
+  providerMessageId String?        @unique
+  lastError         String?
+  acceptedAt        DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([type, checkoutId])
+  @@index([status, nextAttemptAt])
+  @@index([lockedAt])
+}
+
+model EmailWebhookEvent {
+  id              String    @id @default(cuid())
+  providerEventId String    @unique
+  type            String
+  payload         Json
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+
+  @@index([type])
+}
