@@ -52,19 +52,20 @@ model GridTemplate {
 }
 
 model Zone {
-  id         String    @id @default(cuid())
-  venueId    String
-  name       String
-  price      Float
-  capacity   Int
-  sortOrder  Int       @default(0)
-  type       ZoneType  @default(GENERAL)
-  color      String?
-  layoutData Json?
-  venue      Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
-  tickets    Ticket[]
-  seats      Seat[]
-  tables     ZoneTable[]
+  id          String      @id @default(cuid())
+  venueId     String
+  name        String
+  price       Float
+  capacity    Int
+  sortOrder   Int         @default(0)
+  type        ZoneType    @default(GENERAL)
+  color       String?
+  layoutData  Json?
+  tableChairs Int?
+  venue       Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+  seats       Seat[]
+  tables      ZoneTable[]
 }
 
 model Seat {
@@ -90,6 +91,8 @@ model ZoneTable {
   shape      TableShape @default(ROUND)
   chairCount Int
   layoutData Json?
+  row        Int?
+  col        Int?
   zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
 

@@ -255,6 +255,7 @@ export function ManagePanel() {
         type: 'GENERAL',
         color: null,
         layoutData: null,
+        tableChairs: null,
       });
       setZones(z => [...z, zone]);
       setNewZone(ZONE_DEFAULTS);

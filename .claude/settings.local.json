@@ -9,7 +9,31 @@
       "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" npx prisma generate)",
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" node_modules/.bin/prisma generate)",
-      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" ./node_modules/.bin/prisma generate)"
+      "Bash(DATABASE_URL=\"postgresql://x:x@localhost:5432/x\" ./node_modules/.bin/prisma generate)",
+      "Bash(npm install *)",
+      "Bash(npx vite *)",
+      "Bash(ls -la \"/c/Users/kazim/runbooks\" 2>&1)",
+      "Bash(ls -la ~/.ssh/ 2>&1)",
+      "Bash(ssh -o PreferredAuthentications=publickey -o PasswordAuthentication=no -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new root@37.27.45.67 'echo OK && whoami && hostname')",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@37.27.45.67 bash -s)",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@37.27.45.67 'echo \"OK — ключ работает\"')",
+      "Bash(ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no -o BatchMode=yes -o ConnectTimeout=8 root@37.27.45.67 'echo \"если видишь это — пароль всё ещё работает, ПЛОХО\"')",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(ssh -o BatchMode=yes -o ConnectTimeout=8 root@37.27.45.67 'echo \"OK — доступ жив после ufw enable\"')",
+      "Bash(timeout 5 bash -c \"cat < /dev/null > /dev/tcp/37.27.45.67/3002\")",
+      "Bash(git check-ignore *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh run *)",
+      "Bash(curl -s \"https://api.github.com/repos/kamran134/tea-ticket-v2/actions/runs?per_page=1\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npm run *)",
+      "Bash(docker version *)",
+      "Bash(curl -s -H \"Accept: application/vnd.github+json\" \"https://api.github.com/repos/kamran134/tea-ticket-v2/actions/runs?branch=master&per_page=1\")",
+      "Bash(ssh -o StrictHostKeyChecking=accept-new root@37.27.45.67 ' *)",
+      "Bash(npm view *)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

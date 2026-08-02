@@ -95,7 +95,7 @@ export function AdminScanner() {
         groupMembers.filter(m => !m.checkedIn && m.status === 'CONFIRMED').map(m => m.id),
       ));
       if (allDone) {
-        showMessage('По этому билету все уже прошли', 'success');
+        showMessage('По этому билету все уже прошли', 'error');
       }
     } catch {
       setTicket(null);
@@ -231,7 +231,7 @@ export function AdminScanner() {
             </div>
 
             {allCheckedIn ? (
-              <div className="text-center text-green-400 text-sm font-medium py-1">✓ Уже вошли</div>
+              <div className="text-center text-red-400 text-sm font-bold py-1">⚠ Уже вошли</div>
             ) : remainingToCheckIn === 0 ? (
               <div className="text-center text-amber-400 text-sm font-medium py-1">Билет не подтверждён</div>
             ) : (

@@ -8,7 +8,7 @@ export function formatPrice(amount: number, currency: Currency | string): string
   return `${formatted} ${currency}`;
 }
 
-export type GridCellState = 'empty' | 'blocked' | string;
+export type GridCellState = 'empty' | 'blocked' | 'stage' | string;
 
 export interface GridLayout {
   rows: number;
@@ -20,8 +20,9 @@ export interface GridTemplateZoneSlot {
   slotId: string;
   name: string;
   color: string | null;
-  type: 'GENERAL' | 'SEATED';
+  type: ZoneType;
   capacity?: number;
+  tableChairs?: number;
 }
 
 export interface GridTemplateSummary {
@@ -81,6 +82,7 @@ export interface Zone {
   type: ZoneType;
   color: string | null;
   layoutData: ZoneLayoutData | null;
+  tableChairs: number | null;
   available?: number;
 }
 
@@ -102,6 +104,8 @@ export interface ZoneTable {
   shape: TableShape;
   chairCount: number;
   layoutData: Record<string, unknown> | null;
+  row: number | null;
+  col: number | null;
   occupied: number;
   available: number;
 }

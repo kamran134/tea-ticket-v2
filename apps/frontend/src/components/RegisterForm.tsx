@@ -86,13 +86,15 @@ export function RegisterForm({ slug }: Props) {
   const gridZoneIds = new Set<string>();
   if (venue?.gridLayout) {
     for (const row of venue.gridLayout.cells) {
-      for (const cell of row) if (cell !== 'empty' && cell !== 'blocked') gridZoneIds.add(cell);
+      for (const cell of row) if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') gridZoneIds.add(cell);
     }
   }
   const schemaZoneIds = new Set(zones.filter(z => z.layoutData !== null).map(z => z.id));
   const hasGridZones = gridZoneIds.size > 0;
   const hasSchemaZones = !hasGridZones && schemaZoneIds.size > 0;
-  const tableZones = zones.filter(z => z.type === 'TABLE');
+  // Grid-placed table zones are picked directly on the map; only legacy
+  // (un-positioned) table zones fall back to the flat TablePicker list.
+  const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
   const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id) && !schemaZoneIds.has(z.id));
 
   const cartSeatIds = cart.filter(l => l.seatId).map(l => l.seatId!);
@@ -274,8 +276,10 @@ export function RegisterForm({ slug }: Props) {
                 currency={currency}
                 cartSeatIds={cartSeatIds}
                 cartQuantityByZone={cartQuantityByZone}
+                cartQuantityByTable={cartQuantityByTable}
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                 onSeatToggle={toggleSeatInCart}
+                onTableAdd={addTableToCart}
                 onClose={() => setGridMapOpen(false)}
               />
             )}

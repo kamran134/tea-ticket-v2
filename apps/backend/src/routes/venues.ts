@@ -172,16 +172,10 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const usedZoneIds = new Set<string>();
   for (const row of cells) {
     for (const cell of row) {
-      if (cell === 'empty' || cell === 'blocked') continue;
+      if (cell === 'empty' || cell === 'blocked' || cell === 'stage') continue;
       const zone = zoneById.get(cell);
       if (!zone) {
         return res.status(400).json({ success: false, error: `Unknown zone id in grid: ${cell}` });
-      }
-      if (zone.type === 'TABLE') {
-        return res.status(400).json({
-          success: false,
-          error: `Zone "${zone.name}" is a table zone and cannot be painted on the grid`,
-        });
       }
       usedZoneIds.add(cell);
     }
@@ -196,18 +190,31 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   if (previousLayout?.cells) {
     for (const row of previousLayout.cells) {
       for (const cell of row) {
-        if (cell !== 'empty' && cell !== 'blocked') previouslyGridZoneIds.add(cell);
+        if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') previouslyGridZoneIds.add(cell);
       }
     }
   }
 
   const seatedZoneIds = new Set<string>();
+  const tableZoneIds = new Set<string>();
   for (const id of usedZoneIds) {
-    if (zoneById.get(id)!.type === 'SEATED') seatedZoneIds.add(id);
+    const type = zoneById.get(id)!.type;
+    if (type === 'SEATED') seatedZoneIds.add(id);
+    if (type === 'TABLE') tableZoneIds.add(id);
   }
   for (const id of previouslyGridZoneIds) {
     const zone = zoneById.get(id);
     if (zone?.type === 'SEATED') seatedZoneIds.add(id);
+    if (zone?.type === 'TABLE') tableZoneIds.add(id);
+  }
+
+  for (const id of tableZoneIds) {
+    if (!zoneById.get(id)!.tableChairs) {
+      return res.status(400).json({
+        success: false,
+        error: `Zone "${zoneById.get(id)!.name}" has no chairs-per-table configured`,
+      });
+    }
   }
 
   try {
@@ -259,6 +266,57 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         }
 
         await tx.zone.update({ where: { id: zoneId }, data: { capacity: desired.size } });
+      }
+
+      for (const zoneId of tableZoneIds) {
+        const zone = zoneById.get(zoneId)!;
+        const chairCount = zone.tableChairs!;
+        const desired = new Set<string>();
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (cells[r][c] === zoneId) desired.add(`${r}-${c}`);
+          }
+        }
+
+        // Only diff grid-placed tables (row/col set) — tables from the old
+        // bulk "generate tables" flow (row/col null) are left untouched.
+        const allZoneTables = await tx.zoneTable.findMany({
+          where: { zoneId },
+          include: { tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } }, select: { status: true } } },
+        });
+        const gridTables = allZoneTables.filter(t => t.row !== null && t.col !== null);
+        const existingByKey = new Map(gridTables.map(t => [`${t.row}-${t.col}`, t]));
+
+        const toRemove = gridTables.filter(t => !desired.has(`${t.row}-${t.col}`));
+        const blocked = toRemove.find(t => t.tickets.length > 0);
+        if (blocked) {
+          throw new GridConflictError(
+            `Zone "${zone.name}": table at row ${blocked.row! + 1}, col ${blocked.col! + 1} has active tickets and cannot be removed`,
+          );
+        }
+
+        if (toRemove.length > 0) {
+          await tx.zoneTable.deleteMany({ where: { id: { in: toRemove.map(t => t.id) } } });
+        }
+
+        const toAdd = [...desired]
+          .filter(key => !existingByKey.has(key))
+          .map(key => {
+            const [r, c] = key.split('-').map(Number);
+            return { row: r, col: c };
+          })
+          .sort((a, b) => a.row - b.row || a.col - b.col);
+
+        if (toAdd.length > 0) {
+          let counter = allZoneTables.reduce((m, t) => Math.max(m, t.number), 0) + 1;
+          await tx.zoneTable.createMany({
+            data: toAdd.map(({ row, col }) => ({
+              zoneId, number: counter++, chairCount, row, col,
+            })),
+          });
+        }
+
+        await tx.zone.update({ where: { id: zoneId }, data: { capacity: desired.size * chairCount } });
       }
 
       const venue = await tx.venue.update({
