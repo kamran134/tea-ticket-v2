@@ -1,8 +1,8 @@
-import type { Zone } from '../types';
 import { formatPrice } from '../types';
 
 interface Props {
-  zone: Zone;
+  title: string;
+  price: number;
   currency: string;
   quantity: number;
   max: number;
@@ -10,7 +10,7 @@ interface Props {
   onClose: () => void;
 }
 
-export function QuantityModal({ zone, currency, quantity, max, onChange, onClose }: Props) {
+export function QuantityModal({ title, price, currency, quantity, max, onChange, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -21,8 +21,8 @@ export function QuantityModal({ zone, currency, quantity, max, onChange, onClose
         onClick={e => e.stopPropagation()}
       >
         <div>
-          <h3 className="font-semibold text-gray-800 text-lg">{zone.name}</h3>
-          <p className="text-sm text-gray-500">{formatPrice(zone.price, currency)} за билет</p>
+          <h3 className="font-semibold text-gray-800 text-lg">{title}</h3>
+          <p className="text-sm text-gray-500">{formatPrice(price, currency)} за билет</p>
         </div>
 
         <div className="flex items-center justify-center gap-5">

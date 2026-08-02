@@ -57,6 +57,7 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
 
   const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
+  const [quantityModalTableId, setQuantityModalTableId] = useState<string | null>(null);
   const [gridMapOpen, setGridMapOpen] = useState(false);
 
   useEffect(() => {
@@ -153,6 +154,19 @@ export function RegisterForm({ slug }: Props) {
     });
   };
 
+  const setTableQuantity = (zone: Zone, table: ZoneTable, quantity: number) => {
+    const key = `table:${table.id}`;
+    setCart(prev => {
+      if (quantity <= 0) return prev.filter(l => l.key !== key);
+      const existing = prev.find(l => l.key === key);
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
+      return [...prev, {
+        key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
+        tableId: table.id, tableNumber: table.number, quantity,
+      }];
+    });
+  };
+
   const adjustQuantity = (key: string, delta: number, max: number) => {
     setCart(prev => prev
       .map(l => (l.key === key ? { ...l, quantity: Math.min(max, l.quantity + delta) } : l))
@@ -228,6 +242,15 @@ export function RegisterForm({ slug }: Props) {
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
+  const quantityModalTableInfo = (() => {
+    if (!quantityModalTableId) return undefined;
+    for (const zone of zones) {
+      if (zone.type !== 'TABLE') continue;
+      const table = (tablesByZone[zone.id] ?? []).find(t => t.id === quantityModalTableId);
+      if (table) return { zone, table };
+    }
+    return undefined;
+  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
@@ -279,7 +302,7 @@ export function RegisterForm({ slug }: Props) {
                 cartQuantityByTable={cartQuantityByTable}
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                 onSeatToggle={toggleSeatInCart}
-                onTableAdd={addTableToCart}
+                onTableOpen={(_zone, table) => setQuantityModalTableId(table.id)}
                 onClose={() => setGridMapOpen(false)}
               />
             )}
@@ -540,12 +563,25 @@ export function RegisterForm({ slug }: Props) {
 
       {quantityModalZone && (
         <QuantityModal
-          zone={quantityModalZone}
+          title={quantityModalZone.name}
+          price={quantityModalZone.price}
           currency={currency}
           quantity={cartQuantityByZone[quantityModalZone.id] ?? 0}
           max={quantityModalZone.available ?? Infinity}
           onChange={qty => setGeneralQuantity(quantityModalZone, qty)}
           onClose={() => setQuantityModalZoneId(null)}
+        />
+      )}
+
+      {quantityModalTableInfo && (
+        <QuantityModal
+          title={`Стол ${quantityModalTableInfo.table.number}`}
+          price={quantityModalTableInfo.zone.price}
+          currency={currency}
+          quantity={cartQuantityByTable[quantityModalTableInfo.table.id] ?? 0}
+          max={quantityModalTableInfo.table.available}
+          onChange={qty => setTableQuantity(quantityModalTableInfo.zone, quantityModalTableInfo.table, qty)}
+          onClose={() => setQuantityModalTableId(null)}
         />
       )}
     </div>

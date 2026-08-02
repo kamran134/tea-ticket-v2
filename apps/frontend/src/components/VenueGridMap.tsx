@@ -51,13 +51,13 @@ interface Props {
   cartQuantityByTable: Record<string, number>;
   onZoneOpen: (zone: Zone) => void;
   onSeatToggle: (zone: Zone, seat: Seat) => void;
-  onTableAdd: (zone: Zone, table: ZoneTable) => void;
+  onTableOpen: (zone: Zone, table: ZoneTable) => void;
   onClose: () => void;
 }
 
 export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
-  onZoneOpen, onSeatToggle, onTableAdd, onClose,
+  onZoneOpen, onSeatToggle, onTableOpen, onClose,
 }: Props) {
   const layout = venue.gridLayout;
 
@@ -303,7 +303,7 @@ export function VenueGridMap({
               return (
                 <div
                   key={`${r}-${c}`}
-                  onClick={() => !isFull && onTableAdd(zone, table)}
+                  onClick={() => !isFull && onTableOpen(zone, table)}
                   title={`${zone.name} · Стол ${table.number} · ${remaining}/${table.chairCount} своб. · ${formatPrice(zone.price, currency)}`}
                   style={{
                     aspectRatio: '1',
