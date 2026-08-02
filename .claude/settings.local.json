@@ -128,7 +128,8 @@
       "Bash(node -e \"console.log\\(require.resolve\\('@prisma/client'\\)\\)\")",
       "Bash(echo \"backend tsc exit=$?\")",
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('apps/frontend/package-lock.json','utf8'\\)\\); console.log\\('valid JSON'\\)\")",
-      "Bash(rm -rf node_modules dist)"
+      "Bash(rm -rf node_modules dist)",
+      "Bash(npm --version)"
     ]
   }
 }
