@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, ZoneType, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
+import type { Venue, Zone, ZoneType, TableShape, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
+import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 
 const ZONE_COLORS = [
   '#059669', '#0284c7', '#d97706', '#dc2626',
@@ -65,6 +66,80 @@ function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
 }
 
+// Tables occupy a rectangular footprint (not a single cell) — placing/removing
+// one is a discrete "stamp" operation, grouped by 4-directional connectivity.
+const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+
+function connectedBoxes(cells: GridCellState[][], matches: Set<string>): { zoneId: string; box: ZoneBox }[] {
+  const rowsLen = cells.length;
+  const colsLen = cells[0]?.length ?? 0;
+  const seen: boolean[][] = Array.from({ length: rowsLen }, () => Array(colsLen).fill(false));
+  const result: { zoneId: string; box: ZoneBox }[] = [];
+  for (let r = 0; r < rowsLen; r++) {
+    for (let c = 0; c < colsLen; c++) {
+      if (seen[r][c] || !matches.has(cells[r][c])) continue;
+      const target = cells[r][c];
+      let minRow = r, maxRow = r, minCol = c, maxCol = c;
+      const stack: [number, number][] = [[r, c]];
+      seen[r][c] = true;
+      while (stack.length > 0) {
+        const [cr, cc] = stack.pop()!;
+        minRow = Math.min(minRow, cr);
+        maxRow = Math.max(maxRow, cr);
+        minCol = Math.min(minCol, cc);
+        maxCol = Math.max(maxCol, cc);
+        for (const [dr, dc] of NEIGHBORS) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < rowsLen && nc >= 0 && nc < colsLen && !seen[nr][nc] && cells[nr][nc] === target) {
+            seen[nr][nc] = true;
+            stack.push([nr, nc]);
+          }
+        }
+      }
+      result.push({ zoneId: target, box: { minRow, maxRow, minCol, maxCol } });
+    }
+  }
+  return result;
+}
+
+function tryPlaceFootprint(
+  cells: GridCellState[][], totalRows: number, totalCols: number,
+  anchorRow: number, anchorCol: number, size: Footprint, zoneId: string,
+): GridCellState[][] | null {
+  if (anchorRow + size.rows > totalRows || anchorCol + size.cols > totalCols) return null;
+  for (let r = anchorRow; r < anchorRow + size.rows; r++) {
+    for (let c = anchorCol; c < anchorCol + size.cols; c++) {
+      if (cells[r][c] !== 'empty') return null;
+    }
+  }
+  const next = cells.map(row => [...row]);
+  for (let r = anchorRow; r < anchorRow + size.rows; r++) {
+    for (let c = anchorCol; c < anchorCol + size.cols; c++) {
+      next[r][c] = zoneId;
+    }
+  }
+  return next;
+}
+
+function removeConnectedBlob(cells: GridCellState[][], totalRows: number, totalCols: number, row: number, col: number): GridCellState[][] {
+  const target = cells[row][col];
+  const next = cells.map(r => [...r]);
+  const stack: [number, number][] = [[row, col]];
+  const seen = new Set<string>([`${row}-${col}`]);
+  while (stack.length > 0) {
+    const [r, c] = stack.pop()!;
+    next[r][c] = 'empty';
+    for (const [dr, dc] of NEIGHBORS) {
+      const nr = r + dr, nc = c + dc, key = `${nr}-${nc}`;
+      if (nr >= 0 && nr < totalRows && nc >= 0 && nc < totalCols && !seen.has(key) && cells[nr][nc] === target) {
+        seen.add(key);
+        stack.push([nr, nc]);
+      }
+    }
+  }
+  return next;
+}
+
 interface Props {
   venue: Venue;
   onVenueUpdated: (venue: Venue) => void;
@@ -97,6 +172,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [newZoneType, setNewZoneType] = useState<ZoneType>('SEATED');
   const [newZoneCapacity, setNewZoneCapacity] = useState('');
   const [newZoneTableChairs, setNewZoneTableChairs] = useState('');
+  const [newZoneTableShape, setNewZoneTableShape] = useState<TableShape>('ROUND');
 
   // Zone editing (name/price/capacity/color) — for any zone type, incl. tables
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
@@ -104,6 +180,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [editZonePrice, setEditZonePrice] = useState('');
   const [editZoneCapacity, setEditZoneCapacity] = useState('');
   const [editZoneTableChairs, setEditZoneTableChairs] = useState('');
+  const [editZoneTableShape, setEditZoneTableShape] = useState<TableShape>('ROUND');
   const [editZoneColor, setEditZoneColor] = useState(ZONE_COLORS[0]);
   const [savingZoneEdit, setSavingZoneEdit] = useState(false);
 
@@ -171,32 +248,67 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
   const handleCellMouseDown = useCallback((row: number, col: number) => {
     if (locked) return;
+
+    const currentValue = cells[row][col];
+    const currentZone = currentValue !== 'empty' && currentValue !== 'blocked' && currentValue !== 'stage'
+      ? zones.find(z => z.id === currentValue)
+      : undefined;
+    const activeZone = zones.find(z => z.id === activeTool);
+
+    // A table footprint must stay a solid rectangle — clearing any part of it
+    // always clears the whole table, regardless of which tool triggered it.
+    if (currentZone?.type === 'TABLE') {
+      if (activeTool === 'erase' || activeTool === currentValue) {
+        setCells(prev => removeConnectedBlob(prev, rows, cols, row, col));
+      } else {
+        toast.error('Сначала уберите стол инструментом «Стереть»');
+      }
+      return;
+    }
+
+    if (activeZone?.type === 'TABLE') {
+      if (currentValue !== 'empty') {
+        toast.error('Здесь уже занято');
+        return;
+      }
+      const size = tableFootprint(activeZone.tableShape ?? 'ROUND', activeZone.tableChairs ?? 1);
+      const placed = tryPlaceFootprint(cells, rows, cols, row, col, size, activeTool);
+      if (!placed) {
+        toast.error('Недостаточно места для стола здесь');
+        return;
+      }
+      setCells(placed);
+      return;
+    }
+
     isDrawing.current = true;
     setCells(prev => {
-      const currentValue = prev[row][col];
+      const cv = prev[row][col];
       const paintValue: GridCellState =
         activeTool === 'erase' ? 'empty' :
         activeTool === 'block' ?
-          (currentValue === 'blocked' ? 'empty' : 'blocked') :
-        currentValue === activeTool ? 'empty' : activeTool;
+          (cv === 'blocked' ? 'empty' : 'blocked') :
+        cv === activeTool ? 'empty' : activeTool;
       drawValue.current = paintValue;
       const next = [...prev];
       next[row] = [...prev[row]];
       next[row][col] = paintValue;
       return next;
     });
-  }, [locked, activeTool]);
+  }, [locked, activeTool, zones, cells, rows, cols]);
 
   const handleCellMouseEnter = useCallback((row: number, col: number) => {
     if (!isDrawing.current || locked) return;
     setCells(prev => {
       if (prev[row][col] === drawValue.current) return prev;
+      const cellZone = zones.find(z => z.id === prev[row][col]);
+      if (cellZone?.type === 'TABLE') return prev; // never drag-overwrite a table footprint
       const next = [...prev];
       next[row] = [...prev[row]];
       next[row][col] = drawValue.current;
       return next;
     });
-  }, [locked]);
+  }, [locked, zones]);
 
   const resetZoneForm = () => {
     setNewZoneName('');
@@ -204,6 +316,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     setNewZoneType('SEATED');
     setNewZoneCapacity('');
     setNewZoneTableChairs('');
+    setNewZoneTableShape('ROUND');
     setNewZoneColor(ZONE_COLORS[zones.length % ZONE_COLORS.length]);
   };
 
@@ -224,6 +337,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         color: newZoneColor,
         layoutData: null,
         tableChairs: newZoneType === 'TABLE' ? Number(newZoneTableChairs) : null,
+        tableShape: newZoneType === 'TABLE' ? newZoneTableShape : null,
       });
       setZones(prev => [...prev, zone]);
       setActiveTool(zone.id);
@@ -255,6 +369,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     setEditZonePrice(String(zone.price));
     setEditZoneCapacity(zone.type === 'GENERAL' ? String(zone.capacity) : '');
     setEditZoneTableChairs(zone.type === 'TABLE' ? String(zone.tableChairs ?? '') : '');
+    setEditZoneTableShape(zone.tableShape ?? 'ROUND');
     setEditZoneColor(zone.color ?? ZONE_COLORS[0]);
   };
 
@@ -268,6 +383,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         color: editZoneColor,
         ...(zone.type === 'GENERAL' && editZoneCapacity && { capacity: Number(editZoneCapacity) }),
         ...(zone.type === 'TABLE' && editZoneTableChairs && { tableChairs: Number(editZoneTableChairs) }),
+        ...(zone.type === 'TABLE' && { tableShape: editZoneTableShape }),
       });
       setZones(prev => prev.map(z => (z.id === updated.id ? updated : z)));
       setEditingZoneId(null);
@@ -295,7 +411,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         color: z.color,
         type: z.type,
         ...(z.type === 'GENERAL' && { capacity: z.capacity }),
-        ...(z.type === 'TABLE' && { tableChairs: z.tableChairs ?? undefined }),
+        ...(z.type === 'TABLE' && { tableChairs: z.tableChairs ?? undefined, tableShape: z.tableShape ?? undefined }),
       }));
       const created = await api.saveGridTemplate({
         name: templateName.trim(), rows, cols, cells: templateCells, zones: templateZones,
@@ -333,6 +449,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           color: slot.color,
           layoutData: null,
           tableChairs: slot.type === 'TABLE' ? (slot.tableChairs ?? 4) : null,
+          tableShape: slot.type === 'TABLE' ? (slot.tableShape ?? 'ROUND') : null,
         });
         slotToRealId.set(slot.slotId, zone.id);
         createdZones.push(zone);
@@ -361,23 +478,34 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
   const stageBox = useMemo(() => zoneBoundingBoxes(cells, new Set(['stage'])).get('stage'), [cells]);
 
+  // Each table now spans multiple cells, so "how many tables are painted"
+  // requires grouping same-zone-id cells into connected components — one
+  // component per physical table — instead of just counting raw cells.
+  const tableZoneIdSet = useMemo(() => new Set(zones.filter(z => z.type === 'TABLE').map(z => z.id)), [zones]);
+  const tableBoxes = useMemo(() => connectedBoxes(cells, tableZoneIdSet), [cells, tableZoneIdSet]);
+  const tableCountByZone = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const { zoneId } of tableBoxes) counts[zoneId] = (counts[zoneId] ?? 0) + 1;
+    return counts;
+  }, [tableBoxes]);
+
   const revenue = useMemo(() => {
     const flat = cells.flat();
     const countsByZone = countCellsByZone(flat);
     let total = 0;
     const details = zones.map(zone => {
       // GENERAL zones sell by declared capacity, not by painted cell count;
-      // TABLE zones sell by chairs per table, not by number of painted tables
+      // TABLE zones sell by chairs × number of tables, not by painted cells
       const count =
         zone.type === 'GENERAL' ? zone.capacity :
-        zone.type === 'TABLE' ? (countsByZone[zone.id] ?? 0) * (zone.tableChairs ?? 1) :
+        zone.type === 'TABLE' ? (tableCountByZone[zone.id] ?? 0) * (zone.tableChairs ?? 1) :
         (countsByZone[zone.id] ?? 0);
       const amount = count * zone.price;
       total += amount;
       return { zone, count, amount };
     });
     return { total, details };
-  }, [cells, zones]);
+  }, [cells, zones, tableCountByZone]);
 
   const save = async () => {
     setSaving(true);
@@ -430,16 +558,30 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         </div>
       )}
       {zone.type === 'TABLE' && (
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Мест за столом</label>
-          <input
-            type="number"
-            value={editZoneTableChairs}
-            onChange={e => setEditZoneTableChairs(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-            min="1"
-          />
-        </div>
+        <>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Мест за столом</label>
+            <input
+              type="number"
+              value={editZoneTableChairs}
+              onChange={e => setEditZoneTableChairs(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              min="1"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Форма</label>
+            <select
+              value={editZoneTableShape}
+              onChange={e => setEditZoneTableShape(e.target.value as TableShape)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            >
+              <option value="ROUND">Круглый</option>
+              <option value="RECT">Прямоугольный</option>
+              <option value="SOFA">Диван</option>
+            </select>
+          </div>
+        </>
       )}
       <div>
         <label className="block text-xs text-gray-500 mb-1">Цвет</label>
@@ -780,14 +922,25 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   />
                 )}
                 {newZoneType === 'TABLE' && (
-                  <input
-                    type="number"
-                    value={newZoneTableChairs}
-                    onChange={e => setNewZoneTableChairs(e.target.value)}
-                    className="mt-1.5 border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
-                    placeholder="Мест за столом"
-                    min="1"
-                  />
+                  <div className="mt-1.5 flex gap-1.5">
+                    <input
+                      type="number"
+                      value={newZoneTableChairs}
+                      onChange={e => setNewZoneTableChairs(e.target.value)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                      placeholder="Мест за столом"
+                      min="1"
+                    />
+                    <select
+                      value={newZoneTableShape}
+                      onChange={e => setNewZoneTableShape(e.target.value as TableShape)}
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                    >
+                      <option value="ROUND">Круглый</option>
+                      <option value="RECT">Прямоугольный</option>
+                      <option value="SOFA">Диван</option>
+                    </select>
+                  </div>
                 )}
               </div>
               <div>
@@ -852,7 +1005,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 ? zones.findIndex(z => z.id === cell)
                 : -1;
               const zone = zoneIndex >= 0 ? zones[zoneIndex] : null;
-              const mergeFill = zone?.type === 'GENERAL' || isStage;
+              const mergeFill = zone?.type === 'GENERAL' || zone?.type === 'TABLE' || isStage;
               const mergeId = isStage ? 'stage' : zone?.id;
               return (
                 <div
@@ -922,6 +1075,33 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             Сцена
           </div>
         )}
+
+        {/* Table icons — one per connected footprint, not per cell */}
+        {tableBoxes.map(({ zoneId, box }, i) => {
+          const zoneIndex = zones.findIndex(z => z.id === zoneId);
+          const zone = zoneIndex >= 0 ? zones[zoneIndex] : undefined;
+          if (!zone) return null;
+          const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
+          return (
+            <div
+              key={`${zoneId}-${i}`}
+              className="absolute pointer-events-none p-0.5"
+              style={{
+                left: `${(box.minCol / cols) * 100}%`,
+                top: `${(box.minRow / rows) * 100}%`,
+                width: `${(footprint.cols / cols) * 100}%`,
+                height: `${(footprint.rows / rows) * 100}%`,
+              }}
+            >
+              <TableIcon
+                shape={zone.tableShape ?? 'ROUND'}
+                chairs={zone.tableChairs ?? 1}
+                footprint={footprint}
+                color={zoneColor(zone, zoneIndex)}
+              />
+            </div>
+          );
+        })}
       </div>
 
       {/* Legend when locked */}

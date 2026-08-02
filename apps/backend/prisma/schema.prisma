@@ -24,6 +24,7 @@ enum ZoneType {
 enum TableShape {
   ROUND
   RECT
+  SOFA
 }
 
 model Venue {
@@ -62,6 +63,7 @@ model Zone {
   color       String?
   layoutData  Json?
   tableChairs Int?
+  tableShape  TableShape?
   venue       Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
   tickets     Ticket[]
   seats       Seat[]
@@ -93,6 +95,8 @@ model ZoneTable {
   layoutData Json?
   row        Int?
   col        Int?
+  rows       Int?
+  cols       Int?
   zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
 

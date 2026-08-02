@@ -23,6 +23,7 @@ export interface GridTemplateZoneSlot {
   type: ZoneType;
   capacity?: number;
   tableChairs?: number;
+  tableShape?: TableShape;
 }
 
 export interface GridTemplateSummary {
@@ -52,7 +53,7 @@ export interface Venue {
 }
 
 export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';
-export type TableShape = 'ROUND' | 'RECT';
+export type TableShape = 'ROUND' | 'RECT' | 'SOFA';
 
 export interface ZoneSectionLayout {
   sectionIndex: number;
@@ -83,6 +84,7 @@ export interface Zone {
   color: string | null;
   layoutData: ZoneLayoutData | null;
   tableChairs: number | null;
+  tableShape: TableShape | null;
   available?: number;
 }
 
@@ -106,6 +108,8 @@ export interface ZoneTable {
   layoutData: Record<string, unknown> | null;
   row: number | null;
   col: number | null;
+  rows: number | null;
+  cols: number | null;
   occupied: number;
   available: number;
 }

@@ -86,9 +86,13 @@ const createZoneSchema = z.object({
   color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
   tableChairs: z.number().int().positive().nullable().optional(),
+  tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).nullable().optional(),
 }).refine(d => d.type !== 'TABLE' || !!d.tableChairs, {
   message: 'tableChairs is required for TABLE zones',
   path: ['tableChairs'],
+}).refine(d => d.type !== 'TABLE' || !!d.tableShape, {
+  message: 'tableShape is required for TABLE zones',
+  path: ['tableShape'],
 });
 
 function toJsonValue(v: Record<string, unknown> | null | undefined): Prisma.InputJsonValue | typeof Prisma.DbNull | undefined {
@@ -122,6 +126,7 @@ const updateZoneSchema = z.object({
   color: hexColor.nullable().optional(),
   layoutData: z.record(z.unknown()).nullable().optional(),
   tableChairs: z.number().int().positive().nullable().optional(),
+  tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).nullable().optional(),
 });
 
 zonesRouter.put('/:id', requireAuth, async (req, res) => {

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
+import { TableIcon, type Footprint } from './TableIcon';
 
 const FALLBACK_COLORS = [
   '#059669', '#0284c7', '#d97706', '#dc2626',
@@ -139,15 +140,36 @@ export function VenueGridMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableZoneKey]);
 
+  // Maps every cell inside a table's footprint (not just its anchor) to that
+  // table, so a click anywhere on the drawn shape — not one specific cell —
+  // registers as a click on it.
   const tableByCell = useMemo(() => {
     const map = new Map<string, ZoneTable>();
     for (const [zoneId, tables] of Object.entries(tablesByZone)) {
       for (const table of tables) {
-        if (table.row !== null && table.col !== null) map.set(`${zoneId}|${table.row}|${table.col}`, table);
+        if (table.row === null || table.col === null || table.rows === null || table.cols === null) continue;
+        for (let r = table.row; r < table.row + table.rows; r++) {
+          for (let c = table.col; c < table.col + table.cols; c++) {
+            map.set(`${zoneId}|${r}|${c}`, table);
+          }
+        }
       }
     }
     return map;
   }, [tablesByZone]);
+
+  const tableFootprints = useMemo(() => {
+    const list: { zone: Zone; table: ZoneTable }[] = [];
+    for (const zone of zones) {
+      if (zone.type !== 'TABLE') continue;
+      for (const table of tablesByZone[zone.id] ?? []) {
+        if (table.row !== null && table.col !== null && table.rows !== null && table.cols !== null) {
+          list.push({ zone, table });
+        }
+      }
+    }
+    return list;
+  }, [zones, tablesByZone]);
 
   const generalZoneBoxes = useMemo(() => {
     if (!layout) return new Map<string, ZoneBox>();
@@ -267,7 +289,7 @@ export function VenueGridMap({
                   <div
                     key={`${r}-${c}`}
                     style={{
-                      aspectRatio: '1', backgroundColor: `${color}55`,
+                      aspectRatio: '1', backgroundColor: `${color}33`,
                       borderWidth: 1, borderStyle: 'solid', borderColor: GRID_LINE,
                       minWidth: 4, minHeight: 4,
                     }}
@@ -277,6 +299,7 @@ export function VenueGridMap({
               const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
               const remaining = table.available - inCartAtTable;
               const isFull = remaining <= 0;
+              const sameTable = (nr: number, nc: number) => tableByCell.get(`${zone.id}|${nr}|${nc}`) === table;
               return (
                 <div
                   key={`${r}-${c}`}
@@ -284,24 +307,18 @@ export function VenueGridMap({
                   title={`${zone.name} · Стол ${table.number} · ${remaining}/${table.chairCount} своб. · ${formatPrice(zone.price, currency)}`}
                   style={{
                     aspectRatio: '1',
-                    backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? color : `${color}55`,
+                    backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? `${color}55` : `${color}33`,
                     borderWidth: 1,
                     borderStyle: 'solid',
-                    borderColor: inCartAtTable > 0 ? color : GRID_LINE,
+                    borderTopColor: sameTable(r - 1, c) ? 'transparent' : GRID_LINE,
+                    borderBottomColor: sameTable(r + 1, c) ? 'transparent' : GRID_LINE,
+                    borderLeftColor: sameTable(r, c - 1) ? 'transparent' : GRID_LINE,
+                    borderRightColor: sameTable(r, c + 1) ? 'transparent' : GRID_LINE,
                     cursor: isFull ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 'clamp(6px, 1.6cqw, 12px)',
-                    fontWeight: 700,
-                    lineHeight: 1,
-                    color: isFull ? '#9ca3af' : inCartAtTable > 0 ? '#ffffff' : '#374151',
                     minWidth: 4,
                     minHeight: 4,
                   }}
-                >
-                  {table.number}
-                </div>
+                />
               );
             }
 
@@ -381,6 +398,35 @@ export function VenueGridMap({
           Сцена
         </div>
       )}
+
+      {/* Table icons — one per table, positioned from its stored footprint */}
+      {tableFootprints.map(({ zone, table }) => {
+        const index = zoneById.get(zone.id)!.index;
+        const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
+        const isFull = table.available - inCartAtTable <= 0;
+        const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
+        return (
+          <div
+            key={table.id}
+            className="absolute pointer-events-none p-0.5"
+            style={{
+              left: `${(table.col! / layout.cols) * 100}%`,
+              top: `${(table.row! / layout.rows) * 100}%`,
+              width: `${(footprint.cols / layout.cols) * 100}%`,
+              height: `${(footprint.rows / layout.rows) * 100}%`,
+            }}
+          >
+            <TableIcon
+              shape={table.shape}
+              chairs={table.chairCount}
+              footprint={footprint}
+              color={zoneColor(zone, index)}
+              label={String(table.number)}
+              muted={isFull}
+            />
+          </div>
+        );
+      })}
     </div>
   );
 
