@@ -114,6 +114,21 @@ export interface ZoneTable {
   available: number;
 }
 
+export type TicketEmailDeliveryStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'ACCEPTED'
+  | 'DELIVERED'
+  | 'BOUNCED'
+  | 'COMPLAINED'
+  | 'FAILED';
+
+export interface TicketEmailDelivery {
+  status: TicketEmailDeliveryStatus;
+  acceptedAt: string | null;
+  deliveredAt: string | null;
+}
+
 export interface Ticket {
   id: string;
   name: string;
@@ -132,6 +147,7 @@ export interface Ticket {
   groupId: string | null;
   seatId: string | null;
   tableId: string | null;
+  emailDelivery?: TicketEmailDelivery | null;
 }
 
 export interface CreatePaymentResult {

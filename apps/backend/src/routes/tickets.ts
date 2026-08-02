@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { PrismaClient, TicketStatus as PrismaTicketStatus } from '@prisma/client';
+import { EmailJobStatus, PrismaClient, TicketStatus as PrismaTicketStatus } from '@prisma/client';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
@@ -34,6 +34,44 @@ const upload = multer({
 
 export const ticketsRouter = Router();
 
+async function getTicketEmailDelivery(checkoutId: string): Promise<{
+  status: EmailJobStatus;
+  acceptedAt: string | null;
+  deliveredAt: string | null;
+} | null> {
+  const job = await prisma.emailJob.findUnique({
+    where: {
+      type_checkoutId: {
+        type: 'TICKET_CONFIRMED',
+        checkoutId,
+      },
+    },
+    select: {
+      status: true,
+      acceptedAt: true,
+      deliveredAt: true,
+    },
+  });
+  if (!job) return null;
+  return {
+    status: job.status,
+    acceptedAt: job.acceptedAt?.toISOString() ?? null,
+    deliveredAt: job.deliveredAt?.toISOString() ?? null,
+  };
+}
+
+function toEmailDeliveryDto(job: {
+  status: EmailJobStatus;
+  acceptedAt: Date | null;
+  deliveredAt: Date | null;
+}) {
+  return {
+    status: job.status,
+    acceptedAt: job.acceptedAt?.toISOString() ?? null,
+    deliveredAt: job.deliveredAt?.toISOString() ?? null,
+  };
+}
+
 // GET /api/tickets?status=PENDING&venueId=xxx  (admin only)
 ticketsRouter.get('/', requireAuth, async (req, res) => {
   const { status, venueId } = req.query;
@@ -45,7 +83,35 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
       },
       orderBy: { createdAt: 'desc' },
     });
-    return res.json({ success: true, data: tickets });
+
+    const checkoutIds = [...new Set(tickets.map(t => t.groupId ?? t.id))];
+    const jobs =
+      checkoutIds.length === 0
+        ? []
+        : await prisma.emailJob.findMany({
+            where: {
+              type: 'TICKET_CONFIRMED',
+              checkoutId: { in: checkoutIds },
+            },
+            select: {
+              checkoutId: true,
+              status: true,
+              acceptedAt: true,
+              deliveredAt: true,
+            },
+          });
+    const jobByCheckout = new Map(jobs.map(j => [j.checkoutId, j]));
+
+    const data = tickets.map(ticket => {
+      const checkoutId = ticket.groupId ?? ticket.id;
+      const job = jobByCheckout.get(checkoutId);
+      return {
+        ...ticket,
+        emailDelivery: job ? toEmailDeliveryDto(job) : null,
+      };
+    });
+
+    return res.json({ success: true, data });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
   }
@@ -65,9 +131,10 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
       where: { id: mainTicket.venueId },
       select: { currency: true },
     });
+    const emailDelivery = await getTicketEmailDelivery(req.params.groupId);
     return res.json({
       success: true,
-      data: { ticket: mainTicket, members, currency: venue?.currency ?? '₼' },
+      data: { ticket: mainTicket, members, currency: venue?.currency ?? '₼', emailDelivery },
     });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch group' });
@@ -89,9 +156,11 @@ ticketsRouter.get('/:id', async (req, res) => {
       where: { id: ticket.venueId },
       select: { currency: true },
     });
+    const checkoutId = ticket.groupId ?? ticket.id;
+    const emailDelivery = await getTicketEmailDelivery(checkoutId);
     return res.json({
       success: true,
-      data: { ticket, members, currency: venue?.currency ?? '₼' },
+      data: { ticket, members, currency: venue?.currency ?? '₼', emailDelivery },
     });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch ticket' });

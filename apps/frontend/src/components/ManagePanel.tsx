@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, Ticket, TicketStatus } from '../types';
+import type { Venue, Zone, Ticket, TicketStatus, TicketEmailDeliveryStatus } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { generateVenueSlug, slugify } from '../utils/slug';
@@ -29,6 +29,16 @@ const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> =
   CONFIRMED: { label: 'Подтверждён',  className: 'bg-green-100 text-green-700' },
   REJECTED:  { label: 'Отклонён',     className: 'bg-red-100 text-red-600' },
   EXPIRED:   { label: 'Истёк',        className: 'bg-gray-100 text-gray-500' },
+};
+
+const EMAIL_STATUS_STYLE: Record<TicketEmailDeliveryStatus, { label: string; className: string }> = {
+  PENDING:    { label: 'Email в очереди',     className: 'text-amber-700' },
+  PROCESSING: { label: 'Email отправляется',  className: 'text-amber-700' },
+  ACCEPTED:   { label: 'Email отправлен',     className: 'text-emerald-700' },
+  DELIVERED:  { label: 'Email доставлен',     className: 'text-emerald-700' },
+  BOUNCED:    { label: 'Email не доставлен',  className: 'text-red-700' },
+  COMPLAINED: { label: 'Email — жалоба',      className: 'text-red-700' },
+  FAILED:     { label: 'Ошибка email',        className: 'text-red-700' },
 };
 
 function isTokenValid(): boolean {
@@ -329,6 +339,10 @@ export function ManagePanel() {
         ),
       );
       toast.success(status === 'CONFIRMED' ? 'Билет подтверждён' : 'Билет отклонён');
+      // Refresh to pick up EmailJob status after enqueue
+      if (status === 'CONFIRMED') {
+        loadTickets();
+      }
     } catch (err) {
       toast.error(errMsg(err));
     }
@@ -846,6 +860,14 @@ export function ManagePanel() {
                         </div>
                         {t.groupId && (
                           <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
+                        )}
+                        {t.emailDelivery && (
+                          <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[t.emailDelivery.status].className}`}>
+                            {EMAIL_STATUS_STYLE[t.emailDelivery.status].label}
+                          </div>
+                        )}
+                        {t.status === 'CONFIRMED' && t.email && !t.emailDelivery && (
+                          <div className="text-xs mt-0.5 text-gray-400">Email ещё не в очереди</div>
                         )}
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium ${badge.className}`}>

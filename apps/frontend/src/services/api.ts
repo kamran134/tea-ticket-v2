@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem, CreatePaymentResult, PaymentStatusResult } from '../types';
+import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem, CreatePaymentResult, PaymentStatusResult, TicketEmailDelivery } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -109,11 +109,21 @@ export const api = {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },
 
-  async getTicket(id: string): Promise<{ ticket: Ticket; members: Ticket[] | null; currency: Currency }> {
+  async getTicket(id: string): Promise<{
+    ticket: Ticket;
+    members: Ticket[] | null;
+    currency: Currency;
+    emailDelivery: TicketEmailDelivery | null;
+  }> {
     return request(`/api/tickets/${encodeURIComponent(id)}`);
   },
 
-  async getTicketGroup(groupId: string): Promise<{ ticket: Ticket; members: Ticket[]; currency: Currency }> {
+  async getTicketGroup(groupId: string): Promise<{
+    ticket: Ticket;
+    members: Ticket[];
+    currency: Currency;
+    emailDelivery: TicketEmailDelivery | null;
+  }> {
     return request(`/api/tickets/group/${encodeURIComponent(groupId)}`);
   },
 
