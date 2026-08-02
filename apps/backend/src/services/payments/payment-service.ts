@@ -473,8 +473,8 @@ export function resolveCheckoutId(ticket: { id: string; groupId: string | null }
 
 export function getPaymentHoldMinutes(): number {
   const raw = process.env.PAYMENT_HOLD_MINUTES;
-  const parsed = raw ? Number.parseInt(raw, 10) : 30;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+  const parsed = raw ? Number.parseInt(raw, 10) : 15;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
 }
 
 /** PAYMENT_HOLD_SECONDS overrides PAYMENT_HOLD_MINUTES when set (useful for local testing). */

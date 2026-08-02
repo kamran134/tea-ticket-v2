@@ -34,7 +34,7 @@ services:
       UPLOADS_DIR: /app/uploads
       PORT: 3000
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-bank}
-      PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-30}
+      PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tickets.birmanat.band}
       PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tickets.birmanat.band}
       PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
