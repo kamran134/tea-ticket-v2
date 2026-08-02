@@ -3,7 +3,8 @@ import { PrismaClient, TicketStatus as PrismaTicketStatus } from '@prisma/client
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
-import { getPaymentHoldMinutes } from '../services/payments/payment-service';
+import { getPaymentHoldMs } from '../services/payments/payment-service';
+import { expireStaleBookings } from '../services/booking-expiry';
 import { z } from 'zod';
 
 const prisma = new PrismaClient();
@@ -122,6 +123,8 @@ ticketsRouter.post('/register', async (req, res) => {
   const now = new Date();
 
   try {
+    await expireStaleBookings(prisma);
+
     const result = await prisma.$transaction(async tx => {
       const zoneIds = [...new Set(items.map(i => i.zoneId))];
       const zones = await tx.zone.findMany({ where: { id: { in: zoneIds }, venueId } });
@@ -222,8 +225,8 @@ ticketsRouter.post('/register', async (req, res) => {
         }
       }
 
-      const holdMinutes = getPaymentHoldMinutes();
-      const expiresAt = new Date(now.getTime() + holdMinutes * 60 * 1000);
+      const holdMs = getPaymentHoldMs();
+      const expiresAt = new Date(now.getTime() + holdMs);
 
       const names = [
         name,

@@ -12,7 +12,7 @@ import { createWebhookHandler } from './routes/webhooks';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { createPaymentProvider, loadPaymentProviderConfig } from './services/payments/factory';
 import {
-  getPaymentHoldMinutes,
+  getPaymentHoldMs,
   PaymentService,
 } from './services/payments/payment-service';
 
@@ -35,7 +35,7 @@ export function createApp(options?: {
     provider,
     publicAppUrl: providerConfig.publicAppUrl,
     webhookBaseUrl: providerConfig.webhookBaseUrl,
-    paymentHoldMinutes: getPaymentHoldMinutes(),
+    paymentHoldMs: getPaymentHoldMs(),
   });
 
   const app = express();

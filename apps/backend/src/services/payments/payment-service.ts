@@ -10,6 +10,7 @@ import { amountsEqual, formatAmount, sumAmounts } from './decimal';
 import type { PaymentProvider } from './payment-provider';
 import type { ProviderPaymentStatus, WebhookEvent } from './types';
 import { ACTIVE_PAYMENT_STATUSES } from './types';
+import { expireStaleBookings as expireBookings, expireStalePayments as expirePayments } from '../booking-expiry';
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
 
@@ -18,7 +19,7 @@ export interface PaymentServiceDeps {
   provider: PaymentProvider;
   publicAppUrl: string;
   webhookBaseUrl: string;
-  paymentHoldMinutes: number;
+  paymentHoldMs: number;
 }
 
 export interface CreatePaymentResponse {
@@ -72,7 +73,7 @@ export class PaymentService {
     }
 
     const amount = sumAmounts(tickets.map(t => t.price));
-    const holdMs = this.deps.paymentHoldMinutes * 60 * 1000;
+    const holdMs = this.deps.paymentHoldMs;
     const ticketExpiresAt = tickets[0].expiresAt ?? new Date(Date.now() + holdMs);
     const paymentExpiresAt = new Date(Math.min(ticketExpiresAt.getTime(), Date.now() + holdMs));
 
@@ -230,35 +231,11 @@ export class PaymentService {
   }
 
   async expireStaleBookings(): Promise<number> {
-    const now = new Date();
-    const result = await this.deps.prisma.ticket.updateMany({
-      where: {
-        status: 'BOOKED',
-        expiresAt: { lte: now },
-      },
-      data: { status: 'EXPIRED' },
-    });
-    return result.count;
+    return expireBookings(this.deps.prisma);
   }
 
   async expireStalePayments(): Promise<number> {
-    const now = new Date();
-    const stale = await this.deps.prisma.payment.findMany({
-      where: {
-        status: { in: [...ACTIVE_PAYMENT_STATUSES] },
-        expiresAt: { lte: now },
-      },
-    });
-
-    let count = 0;
-    for (const payment of stale) {
-      await this.deps.prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'EXPIRED' },
-      });
-      count++;
-    }
-    return count;
+    return expirePayments(this.deps.prisma);
   }
 
   async reconcileProcessingPayments(): Promise<number> {
@@ -498,4 +475,16 @@ export function getPaymentHoldMinutes(): number {
   const raw = process.env.PAYMENT_HOLD_MINUTES;
   const parsed = raw ? Number.parseInt(raw, 10) : 30;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30;
+}
+
+/** PAYMENT_HOLD_SECONDS overrides PAYMENT_HOLD_MINUTES when set (useful for local testing). */
+export function getPaymentHoldMs(): number {
+  const secondsRaw = process.env.PAYMENT_HOLD_SECONDS;
+  if (secondsRaw) {
+    const seconds = Number.parseInt(secondsRaw, 10);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return seconds * 1000;
+    }
+  }
+  return getPaymentHoldMinutes() * 60 * 1000;
 }
