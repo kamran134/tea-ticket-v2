@@ -23,16 +23,25 @@ export function tableFootprint(shape: TableShape, chairs: number): Footprint {
 
 const MAX_DRAWN_CHAIRS = 10;
 
+// Realistic furniture tones instead of the zone's accent color — a wood
+// tabletop, darker wood chairs, brown upholstery for the sofa.
+const PALETTE = {
+  table: { fill: '#d4a76a', stroke: '#7c5230' },
+  chair: { fill: '#9c6b3f', stroke: '#5c3d21' },
+  sofa: { fill: '#7a4a30', stroke: '#4a2e1c' },
+  mutedFill: '#d1d5db',
+  mutedStroke: '#9ca3af',
+};
+
 interface ShapeProps {
   rows: number;
   cols: number;
-  stroke: string;
-  fill: string;
   chairs: number;
   label?: string;
+  muted?: boolean;
 }
 
-function RoundShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
+function RoundShape({ rows, cols, chairs, label, muted }: ShapeProps) {
   const cx = cols / 2;
   const cy = rows / 2;
   const unit = Math.min(rows, cols);
@@ -40,6 +49,10 @@ function RoundShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
   const chairR = unit * 0.09;
   const orbit = unit * 0.42;
   const drawCount = Math.min(chairs, MAX_DRAWN_CHAIRS);
+  const tableFill = muted ? PALETTE.mutedFill : PALETTE.table.fill;
+  const tableStroke = muted ? PALETTE.mutedStroke : PALETTE.table.stroke;
+  const chairFill = muted ? PALETTE.mutedFill : PALETTE.chair.fill;
+  const chairStroke = muted ? PALETTE.mutedStroke : PALETTE.chair.stroke;
   return (
     <>
       {Array.from({ length: drawCount }, (_, i) => {
@@ -50,15 +63,15 @@ function RoundShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
             cx={cx + orbit * Math.cos(angle)}
             cy={cy + orbit * Math.sin(angle)}
             r={chairR}
-            fill={fill}
-            stroke={stroke}
+            fill={chairFill}
+            stroke={chairStroke}
             strokeWidth={0.03}
           />
         );
       })}
-      <circle cx={cx} cy={cy} r={tableR} fill="#ffffff" stroke={stroke} strokeWidth={0.05} />
+      <circle cx={cx} cy={cy} r={tableR} fill={tableFill} stroke={tableStroke} strokeWidth={0.05} />
       {label && (
-        <text x={cx} y={cy + tableR * 0.35} fontSize={tableR * 0.85} textAnchor="middle" fill={stroke}>
+        <text x={cx} y={cy + tableR * 0.35} fontSize={tableR * 0.85} textAnchor="middle" fill={tableStroke} fontWeight={700}>
           {label}
         </text>
       )}
@@ -66,7 +79,7 @@ function RoundShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
   );
 }
 
-function RectShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
+function RectShape({ rows, cols, chairs, label, muted }: ShapeProps) {
   const tableX = cols * 0.15;
   const tableY = rows * 0.3;
   const tableW = cols * 0.7;
@@ -75,6 +88,10 @@ function RectShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
   const topCount = Math.ceil(drawCount / 2);
   const bottomCount = drawCount - topCount;
   const chairSize = Math.min(rows, cols) * 0.16;
+  const tableFill = muted ? PALETTE.mutedFill : PALETTE.table.fill;
+  const tableStroke = muted ? PALETTE.mutedStroke : PALETTE.table.stroke;
+  const chairFill = muted ? PALETTE.mutedFill : PALETTE.chair.fill;
+  const chairStroke = muted ? PALETTE.mutedStroke : PALETTE.chair.stroke;
 
   const row = (count: number, y: number) =>
     Array.from({ length: count }, (_, i) => {
@@ -87,8 +104,8 @@ function RectShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
           width={chairSize}
           height={chairSize}
           rx={chairSize * 0.25}
-          fill={fill}
-          stroke={stroke}
+          fill={chairFill}
+          stroke={chairStroke}
           strokeWidth={0.03}
         />
       );
@@ -98,9 +115,9 @@ function RectShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
     <>
       {row(topCount, rows * 0.12)}
       {bottomCount > 0 && row(bottomCount, rows * 0.88)}
-      <rect x={tableX} y={tableY} width={tableW} height={tableH} rx={0.12} fill="#ffffff" stroke={stroke} strokeWidth={0.05} />
+      <rect x={tableX} y={tableY} width={tableW} height={tableH} rx={0.12} fill={tableFill} stroke={tableStroke} strokeWidth={0.05} />
       {label && (
-        <text x={cols / 2} y={rows / 2 + 0.15} fontSize={0.5} textAnchor="middle" fill={stroke}>
+        <text x={cols / 2} y={rows / 2 + 0.15} fontSize={0.5} textAnchor="middle" fill={tableStroke} fontWeight={700}>
           {label}
         </text>
       )}
@@ -108,20 +125,24 @@ function RectShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
   );
 }
 
-function SofaShape({ rows, cols, stroke, fill, chairs, label }: ShapeProps) {
+function SofaShape({ rows, cols, chairs, label, muted }: ShapeProps) {
   const benchH = rows * 0.4;
   const tableSize = Math.min(rows, cols) * 0.42;
   const tableX = cols / 2 - tableSize / 2;
   const tableY = rows - tableSize - rows * 0.08;
+  const sofaFill = muted ? PALETTE.mutedFill : PALETTE.sofa.fill;
+  const sofaStroke = muted ? PALETTE.mutedStroke : PALETTE.sofa.stroke;
+  const tableFill = muted ? PALETTE.mutedFill : PALETTE.table.fill;
+  const tableStroke = muted ? PALETTE.mutedStroke : PALETTE.table.stroke;
   return (
     <>
-      <rect x={cols * 0.05} y={rows * 0.05} width={cols * 0.9} height={benchH} rx={benchH * 0.3} fill={fill} stroke={stroke} strokeWidth={0.05} />
-      <text x={cols / 2} y={rows * 0.05 + benchH / 2 + 0.15} fontSize={0.42} textAnchor="middle" fill="#ffffff">
+      <rect x={cols * 0.05} y={rows * 0.05} width={cols * 0.9} height={benchH} rx={benchH * 0.3} fill={sofaFill} stroke={sofaStroke} strokeWidth={0.05} />
+      <text x={cols / 2} y={rows * 0.05 + benchH / 2 + 0.15} fontSize={0.42} textAnchor="middle" fill="#ffffff" fontWeight={700}>
         × {chairs}
       </text>
-      <rect x={tableX} y={tableY} width={tableSize} height={tableSize} rx={tableSize * 0.2} fill="#ffffff" stroke={stroke} strokeWidth={0.05} />
+      <rect x={tableX} y={tableY} width={tableSize} height={tableSize} rx={tableSize * 0.2} fill={tableFill} stroke={tableStroke} strokeWidth={0.05} />
       {label && (
-        <text x={cols / 2} y={tableY + tableSize / 2 + 0.15} fontSize={0.35} textAnchor="middle" fill={stroke}>
+        <text x={cols / 2} y={tableY + tableSize / 2 + 0.15} fontSize={0.35} textAnchor="middle" fill={tableStroke} fontWeight={700}>
           {label}
         </text>
       )}
@@ -133,16 +154,13 @@ interface TableIconProps {
   shape: TableShape;
   chairs: number;
   footprint: Footprint;
-  color: string;
   label?: string;
   muted?: boolean;
 }
 
-export function TableIcon({ shape, chairs, footprint, color, label, muted }: TableIconProps) {
+export function TableIcon({ shape, chairs, footprint, label, muted }: TableIconProps) {
   const { rows, cols } = footprint;
-  const stroke = muted ? '#9ca3af' : '#1f2937';
-  const fill = muted ? '#d1d5db' : color;
-  const shapeProps: ShapeProps = { rows, cols, stroke, fill, chairs, label };
+  const shapeProps: ShapeProps = { rows, cols, chairs, label, muted };
 
   return (
     <svg viewBox={`0 0 ${cols} ${rows}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">

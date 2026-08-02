@@ -1015,6 +1015,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     backgroundColor:
                       cell === 'blocked' ? '#9ca3af' :
                       isStage ? '#1e293b' :
+                      zone?.type === 'TABLE' ? '#ffffff' :
                       zone ? zoneColor(zone, zoneIndex) + 'cc' : '#ffffff',
                     cursor: locked ? 'default' : 'crosshair',
                     minWidth: 4,
@@ -1078,8 +1079,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
         {/* Table icons — one per connected footprint, not per cell */}
         {tableBoxes.map(({ zoneId, box }, i) => {
-          const zoneIndex = zones.findIndex(z => z.id === zoneId);
-          const zone = zoneIndex >= 0 ? zones[zoneIndex] : undefined;
+          const zone = zones.find(z => z.id === zoneId);
           if (!zone) return null;
           const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
           return (
@@ -1097,7 +1097,6 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 shape={zone.tableShape ?? 'ROUND'}
                 chairs={zone.tableChairs ?? 1}
                 footprint={footprint}
-                color={zoneColor(zone, zoneIndex)}
               />
             </div>
           );

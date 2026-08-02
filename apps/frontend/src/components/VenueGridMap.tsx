@@ -289,7 +289,7 @@ export function VenueGridMap({
                   <div
                     key={`${r}-${c}`}
                     style={{
-                      aspectRatio: '1', backgroundColor: `${color}33`,
+                      aspectRatio: '1', backgroundColor: '#ffffff',
                       borderWidth: 1, borderStyle: 'solid', borderColor: GRID_LINE,
                       minWidth: 4, minHeight: 4,
                     }}
@@ -307,7 +307,7 @@ export function VenueGridMap({
                   title={`${zone.name} · Стол ${table.number} · ${remaining}/${table.chairCount} своб. · ${formatPrice(zone.price, currency)}`}
                   style={{
                     aspectRatio: '1',
-                    backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? `${color}55` : `${color}33`,
+                    backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? '#d1fae5' : '#ffffff',
                     borderWidth: 1,
                     borderStyle: 'solid',
                     borderTopColor: sameTable(r - 1, c) ? 'transparent' : GRID_LINE,
@@ -400,8 +400,7 @@ export function VenueGridMap({
       )}
 
       {/* Table icons — one per table, positioned from its stored footprint */}
-      {tableFootprints.map(({ zone, table }) => {
-        const index = zoneById.get(zone.id)!.index;
+      {tableFootprints.map(({ table }) => {
         const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
         const isFull = table.available - inCartAtTable <= 0;
         const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
@@ -420,7 +419,6 @@ export function VenueGridMap({
               shape={table.shape}
               chairs={table.chairCount}
               footprint={footprint}
-              color={zoneColor(zone, index)}
               label={String(table.number)}
               muted={isFull}
             />
