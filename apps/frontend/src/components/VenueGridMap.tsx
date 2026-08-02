@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
 import { TableIcon, type Footprint } from './TableIcon';
-import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea } from './grid/gridGeometry';
+import { GRID_LINE, GRID_CELL_SIZE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea } from './grid/gridGeometry';
 import { zoneColor } from './grid/zoneColors';
 
 interface Props {
@@ -120,16 +120,19 @@ export function VenueGridMap({
   if (usedZones.length === 0) return null;
 
   const grid = (
-    <div className="relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none overflow-auto">
+    <div
+      className="relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none overflow-auto"
+      style={{ maxHeight: '65vh' }}
+    >
+      {/* Fixed-size cells give the canvas a fixed total footprint — this flex
+          wrapper centers it when that's smaller than the scroll container
+          (both axes), and just lets it overflow into the scrollbars above
+          when it's bigger, instead of inflating cell size to fill the gap. */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '100%', minHeight: '100%' }}>
       <div
         style={{
           display: 'grid',
-          // Capped at 65px so a small venue doesn't stretch into huge cells
-          // filling the fullscreen modal — centered when the grid is
-          // narrower than its container, scrolls (via overflow-auto above)
-          // when it's wider.
-          gridTemplateColumns: `repeat(${layout.cols}, minmax(28px, 65px))`,
-          justifyContent: 'center',
+          gridTemplateColumns: `repeat(${layout.cols}, ${GRID_CELL_SIZE}px)`,
         }}
       >
         {layout.cells.map((row, r) =>
@@ -204,7 +207,7 @@ export function VenueGridMap({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    fontSize: 'clamp(6px, 1.6cqw, 12px)',
+                    fontSize: 12,
                     fontWeight: 700,
                     lineHeight: 1,
                     color: isOccupied ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
@@ -301,13 +304,13 @@ export function VenueGridMap({
                 ...boxToGridArea(box),
                 color: '#ffffff',
                 textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                fontSize: 14,
                 lineHeight: 1.2,
               }}
             >
               <span>{zone.name}</span>
               {zone.available !== undefined && (
-                <span style={{ fontSize: 'clamp(7px, 1.8cqw, 12px)', fontWeight: 500 }}>
+                <span style={{ fontSize: 11, fontWeight: 500 }}>
                   {isEmpty ? 'мест нет' : `осталось: ${zone.available}`}
                 </span>
               )}
@@ -323,7 +326,7 @@ export function VenueGridMap({
             style={{
               ...boxToGridArea(box),
               color: '#ffffff',
-              fontSize: 'clamp(8px, 2.2cqw, 15px)',
+              fontSize: 14,
               lineHeight: 1.2,
             }}
           >
@@ -352,6 +355,7 @@ export function VenueGridMap({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

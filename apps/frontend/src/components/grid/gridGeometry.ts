@@ -4,6 +4,13 @@
 
 export const GRID_LINE = '#e5e7eb';
 
+// Fixed pixel size for each cell in a scrollable full-screen grid view (admin
+// expanded editor, buyer seat picker). A fixed size means the canvas's total
+// footprint (cols/rows * this) never stretches to fill its container — the
+// container just scrolls (both axes) past it when it's bigger, and centers
+// it when it's smaller, instead of inflating cell size to fill the gap.
+export const GRID_CELL_SIZE = 40;
+
 export interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
 
 // Cells painted with the same zone/stage id should read as one filled area,

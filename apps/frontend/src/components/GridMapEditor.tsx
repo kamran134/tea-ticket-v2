@@ -5,7 +5,7 @@ import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
-import { GRID_LINE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
+import { GRID_LINE, GRID_CELL_SIZE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
 
 type Tool = 'block' | 'erase' | string;
 
@@ -944,19 +944,26 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         className={`relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none ${
           expanded ? 'overflow-auto' : 'overflow-hidden'
         }`}
+        style={expanded ? { maxHeight: '65vh' } : undefined}
         onMouseLeave={() => { isDrawing.current = false; }}
       >
+        {/* Fullscreen mode uses a fixed cell size — the canvas's total
+            footprint never stretches to fill the container. This flex
+            wrapper centers it (both axes) when it's smaller than the scroll
+            container, and just lets it overflow into the scrollbars above
+            when it's bigger; the small inline preview keeps shrinking cells
+            to fit instead (no scrolling there). */}
+        <div
+          style={expanded
+            ? { display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '100%', minHeight: '100%' }
+            : undefined}
+        >
         <div
           style={{
             display: 'grid',
-            // Fullscreen mode caps cell size at 65px — otherwise a small
-            // venue stretches into huge cells filling the whole screen —
-            // and centers the grid when it's narrower than the container;
-            // the small inline preview keeps shrinking cells to fit instead.
             gridTemplateColumns: expanded
-              ? `repeat(${cols}, minmax(28px, 65px))`
+              ? `repeat(${cols}, ${GRID_CELL_SIZE}px)`
               : `repeat(${cols}, minmax(0, 1fr))`,
-            justifyContent: expanded ? 'center' : undefined,
           }}
         >
           {cells.map((row, r) =>
@@ -1009,7 +1016,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   ...boxToGridArea(box),
                   color: '#ffffff',
                   textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                  fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                  fontSize: 14,
                   lineHeight: 1.2,
                 }}
               >
@@ -1026,7 +1033,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               style={{
                 ...boxToGridArea(box),
                 color: '#ffffff',
-                fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                fontSize: 14,
                 lineHeight: 1.2,
               }}
             >
@@ -1053,6 +1060,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               </div>
             );
           })}
+        </div>
         </div>
       </div>
 
