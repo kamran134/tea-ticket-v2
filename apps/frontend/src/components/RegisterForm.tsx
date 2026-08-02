@@ -19,6 +19,7 @@ interface CartLine {
   seatLabel?: string;
   tableId?: string;
   tableNumber?: number;
+  tableAvailable?: number;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -56,7 +57,11 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
 
   const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
-  const [quantityModalTableId, setQuantityModalTableId] = useState<string | null>(null);
+  // Holds the zone+table directly rather than just an id to re-look-up —
+  // grid-placed tables aren't in this component's own tablesByZone (that's
+  // fetched once by VenueGridMap itself, see P3 in the audit), so looking up
+  // by id here would silently fail to find them (this was a real regression).
+  const [quantityModalTable, setQuantityModalTable] = useState<{ zone: Zone; table: ZoneTable } | null>(null);
   const [gridMapOpen, setGridMapOpen] = useState(false);
 
   useEffect(() => {
@@ -145,10 +150,10 @@ export function RegisterForm({ slug }: Props) {
     setCart(prev => {
       const existing = prev.find(l => l.key === key);
       if ((existing?.quantity ?? 0) >= table.available) return prev;
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l));
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity: l.quantity + 1, tableAvailable: table.available } : l));
       return [...prev, {
         key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        tableId: table.id, tableNumber: table.number, quantity: 1,
+        tableId: table.id, tableNumber: table.number, tableAvailable: table.available, quantity: 1,
       }];
     });
   };
@@ -158,10 +163,10 @@ export function RegisterForm({ slug }: Props) {
     setCart(prev => {
       if (quantity <= 0) return prev.filter(l => l.key !== key);
       const existing = prev.find(l => l.key === key);
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
+      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity, tableAvailable: table.available } : l));
       return [...prev, {
         key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        tableId: table.id, tableNumber: table.number, quantity,
+        tableId: table.id, tableNumber: table.number, tableAvailable: table.available, quantity,
       }];
     });
   };
@@ -241,15 +246,6 @@ export function RegisterForm({ slug }: Props) {
 
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
-  const quantityModalTableInfo = (() => {
-    if (!quantityModalTableId) return undefined;
-    for (const zone of zones) {
-      if (zone.type !== 'TABLE') continue;
-      const table = (tablesByZone[zone.id] ?? []).find(t => t.id === quantityModalTableId);
-      if (table) return { zone, table };
-    }
-    return undefined;
-  })();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
@@ -301,7 +297,7 @@ export function RegisterForm({ slug }: Props) {
                 cartQuantityByTable={cartQuantityByTable}
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                 onSeatToggle={toggleSeatInCart}
-                onTableOpen={(_zone, table) => setQuantityModalTableId(table.id)}
+                onTableOpen={(zone, table) => setQuantityModalTable({ zone, table })}
                 onClose={() => setGridMapOpen(false)}
               />
             )}
@@ -401,7 +397,7 @@ export function RegisterForm({ slug }: Props) {
                 <div className="space-y-1.5">
                   {cart.map(line => {
                     const max = line.tableId
-                      ? (tablesByZone[line.zoneId]?.find(t => t.id === line.tableId)?.available ?? Infinity)
+                      ? (line.tableAvailable ?? Infinity)
                       : (zoneById.get(line.zoneId)?.available ?? Infinity);
                     return (
                       <div key={line.key} className="flex items-center justify-between text-sm gap-2">
@@ -559,15 +555,15 @@ export function RegisterForm({ slug }: Props) {
         />
       )}
 
-      {quantityModalTableInfo && (
+      {quantityModalTable && (
         <QuantityModal
-          title={`Стол ${quantityModalTableInfo.table.number}`}
-          price={quantityModalTableInfo.zone.price}
+          title={`Стол ${quantityModalTable.table.number}`}
+          price={quantityModalTable.zone.price}
           currency={currency}
-          quantity={cartQuantityByTable[quantityModalTableInfo.table.id] ?? 0}
-          max={quantityModalTableInfo.table.available}
-          onChange={qty => setTableQuantity(quantityModalTableInfo.zone, quantityModalTableInfo.table, qty)}
-          onClose={() => setQuantityModalTableId(null)}
+          quantity={cartQuantityByTable[quantityModalTable.table.id] ?? 0}
+          max={quantityModalTable.table.available}
+          onChange={qty => setTableQuantity(quantityModalTable.zone, quantityModalTable.table, qty)}
+          onClose={() => setQuantityModalTable(null)}
         />
       )}
     </div>

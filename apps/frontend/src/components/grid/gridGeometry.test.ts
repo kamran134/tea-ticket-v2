@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { zoneBoundingBoxes, sameZoneNeighbor, connectedComponents, isSolidRectangle } from './gridGeometry';
+import { zoneBoundingBoxes, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, footprintToGridArea } from './gridGeometry';
 
 const Z = 'zone1';
 const E = 'empty';
@@ -43,5 +43,21 @@ describe('connectedComponents + isSolidRectangle', () => {
     ];
     const [component] = connectedComponents(cells, new Set([Z]));
     expect(isSolidRectangle(component)).toBe(false);
+  });
+});
+
+describe('boxToGridArea / footprintToGridArea', () => {
+  it('converts a bounding box to 1-indexed CSS grid line/span syntax', () => {
+    expect(boxToGridArea({ minRow: 1, maxRow: 2, minCol: 3, maxCol: 5 })).toEqual({
+      gridColumn: '4 / span 3',
+      gridRow: '2 / span 2',
+    });
+  });
+
+  it('converts a stored table footprint the same way', () => {
+    expect(footprintToGridArea(1, 3, 2, 3)).toEqual({
+      gridColumn: '4 / span 3',
+      gridRow: '2 / span 2',
+    });
   });
 });

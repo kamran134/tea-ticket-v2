@@ -5,7 +5,7 @@ import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
-import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, connectedComponents, isSolidRectangle } from './grid/gridGeometry';
+import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
 
 type Tool = 'block' | 'erase' | string;
 
@@ -943,7 +943,14 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: `repeat(${cols}, minmax(${expanded ? '28px' : '0'}, 1fr))`,
+            // Fullscreen mode caps cell size at 65px — otherwise a small
+            // venue stretches into huge cells filling the whole screen —
+            // and centers the grid when it's narrower than the container;
+            // the small inline preview keeps shrinking cells to fit instead.
+            gridTemplateColumns: expanded
+              ? `repeat(${cols}, minmax(28px, 65px))`
+              : `repeat(${cols}, minmax(0, 1fr))`,
+            justifyContent: expanded ? 'center' : undefined,
           }}
         >
           {cells.map((row, r) =>
@@ -980,74 +987,65 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               );
             }),
           )}
-        </div>
 
-        {/* Zone name overlay for GENERAL areas — sits on top, clicks pass through to cells */}
-        {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
-          const zone = zones.find(z => z.id === zoneId);
-          if (!zone) return null;
-          return (
+          {/* Zone name overlay for GENERAL areas — a grid item placed over
+              the same cells via gridColumn/gridRow (not percentages — see
+              boxToGridArea), clicks pass through to the cells underneath */}
+          {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+            const zone = zones.find(z => z.id === zoneId);
+            if (!zone) return null;
+            return (
+              <div
+                key={zoneId}
+                className="flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+                style={{
+                  ...boxToGridArea(box),
+                  color: '#ffffff',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                  fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {zone.name}
+              </div>
+            );
+          })}
+
+          {/* Stage label overlay — decorative, not a real zone */}
+          {stageBox && (
             <div
-              key={zoneId}
-              className="absolute flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+              className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
               style={{
-                left: `${(box.minCol / cols) * 100}%`,
-                top: `${(box.minRow / rows) * 100}%`,
-                width: `${((box.maxCol - box.minCol + 1) / cols) * 100}%`,
-                height: `${((box.maxRow - box.minRow + 1) / rows) * 100}%`,
+                ...boxToGridArea(stageBox),
                 color: '#ffffff',
-                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
                 fontSize: 'clamp(8px, 2.2cqw, 15px)',
                 lineHeight: 1.2,
               }}
             >
-              {zone.name}
+              Сцена
             </div>
-          );
-        })}
+          )}
 
-        {/* Stage label overlay — decorative, not a real zone */}
-        {stageBox && (
-          <div
-            className="absolute flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
-            style={{
-              left: `${(stageBox.minCol / cols) * 100}%`,
-              top: `${(stageBox.minRow / rows) * 100}%`,
-              width: `${((stageBox.maxCol - stageBox.minCol + 1) / cols) * 100}%`,
-              height: `${((stageBox.maxRow - stageBox.minRow + 1) / rows) * 100}%`,
-              color: '#ffffff',
-              fontSize: 'clamp(8px, 2.2cqw, 15px)',
-              lineHeight: 1.2,
-            }}
-          >
-            Сцена
-          </div>
-        )}
-
-        {/* Table icons — one per connected footprint, not per cell */}
-        {tableBoxes.map(({ zoneId, box }, i) => {
-          const zone = zones.find(z => z.id === zoneId);
-          if (!zone) return null;
-          const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
-          return (
-            <div
-              key={`${zoneId}-${i}`}
-              className="absolute pointer-events-none p-0.5"
-              style={{
-                left: `${(box.minCol / cols) * 100}%`,
-                top: `${(box.minRow / rows) * 100}%`,
-                width: `${(footprint.cols / cols) * 100}%`,
-                height: `${(footprint.rows / rows) * 100}%`,
-              }}
-            >
-              <TableIcon
-                shape={zone.tableShape ?? 'ROUND'}
-                chairs={zone.tableChairs ?? 1}
-                footprint={footprint}
-              />
-            </div>
-          );
-        })}
+          {/* Table icons — one per connected footprint, not per cell */}
+          {tableBoxes.map(({ zoneId, box }, i) => {
+            const zone = zones.find(z => z.id === zoneId);
+            if (!zone) return null;
+            const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
+            return (
+              <div
+                key={`${zoneId}-${i}`}
+                className="pointer-events-none p-0.5"
+                style={boxToGridArea(box)}
+              >
+                <TableIcon
+                  shape={zone.tableShape ?? 'ROUND'}
+                  chairs={zone.tableChairs ?? 1}
+                  footprint={footprint}
+                />
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Legend when locked */}

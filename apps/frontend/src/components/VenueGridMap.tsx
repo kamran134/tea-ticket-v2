@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
 import { TableIcon, type Footprint } from './TableIcon';
-import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, type ZoneBox } from './grid/gridGeometry';
+import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, boxToGridArea, footprintToGridArea, type ZoneBox } from './grid/gridGeometry';
 import { zoneColor } from './grid/zoneColors';
 
 interface Props {
@@ -120,7 +120,12 @@ export function VenueGridMap({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${layout.cols}, minmax(28px, 1fr))`,
+          // Capped at 65px so a small venue doesn't stretch into huge cells
+          // filling the fullscreen modal — centered when the grid is
+          // narrower than its container, scrolls (via overflow-auto above)
+          // when it's wider.
+          gridTemplateColumns: `repeat(${layout.cols}, minmax(28px, 65px))`,
+          justifyContent: 'center',
         }}
       >
         {layout.cells.map((row, r) =>
@@ -274,83 +279,74 @@ export function VenueGridMap({
             );
           }),
         )}
-      </div>
 
-      {/* Zone name overlay for GENERAL areas — sits on top, clicks pass through to cells */}
-      {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
-        const zone = zones.find(z => z.id === zoneId);
-        if (!zone) return null;
-        const inCart = cartQuantityByZone[zone.id] ?? 0;
-        const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
-        return (
+        {/* Zone name overlay for GENERAL areas — a grid item placed over the
+            same cells via gridColumn/gridRow (not percentages — see
+            boxToGridArea), clicks pass through to the cells underneath */}
+        {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          const inCart = cartQuantityByZone[zone.id] ?? 0;
+          const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
+          return (
+            <div
+              key={zoneId}
+              className="flex flex-col items-center justify-center text-center font-semibold pointer-events-none px-1"
+              style={{
+                ...boxToGridArea(box),
+                color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                fontSize: 'clamp(8px, 2.2cqw, 15px)',
+                lineHeight: 1.2,
+              }}
+            >
+              <span>{zone.name}</span>
+              {zone.available !== undefined && (
+                <span style={{ fontSize: 'clamp(7px, 1.8cqw, 12px)', fontWeight: 500 }}>
+                  {isEmpty ? 'мест нет' : `осталось: ${zone.available}`}
+                </span>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Stage label overlay — decorative, not sellable */}
+        {stageBox && (
           <div
-            key={zoneId}
-            className="absolute flex flex-col items-center justify-center text-center font-semibold pointer-events-none px-1"
+            className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
             style={{
-              left: `${(box.minCol / layout.cols) * 100}%`,
-              top: `${(box.minRow / layout.rows) * 100}%`,
-              width: `${((box.maxCol - box.minCol + 1) / layout.cols) * 100}%`,
-              height: `${((box.maxRow - box.minRow + 1) / layout.rows) * 100}%`,
+              ...boxToGridArea(stageBox),
               color: '#ffffff',
-              textShadow: '0 1px 2px rgba(0,0,0,0.6)',
               fontSize: 'clamp(8px, 2.2cqw, 15px)',
               lineHeight: 1.2,
             }}
           >
-            <span>{zone.name}</span>
-            {zone.available !== undefined && (
-              <span style={{ fontSize: 'clamp(7px, 1.8cqw, 12px)', fontWeight: 500 }}>
-                {isEmpty ? 'мест нет' : `осталось: ${zone.available}`}
-              </span>
-            )}
+            Сцена
           </div>
-        );
-      })}
+        )}
 
-      {/* Stage label overlay — decorative, not sellable */}
-      {stageBox && (
-        <div
-          className="absolute flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
-          style={{
-            left: `${(stageBox.minCol / layout.cols) * 100}%`,
-            top: `${(stageBox.minRow / layout.rows) * 100}%`,
-            width: `${((stageBox.maxCol - stageBox.minCol + 1) / layout.cols) * 100}%`,
-            height: `${((stageBox.maxRow - stageBox.minRow + 1) / layout.rows) * 100}%`,
-            color: '#ffffff',
-            fontSize: 'clamp(8px, 2.2cqw, 15px)',
-            lineHeight: 1.2,
-          }}
-        >
-          Сцена
-        </div>
-      )}
-
-      {/* Table icons — one per table, positioned from its stored footprint */}
-      {tableFootprints.map(({ table }) => {
-        const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
-        const isFull = table.available - inCartAtTable <= 0;
-        const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
-        return (
-          <div
-            key={table.id}
-            className="absolute pointer-events-none p-0.5"
-            style={{
-              left: `${(table.col! / layout.cols) * 100}%`,
-              top: `${(table.row! / layout.rows) * 100}%`,
-              width: `${(footprint.cols / layout.cols) * 100}%`,
-              height: `${(footprint.rows / layout.rows) * 100}%`,
-            }}
-          >
-            <TableIcon
-              shape={table.shape}
-              chairs={table.chairCount}
-              footprint={footprint}
-              label={String(table.number)}
-              muted={isFull}
-            />
-          </div>
-        );
-      })}
+        {/* Table icons — one per table, placed from its stored footprint */}
+        {tableFootprints.map(({ table }) => {
+          const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
+          const isFull = table.available - inCartAtTable <= 0;
+          const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
+          return (
+            <div
+              key={table.id}
+              className="pointer-events-none p-0.5"
+              style={footprintToGridArea(table.row!, table.col!, table.rows!, table.cols!)}
+            >
+              <TableIcon
+                shape={table.shape}
+                chairs={table.chairCount}
+                footprint={footprint}
+                label={String(table.number)}
+                muted={isFull}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 

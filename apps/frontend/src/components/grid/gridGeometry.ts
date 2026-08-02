@@ -71,6 +71,28 @@ export function connectedComponents(cells: string[][], matches: Set<string>): Co
   return result;
 }
 
+// Places an overlay (zone name, stage label, table icon) via native CSS Grid
+// placement instead of percentage left/top/width/height. Percentages are
+// computed against the containing block's own box, which stops matching the
+// grid's actual rendered size the moment the grid overflows its container
+// (e.g. on a narrow mobile screen with many columns, where the container
+// scrolls horizontally) — grid-column/grid-row track placement has no such
+// failure mode: it always lines up with the same cells the grid itself uses,
+// regardless of actual pixel size, min/max caps, zoom, or overflow/scroll.
+export function boxToGridArea(box: ZoneBox): { gridColumn: string; gridRow: string } {
+  return {
+    gridColumn: `${box.minCol + 1} / span ${box.maxCol - box.minCol + 1}`,
+    gridRow: `${box.minRow + 1} / span ${box.maxRow - box.minRow + 1}`,
+  };
+}
+
+export function footprintToGridArea(row: number, col: number, rows: number, cols: number): { gridColumn: string; gridRow: string } {
+  return {
+    gridColumn: `${col + 1} / span ${cols}`,
+    gridRow: `${row + 1} / span ${rows}`,
+  };
+}
+
 // Mirrors the backend's findTableBlobs solidity check (venues.ts) — a table's
 // painted footprint must be a solid rectangle, since row/col/rows/cols can
 // only represent that. The current editor UI only ever creates tables via a

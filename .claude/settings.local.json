@@ -122,7 +122,11 @@
       "Bash(mkdir -p C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_backend C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_frontend)",
       "Bash(cp /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/backend/package.json /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/backend/package-lock.json C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_backend/)",
       "Bash(cp /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/frontend/package.json /c/Users/kazim/Work/hobby/tea-ticket-v2/apps/frontend/package-lock.json C:/Users/kazim/AppData/Local/Temp/claude/C--Users-kazim-Work-hobby-tea-ticket-v2/2930de71-4137-40da-bb83-29d0c624c112/scratchpad/docker_sim_frontend/)",
-      "Bash(echo \"check-ignore exit=$?\")"
+      "Bash(echo \"check-ignore exit=$?\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('react'\\)\\)\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('@vitejs/plugin-react'\\)\\)\")",
+      "Bash(node -e \"console.log\\(require.resolve\\('@prisma/client'\\)\\)\")",
+      "Bash(echo \"backend tsc exit=$?\")"
     ]
   }
 }
