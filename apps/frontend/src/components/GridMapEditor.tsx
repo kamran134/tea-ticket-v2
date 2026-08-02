@@ -5,7 +5,7 @@ import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
-import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
+import { GRID_LINE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
 
 type Tool = 'block' | 'erase' | string;
 
@@ -405,12 +405,18 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
   };
 
-  const generalZoneBoxes = useMemo(() => {
+  // A single zone (or the stage) can be painted in more than one disconnected
+  // area — a plain min/max bounding box would span the whole gap between
+  // them, and with grid-column/grid-row placement that forces CSS to
+  // generate a pile of extra empty implicit rows to fit it (this is exactly
+  // what broke the buyer-facing grid for a real venue). connectedComponents
+  // gives one correctly-sized box per physically separate area, same as tables.
+  const generalZoneComponents = useMemo(() => {
     const generalIds = new Set(zones.filter(z => z.type === 'GENERAL').map(z => z.id));
-    return zoneBoundingBoxes(cells, generalIds);
+    return connectedComponents(cells, generalIds);
   }, [cells, zones]);
 
-  const stageBox = useMemo(() => zoneBoundingBoxes(cells, new Set(['stage'])).get('stage'), [cells]);
+  const stageComponents = useMemo(() => connectedComponents(cells, new Set(['stage'])), [cells]);
 
   // Each table now spans multiple cells, so "how many tables are painted"
   // requires grouping same-zone-id cells into connected components — one
@@ -988,15 +994,16 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             }),
           )}
 
-          {/* Zone name overlay for GENERAL areas — a grid item placed over
-              the same cells via gridColumn/gridRow (not percentages — see
-              boxToGridArea), clicks pass through to the cells underneath */}
-          {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+          {/* Zone name overlay for GENERAL areas — one per physically separate
+              painted region (see generalZoneComponents), a grid item placed
+              over the same cells via gridColumn/gridRow, clicks pass through
+              to the cells underneath */}
+          {generalZoneComponents.map(({ zoneId, box }, i) => {
             const zone = zones.find(z => z.id === zoneId);
             if (!zone) return null;
             return (
               <div
-                key={zoneId}
+                key={`${zoneId}-${i}`}
                 className="flex items-center justify-center text-center font-semibold pointer-events-none px-1"
                 style={{
                   ...boxToGridArea(box),
@@ -1011,12 +1018,13 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             );
           })}
 
-          {/* Stage label overlay — decorative, not a real zone */}
-          {stageBox && (
+          {/* Stage label overlay — decorative, not a real zone, one per separate area */}
+          {stageComponents.map(({ box }, i) => (
             <div
+              key={i}
               className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
               style={{
-                ...boxToGridArea(stageBox),
+                ...boxToGridArea(box),
                 color: '#ffffff',
                 fontSize: 'clamp(8px, 2.2cqw, 15px)',
                 lineHeight: 1.2,
@@ -1024,7 +1032,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             >
               Сцена
             </div>
-          )}
+          ))}
 
           {/* Table icons — one per connected footprint, not per cell */}
           {tableBoxes.map(({ zoneId, box }, i) => {

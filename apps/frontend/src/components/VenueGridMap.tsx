@@ -3,7 +3,7 @@ import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
 import { TableIcon, type Footprint } from './TableIcon';
-import { GRID_LINE, sameZoneNeighbor, zoneBoundingBoxes, boxToGridArea, footprintToGridArea, type ZoneBox } from './grid/gridGeometry';
+import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea } from './grid/gridGeometry';
 import { zoneColor } from './grid/zoneColors';
 
 interface Props {
@@ -97,16 +97,20 @@ export function VenueGridMap({
     return list;
   }, [zones, tablesByZone]);
 
-  const generalZoneBoxes = useMemo(() => {
-    if (!layout) return new Map<string, ZoneBox>();
-    const generalIds = new Set(
-      zones.filter(z => z.type === 'GENERAL' && layout.cells.some(row => row.includes(z.id))).map(z => z.id),
-    );
-    return zoneBoundingBoxes(layout.cells, generalIds);
+  // A single zone (or the stage) can be painted in more than one disconnected
+  // area of a large venue — a plain min/max bounding box would then span the
+  // whole gap between them, stretching the overlay across empty space (and,
+  // with grid-column/grid-row placement, forcing CSS to generate a pile of
+  // extra empty implicit rows to fit it). connectedComponents gives one
+  // correctly-sized box per physically separate area instead, same as tables.
+  const generalZoneComponents = useMemo(() => {
+    if (!layout) return [];
+    const generalIds = new Set(zones.filter(z => z.type === 'GENERAL').map(z => z.id));
+    return connectedComponents(layout.cells, generalIds);
   }, [layout, zones]);
 
-  const stageBox = useMemo(
-    () => (layout ? zoneBoundingBoxes(layout.cells, new Set(['stage'])).get('stage') : undefined),
+  const stageComponents = useMemo(
+    () => (layout ? connectedComponents(layout.cells, new Set(['stage'])) : []),
     [layout],
   );
 
@@ -280,17 +284,18 @@ export function VenueGridMap({
           }),
         )}
 
-        {/* Zone name overlay for GENERAL areas — a grid item placed over the
-            same cells via gridColumn/gridRow (not percentages — see
-            boxToGridArea), clicks pass through to the cells underneath */}
-        {[...generalZoneBoxes.entries()].map(([zoneId, box]) => {
+        {/* Zone name overlay for GENERAL areas — one per physically separate
+            painted region (see generalZoneComponents), a grid item placed
+            over the same cells via gridColumn/gridRow, clicks pass through
+            to the cells underneath */}
+        {generalZoneComponents.map(({ zoneId, box }, i) => {
           const zone = zones.find(z => z.id === zoneId);
           if (!zone) return null;
           const inCart = cartQuantityByZone[zone.id] ?? 0;
           const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
           return (
             <div
-              key={zoneId}
+              key={`${zoneId}-${i}`}
               className="flex flex-col items-center justify-center text-center font-semibold pointer-events-none px-1"
               style={{
                 ...boxToGridArea(box),
@@ -310,12 +315,13 @@ export function VenueGridMap({
           );
         })}
 
-        {/* Stage label overlay — decorative, not sellable */}
-        {stageBox && (
+        {/* Stage label overlay — decorative, not sellable, one per separate area */}
+        {stageComponents.map(({ box }, i) => (
           <div
+            key={i}
             className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
             style={{
-              ...boxToGridArea(stageBox),
+              ...boxToGridArea(box),
               color: '#ffffff',
               fontSize: 'clamp(8px, 2.2cqw, 15px)',
               lineHeight: 1.2,
@@ -323,7 +329,7 @@ export function VenueGridMap({
           >
             Сцена
           </div>
-        )}
+        ))}
 
         {/* Table icons — one per table, placed from its stored footprint */}
         {tableFootprints.map(({ table }) => {
