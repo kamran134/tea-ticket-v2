@@ -1,4 +1,4 @@
-import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem } from '../types';
+import type { Ticket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, ZoneType, ZoneLayoutData, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem, CreatePaymentResult, PaymentStatusResult } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -129,6 +129,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  async createPayment(ticketId: string): Promise<CreatePaymentResult> {
+    return request('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId }),
+    });
+  },
+
+  async getPaymentStatus(paymentId: string, returnToken?: string): Promise<PaymentStatusResult> {
+    const params = returnToken ? `?token=${encodeURIComponent(returnToken)}` : '';
+    return request(`/api/payments/${encodeURIComponent(paymentId)}/status${params}`);
   },
 
   async uploadReceipt(id: string, file: File): Promise<Ticket> {

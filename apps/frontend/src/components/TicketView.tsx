@@ -1,9 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
 import { toast } from '../services/toast';
 import type { Ticket, TicketStatus, Currency } from '../types';
 import { formatPrice } from '../types';
+
+const TERMINAL_PAYMENT_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'REQUIRES_REVIEW']);
+
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return '0:00';
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${min}:${sec.toString().padStart(2, '0')}`;
+}
+
+async function reloadTicket(id: string): Promise<{
+  ticket: Ticket;
+  members: Ticket[] | null;
+  currency: Currency;
+}> {
+  return api.getTicket(id);
+}
 
 const STATUS_LABELS: Record<TicketStatus, string> = {
   BOOKED: 'Бронь оформлена',
@@ -26,31 +44,120 @@ export function TicketView() {
   const [members, setMembers] = useState<Ticket[]>([]);
   const [currency, setCurrency] = useState<Currency>('₼');
   const [copied, setCopied] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [pollingPayment, setPollingPayment] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const ticketUrl = (() => {
-    const id = new URLSearchParams(window.location.search).get('id');
-    return `${window.location.origin}/ticket?id=${id}`;
-  })();
+  const params = new URLSearchParams(window.location.search);
+  const ticketId = params.get('id') ?? params.get('checkoutId');
+
+  const ticketUrl = `${window.location.origin}/ticket?id=${ticketId ?? ''}`;
 
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
+  const applyTicketData = useCallback((data: { ticket: Ticket; members: Ticket[] | null; currency: Currency }) => {
+    setTicket(data.ticket);
+    setCurrency(data.currency);
+    if (data.members) setMembers(data.members);
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    setPollingPayment(false);
+  }, []);
+
+  const startPaymentPolling = useCallback((paymentId: string, returnToken: string, id: string) => {
+    stopPolling();
+    setPollingPayment(true);
+    setPaymentMessage('Проверяем статус оплаты…');
+
+    const poll = async () => {
+      try {
+        const status = await api.getPaymentStatus(paymentId, returnToken);
+        if (status.ticketsConfirmed || status.status === 'SUCCEEDED') {
+          stopPolling();
+          setPaymentMessage(null);
+          const fresh = await reloadTicket(id);
+          applyTicketData(fresh);
+          toast.success('Оплата прошла успешно!');
+          window.history.replaceState(null, '', `/ticket?id=${id}`);
+          return;
+        }
+        if (TERMINAL_PAYMENT_STATUSES.has(status.status) && status.status !== 'SUCCEEDED') {
+          stopPolling();
+          if (status.status === 'REQUIRES_REVIEW') {
+            setPaymentMessage('Оплата получена, но требует проверки организатором. Свяжитесь с поддержкой.');
+          } else {
+            setPaymentMessage('Оплата не прошла. Попробуйте ещё раз.');
+          }
+          window.history.replaceState(null, '', `/ticket?id=${id}`);
+        }
+      } catch {
+        // keep polling until timeout
+      }
+    };
+
+    void poll();
+    pollRef.current = setInterval(() => { void poll(); }, 2000);
+    setTimeout(() => stopPolling(), 120_000);
+  }, [applyTicketData, stopPolling]);
+
   useEffect(() => {
+    if (!ticketId) return;
+
+    reloadTicket(ticketId).then(applyTicketData);
+
     const params = new URLSearchParams(window.location.search);
-    const id = params.get('id');
-    if (!id) return;
-    api.getTicket(id).then(({ ticket, members, currency }) => {
-      setTicket(ticket);
-      setCurrency(currency);
-      if (members) setMembers(members);
-    });
+    const paymentId = params.get('paymentId');
+    const returnToken = params.get('returnToken');
+
+    if (paymentId && returnToken) {
+      startPaymentPolling(paymentId, returnToken, ticketId);
+    }
 
     if (params.get('new') === '1') {
-      window.history.replaceState(null, '', `/ticket?id=${id}`);
-      navigator.clipboard.writeText(`${window.location.origin}/ticket?id=${id}`)
+      window.history.replaceState(null, '', `/ticket?id=${ticketId}`);
+      navigator.clipboard.writeText(`${window.location.origin}/ticket?id=${ticketId}`)
         .then(() => toast.success('Ссылка скопирована — не потеряйте её!'))
         .catch(() => {});
     }
-  }, []);
+
+    return () => stopPolling();
+  }, [ticketId, applyTicketData, startPaymentPolling, stopPolling]);
+
+  useEffect(() => {
+    if (!ticket?.expiresAt || ticket.status !== 'BOOKED') {
+      setHoldCountdown(null);
+      return;
+    }
+
+    const update = () => {
+      const remaining = new Date(ticket.expiresAt!).getTime() - Date.now();
+      setHoldCountdown(formatCountdown(remaining));
+    };
+
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [ticket?.expiresAt, ticket?.status]);
+
+  const handlePay = async () => {
+    if (!ticket) return;
+    setPaying(true);
+    setPaymentMessage(null);
+    try {
+      const payment = await api.createPayment(ticket.id);
+      window.location.href = payment.redirectUrl;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Не удалось начать оплату');
+      setPaying(false);
+    }
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(ticketUrl).then(() => {
@@ -64,9 +171,13 @@ export function TicketView() {
   };
 
   if (!ticket) {
+    const params = new URLSearchParams(window.location.search);
+    const hasReturnParams = params.get('paymentId') && params.get('returnToken');
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
-        Загрузка...
+        {hasReturnParams && !params.get('id') && !params.get('checkoutId')
+          ? 'Не удалось определить билет. Откройте сохранённую ссылку на билет.'
+          : 'Загрузка...'}
       </div>
     );
   }
@@ -145,14 +256,33 @@ export function TicketView() {
           </div>
         )}
 
-        {/* BOOKED: payment stub — online card payment isn't wired up yet */}
+        {/* BOOKED: pay before hold expires */}
         {ticket.status === 'BOOKED' && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center space-y-2">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center space-y-4">
             <div className="text-4xl mb-1">🕐</div>
             <h2 className="font-semibold text-yellow-900">Бронь оформлена</h2>
-            <p className="text-sm text-yellow-800">
-              Оплата картой скоро будет доступна прямо здесь. Пока с вами свяжется организатор для оплаты.
-            </p>
+            {holdCountdown && (
+              <p className="text-sm text-yellow-800">
+                Оплатите в течение <span className="font-semibold tabular-nums">{holdCountdown}</span>
+              </p>
+            )}
+            {pollingPayment ? (
+              <p className="text-sm text-yellow-800 animate-pulse">{paymentMessage}</p>
+            ) : paymentMessage ? (
+              <p className="text-sm text-red-700">{paymentMessage}</p>
+            ) : (
+              <p className="text-sm text-yellow-800">
+                Нажмите «Оплатить», чтобы перейти на защищённую страницу банка.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => { void handlePay(); }}
+              disabled={paying || pollingPayment}
+              className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              {paying ? 'Переход к оплате…' : 'Оплатить'}
+            </button>
           </div>
         )}
 

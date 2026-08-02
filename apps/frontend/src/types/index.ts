@@ -128,9 +128,36 @@ export interface Ticket {
   checkedIn: boolean;
   createdAt: string;
   bookedAt: string;
+  expiresAt: string | null;
   groupId: string | null;
   seatId: string | null;
   tableId: string | null;
+}
+
+export interface CreatePaymentResult {
+  paymentId: string;
+  redirectUrl: string;
+  status: string;
+  amount: string;
+  expiresAt: string | null;
+  returnToken: string;
+}
+
+export interface PaymentStatusResult {
+  paymentId: string;
+  status: string;
+  amount: string;
+  paidAt: string | null;
+  failureCode: string | null;
+  ticketStatus: TicketStatus | null;
+  ticketsConfirmed: boolean;
+}
+
+export interface RegisterResult {
+  id: string;
+  groupId: string | null;
+  totalPrice: number;
+  expiresAt?: string;
 }
 
 export interface CartItem {
@@ -138,12 +165,6 @@ export interface CartItem {
   seatIds?: string[];
   tableId?: string;
   quantity?: number;
-}
-
-export interface RegisterResult {
-  id: string;
-  groupId: string | null;
-  totalPrice: number;
 }
 
 export interface ApiResponse<T> {
