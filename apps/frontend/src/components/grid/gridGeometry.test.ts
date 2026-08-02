@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { zoneBoundingBoxes, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, footprintToGridArea } from './gridGeometry';
+import { zoneBoundingBoxes, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, footprintToGridArea, cellToGridArea } from './gridGeometry';
 
 const Z = 'zone1';
 const E = 'empty';
@@ -58,6 +58,23 @@ describe('boxToGridArea / footprintToGridArea', () => {
     expect(footprintToGridArea(1, 3, 2, 3)).toEqual({
       gridColumn: '4 / span 3',
       gridRow: '2 / span 2',
+    });
+  });
+});
+
+describe('cellToGridArea', () => {
+  it('places a cell on its own 1-indexed grid line', () => {
+    expect(cellToGridArea(0, 0)).toEqual({ gridColumn: 1, gridRow: 1 });
+    expect(cellToGridArea(2, 4)).toEqual({ gridColumn: 5, gridRow: 3 });
+  });
+
+  // Cells must be placed explicitly rather than auto-placed: an overlay's
+  // explicit placement would otherwise make every following auto-placed cell
+  // skip past it, scrambling the grid and misdirecting clicks.
+  it('agrees with the overlay helpers on the same cell', () => {
+    expect(cellToGridArea(3, 6)).toEqual({
+      gridColumn: Number(boxToGridArea({ minRow: 3, maxRow: 3, minCol: 6, maxCol: 6 }).gridColumn.split(' / ')[0]),
+      gridRow: Number(boxToGridArea({ minRow: 3, maxRow: 3, minCol: 6, maxCol: 6 }).gridRow.split(' / ')[0]),
     });
   });
 });

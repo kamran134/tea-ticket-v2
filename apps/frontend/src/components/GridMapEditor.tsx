@@ -5,7 +5,8 @@ import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
-import { GRID_LINE, GRID_CELL_SIZE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea } from './grid/gridGeometry';
+import { GRID_LINE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, cellToGridArea } from './grid/gridGeometry';
+import { GridCanvas } from './grid/GridCanvas';
 
 type Tool = 'block' | 'erase' | string;
 
@@ -939,130 +940,111 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         </div>
       )}
 
-      {/* Grid canvas */}
-      <div
-        className={`relative w-full rounded-xl border border-gray-200 bg-gray-100 select-none ${
-          expanded ? 'overflow-auto' : 'overflow-hidden'
-        }`}
-        style={expanded ? { maxHeight: '65vh' } : undefined}
+      {/* Grid canvas — same fixed-size, scrollable canvas the buyer sees, so
+          the admin is always editing exactly the picture that gets sold */}
+      <GridCanvas
+        // Taken from cells, not the rows/cols inputs, so the track count can
+        // never disagree with the cells actually rendered into it
+        rows={cells.length}
+        cols={cells[0]?.length ?? 0}
+        maxHeight={expanded ? '78vh' : '55vh'}
         onMouseLeave={() => { isDrawing.current = false; }}
       >
-        {/* Fullscreen mode uses a fixed cell size — the canvas's total
-            footprint never stretches to fill the container. This flex
-            wrapper centers it (both axes) when it's smaller than the scroll
-            container, and just lets it overflow into the scrollbars above
-            when it's bigger; the small inline preview keeps shrinking cells
-            to fit instead (no scrolling there). */}
-        <div
-          style={expanded
-            ? { display: 'flex', justifyContent: 'center', alignItems: 'center', minWidth: '100%', minHeight: '100%' }
-            : undefined}
-        >
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: expanded
-              ? `repeat(${cols}, ${GRID_CELL_SIZE}px)`
-              : `repeat(${cols}, minmax(0, 1fr))`,
-          }}
-        >
-          {cells.map((row, r) =>
-            row.map((cell, c) => {
-              const isStage = cell === 'stage';
-              const entry = cell !== 'empty' && cell !== 'blocked' && !isStage ? zoneById.get(cell) : undefined;
-              const zone = entry?.zone ?? null;
-              const zoneIndex = entry?.index ?? -1;
-              const mergeFill = zone?.type === 'GENERAL' || zone?.type === 'TABLE' || isStage;
-              const mergeId = isStage ? 'stage' : zone?.id;
-              return (
-                <div
-                  key={`${r}-${c}`}
-                  style={{
-                    aspectRatio: '1',
-                    backgroundColor:
-                      cell === 'blocked' ? '#9ca3af' :
-                      isStage ? '#1e293b' :
-                      zone?.type === 'TABLE' ? '#ffffff' :
-                      zone ? zoneColor(zone, zoneIndex) + 'cc' : '#ffffff',
-                    cursor: locked ? 'default' : 'crosshair',
-                    minWidth: 4,
-                    minHeight: 4,
-                    borderWidth: 1,
-                    borderStyle: 'solid',
-                    borderTopColor: mergeFill && sameZoneNeighbor(cells, r - 1, c, mergeId!) ? 'transparent' : GRID_LINE,
-                    borderBottomColor: mergeFill && sameZoneNeighbor(cells, r + 1, c, mergeId!) ? 'transparent' : GRID_LINE,
-                    borderLeftColor: mergeFill && sameZoneNeighbor(cells, r, c - 1, mergeId!) ? 'transparent' : GRID_LINE,
-                    borderRightColor: mergeFill && sameZoneNeighbor(cells, r, c + 1, mergeId!) ? 'transparent' : GRID_LINE,
-                  }}
-                  onMouseDown={() => handleCellMouseDown(r, c)}
-                  onMouseEnter={() => handleCellMouseEnter(r, c)}
-                />
-              );
-            }),
-          )}
-
-          {/* Zone name overlay for GENERAL areas — one per physically separate
-              painted region (see generalZoneComponents), a grid item placed
-              over the same cells via gridColumn/gridRow, clicks pass through
-              to the cells underneath */}
-          {generalZoneComponents.map(({ zoneId, box }, i) => {
-            const zone = zones.find(z => z.id === zoneId);
-            if (!zone) return null;
+        {cells.map((row, r) =>
+          row.map((cell, c) => {
+            const isStage = cell === 'stage';
+            const entry = cell !== 'empty' && cell !== 'blocked' && !isStage ? zoneById.get(cell) : undefined;
+            const zone = entry?.zone ?? null;
+            const zoneIndex = entry?.index ?? -1;
+            const mergeFill = zone?.type === 'GENERAL' || zone?.type === 'TABLE' || isStage;
+            const mergeId = isStage ? 'stage' : zone?.id;
             return (
               <div
-                key={`${zoneId}-${i}`}
-                className="flex items-center justify-center text-center font-semibold pointer-events-none px-1"
+                key={`${r}-${c}`}
                 style={{
-                  ...boxToGridArea(box),
-                  color: '#ffffff',
-                  textShadow: '0 1px 2px rgba(0,0,0,0.6)',
-                  fontSize: 14,
-                  lineHeight: 1.2,
+                  // Explicit placement — see cellToGridArea
+                  ...cellToGridArea(r, c),
+                  backgroundColor:
+                    cell === 'blocked' ? '#9ca3af' :
+                    isStage ? '#1e293b' :
+                    zone?.type === 'TABLE' ? '#ffffff' :
+                    zone ? zoneColor(zone, zoneIndex) + 'cc' : '#ffffff',
+                  cursor: locked ? 'default' : 'crosshair',
+                  borderWidth: 1,
+                  borderStyle: 'solid',
+                  borderTopColor: mergeFill && sameZoneNeighbor(cells, r - 1, c, mergeId!) ? 'transparent' : GRID_LINE,
+                  borderBottomColor: mergeFill && sameZoneNeighbor(cells, r + 1, c, mergeId!) ? 'transparent' : GRID_LINE,
+                  borderLeftColor: mergeFill && sameZoneNeighbor(cells, r, c - 1, mergeId!) ? 'transparent' : GRID_LINE,
+                  borderRightColor: mergeFill && sameZoneNeighbor(cells, r, c + 1, mergeId!) ? 'transparent' : GRID_LINE,
                 }}
-              >
-                {zone.name}
-              </div>
+                onMouseDown={() => handleCellMouseDown(r, c)}
+                onMouseEnter={() => handleCellMouseEnter(r, c)}
+              />
             );
-          })}
+          }),
+        )}
 
-          {/* Stage label overlay — decorative, not a real zone, one per separate area */}
-          {stageComponents.map(({ box }, i) => (
+        {/* Zone name overlay for GENERAL areas — one per physically separate
+            painted region (see generalZoneComponents), drawn over the same
+            cells and clipped to them, clicks pass through to the cells below */}
+        {generalZoneComponents.map(({ zoneId, box }, i) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          return (
             <div
-              key={i}
-              className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
+              key={`${zoneId}-${i}`}
+              className="flex items-center justify-center text-center font-semibold pointer-events-none px-1"
               style={{
                 ...boxToGridArea(box),
+                overflow: 'hidden',
                 color: '#ffffff',
+                textShadow: '0 1px 2px rgba(0,0,0,0.6)',
                 fontSize: 14,
                 lineHeight: 1.2,
               }}
             >
-              Сцена
+              {zone.name}
             </div>
-          ))}
+          );
+        })}
 
-          {/* Table icons — one per connected footprint, not per cell */}
-          {tableBoxes.map(({ zoneId, box }, i) => {
-            const zone = zones.find(z => z.id === zoneId);
-            if (!zone) return null;
-            const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
-            return (
-              <div
-                key={`${zoneId}-${i}`}
-                className="pointer-events-none p-0.5"
-                style={boxToGridArea(box)}
-              >
-                <TableIcon
-                  shape={zone.tableShape ?? 'ROUND'}
-                  chairs={zone.tableChairs ?? 1}
-                  footprint={footprint}
-                />
-              </div>
-            );
-          })}
-        </div>
-        </div>
-      </div>
+        {/* Stage label overlay — decorative, not a real zone, one per separate area */}
+        {stageComponents.map(({ box }, i) => (
+          <div
+            key={i}
+            className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
+            style={{
+              ...boxToGridArea(box),
+              overflow: 'hidden',
+              color: '#ffffff',
+              fontSize: 14,
+              lineHeight: 1.2,
+            }}
+          >
+            Сцена
+          </div>
+        ))}
+
+        {/* Table icons — one per connected footprint, not per cell */}
+        {tableBoxes.map(({ zoneId, box }, i) => {
+          const zone = zones.find(z => z.id === zoneId);
+          if (!zone) return null;
+          const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
+          return (
+            <div
+              key={`${zoneId}-${i}`}
+              className="pointer-events-none p-0.5"
+              style={{ ...boxToGridArea(box), overflow: 'hidden' }}
+            >
+              <TableIcon
+                shape={zone.tableShape ?? 'ROUND'}
+                chairs={zone.tableChairs ?? 1}
+                footprint={footprint}
+              />
+            </div>
+          );
+        })}
+      </GridCanvas>
 
       {/* Legend when locked */}
       {locked && zones.length > 0 && (

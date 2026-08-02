@@ -4,11 +4,11 @@
 
 export const GRID_LINE = '#e5e7eb';
 
-// Fixed pixel size for each cell in a scrollable full-screen grid view (admin
-// expanded editor, buyer seat picker). A fixed size means the canvas's total
-// footprint (cols/rows * this) never stretches to fill its container — the
-// container just scrolls (both axes) past it when it's bigger, and centers
-// it when it's smaller, instead of inflating cell size to fill the gap.
+// Fixed pixel size of one grid cell, on every screen. Because both track
+// dimensions are fixed, the canvas has a single intrinsic size that never
+// stretches to fill its container and never shrinks to fit it — a phone and a
+// desktop render the exact same picture, and whatever doesn't fit is reached
+// by scrolling (see GridCanvas).
 export const GRID_CELL_SIZE = 40;
 
 export interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
@@ -98,6 +98,20 @@ export function footprintToGridArea(row: number, col: number, rows: number, cols
     gridColumn: `${col + 1} / span ${cols}`,
     gridRow: `${row + 1} / span ${rows}`,
   };
+}
+
+// Every single cell is placed explicitly too, exactly like the overlays drawn
+// on top of it. This is load-bearing, not cosmetic: CSS Grid positions
+// explicitly-placed items first, then makes auto-placed ones *skip* the cells
+// those already occupy (css-grid-2 §8.5, step 4). Leaving the cells
+// auto-placed therefore let a single overlay — a zone name, the stage label,
+// a table icon — push every following cell one slot along, cascading the rest
+// of the grid out of alignment: the venue rendered scrambled, and clicks
+// landed on a different cell than the one drawn under the cursor. With every
+// item explicitly placed nothing is auto-placed, so overlays and cells simply
+// overlap, painted in DOM order.
+export function cellToGridArea(row: number, col: number): { gridColumn: number; gridRow: number } {
+  return { gridColumn: col + 1, gridRow: row + 1 };
 }
 
 // Mirrors the backend's findTableBlobs solidity check (venues.ts) — a table's
