@@ -41,8 +41,7 @@ export function loadResendInboundConfig(
 ): ResendInboundConfig {
   return {
     apiKey: env.RESEND_API_KEY ?? '',
-    webhookSecret:
-      env.RESEND_INBOUND_WEBHOOK_SECRET ?? env.RESEND_WEBHOOK_SECRET ?? '',
+    webhookSecret: env.RESEND_RECEIVING_WEBHOOK_SECRET ?? '',
     telegramBotToken: env.TELEGRAM_BOT_TOKEN ?? '',
     telegramChatId: env.TELEGRAM_CHAT_ID ?? '',
   };
