@@ -1,8 +1,9 @@
 import dotenv from 'dotenv';
+dotenv.config();
+
+import './env';
 import { createApp } from './app';
 import { startCronJobs } from './services/cron';
-
-dotenv.config();
 
 const { app, prisma, paymentService, emailJobProcessor } = createApp();
 const PORT = process.env.PORT ?? 3000;

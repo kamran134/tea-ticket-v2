@@ -107,7 +107,7 @@ export function createEmailJobProcessor(
       const ticketUrl = `${config.publicFrontendUrl}/ticket?id=${encodeURIComponent(job.checkoutId)}`;
       const seatLabels = tickets
         .filter(t => t.seat)
-        .map(t => t.seat!.label ?? String(t.seat!.number));
+        .map(t => String(t.seat!.number));
       const table = tickets.find(t => t.table)?.table ?? null;
       const totalAmount = tickets.reduce((sum, t) => sum + t.price, 0);
 

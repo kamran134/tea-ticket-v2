@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../services/api';
-import type { Ticket } from '../types';
+import type { PublicTicket } from '../types';
 
 function isTokenValid(): boolean {
   const token = localStorage.getItem('admin_token');
@@ -19,8 +19,8 @@ export function AdminScanner() {
   const [password, setPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [scanning, setScanning] = useState(false);
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [members, setMembers] = useState<Ticket[]>([]);
+  const [ticket, setTicket] = useState<PublicTicket | null>(null);
+  const [members, setMembers] = useState<PublicTicket[]>([]);
   const [confirming, setConfirming] = useState(false);
   const [stats, setStats] = useState<{ purchased: number; checkedIn: number } | null>(null);
   const [message, setMessage] = useState('');

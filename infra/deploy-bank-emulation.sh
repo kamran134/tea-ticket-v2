@@ -47,7 +47,7 @@ if ! grep -q '^BIRMANAT_BANK_API_TOKEN=' "$ENV_FILE"; then
 
 # BirManatBank (added by deploy-bank-emulation.sh)
 PAYMENT_PROVIDER=bank
-PAYMENT_HOLD_MINUTES=30
+PAYMENT_HOLD_MINUTES=15
 PUBLIC_APP_URL=https://tickets.birmanat.band
 PUBLIC_FRONTEND_URL=https://tickets.birmanat.band
 PAYMENT_WEBHOOK_BASE_URL=http://backend:3000

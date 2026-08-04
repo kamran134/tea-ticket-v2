@@ -76,7 +76,6 @@ model Zone {
   sortOrder   Int         @default(0)
   type        ZoneType    @default(GENERAL)
   color       String?
-  layoutData  Json?
   tableChairs Int?
   tableShape  TableShape?
   venue       Venue       @relation(fields: [venueId], references: [id], onDelete: Cascade)
@@ -92,7 +91,6 @@ model Seat {
   row          Int
   sectionIndex Int     @default(0)
   posInSection Int
-  label        String?
   zone         Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   ticket       Ticket?
 
@@ -107,7 +105,6 @@ model ZoneTable {
   number     Int
   shape      TableShape @default(ROUND)
   chairCount Int
-  layoutData Json?
   row        Int?
   col        Int?
   rows       Int?

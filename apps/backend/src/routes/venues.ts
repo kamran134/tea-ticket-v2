@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { Prisma, PrismaClient, TicketStatus } from '@prisma/client';
+import { Prisma, TicketStatus } from '@prisma/client';
 import multer from 'multer';
 import { requireAuth } from '../middleware/auth';
 import { uploadFile } from '../services/storage';
 import { generateVenueSlug, slugify } from '../services/slug';
+import { isNonZoneCell, findTableBlobs } from '../services/gridCells';
+import { prisma } from '../db';
 import { z } from 'zod';
 
 const upload = multer({
@@ -14,22 +16,32 @@ const upload = multer({
   },
 });
 
-const prisma = new PrismaClient();
 export const venuesRouter = Router();
 
 venuesRouter.get('/', async (req, res) => {
   const all = req.query.all === 'true';
   const upcoming = req.query.upcoming === 'true';
-  try {
-    const venues = await prisma.venue.findMany({
-      where: upcoming
-        ? { active: true, date: { gte: new Date() } }
-        : (all ? undefined : { active: true }),
-      orderBy: { date: upcoming ? 'asc' : 'desc' },
-    });
-    return res.json({ success: true, data: venues });
-  } catch {
-    return res.status(500).json({ success: false, error: 'Failed to fetch venues' });
+
+  const respond = async () => {
+    try {
+      const venues = await prisma.venue.findMany({
+        where: upcoming
+          ? { active: true, date: { gte: new Date() } }
+          : (all ? undefined : { active: true }),
+        orderBy: { date: upcoming ? 'asc' : 'desc' },
+      });
+      res.json({ success: true, data: venues });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch venues' });
+    }
+  };
+
+  // all=true also surfaces hidden/past venues — admin only. The default and
+  // upcoming=true modes (Afisha, event pages) stay public.
+  if (all) {
+    requireAuth(req, res, respond);
+  } else {
+    await respond();
   }
 });
 
@@ -148,45 +160,6 @@ const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'
 
 class GridConflictError extends Error {}
 
-interface TableBlob { row: number; col: number; rows: number; cols: number }
-
-// A table now spans a rectangular footprint (drawn as a "stamp" by the
-// frontend), not a single cell — group same-zone-id cells into their
-// connected components (4-directional flood fill) and reject anything that
-// isn't a solid rectangle, since row/col/rows/cols can only represent that.
-function findTableBlobs(cells: string[][], rows: number, cols: number, zoneId: string): TableBlob[] | null {
-  const seen: boolean[][] = Array.from({ length: rows }, () => Array(cols).fill(false));
-  const blobs: TableBlob[] = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      if (seen[r][c] || cells[r][c] !== zoneId) continue;
-      let minRow = r, maxRow = r, minCol = c, maxCol = c, cellCount = 0;
-      const stack: [number, number][] = [[r, c]];
-      seen[r][c] = true;
-      while (stack.length > 0) {
-        const [cr, cc] = stack.pop()!;
-        cellCount++;
-        minRow = Math.min(minRow, cr);
-        maxRow = Math.max(maxRow, cr);
-        minCol = Math.min(minCol, cc);
-        maxCol = Math.max(maxCol, cc);
-        for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
-          const nr = cr + dr, nc = cc + dc;
-          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !seen[nr][nc] && cells[nr][nc] === zoneId) {
-            seen[nr][nc] = true;
-            stack.push([nr, nc]);
-          }
-        }
-      }
-      const footprintRows = maxRow - minRow + 1;
-      const footprintCols = maxCol - minCol + 1;
-      if (cellCount !== footprintRows * footprintCols) return null; // not a solid rectangle
-      blobs.push({ row: minRow, col: minCol, rows: footprintRows, cols: footprintCols });
-    }
-  }
-  return blobs;
-}
-
 venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const parsed = gridLayoutSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -211,7 +184,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const usedZoneIds = new Set<string>();
   for (const row of cells) {
     for (const cell of row) {
-      if (cell === 'empty' || cell === 'blocked' || cell === 'stage') continue;
+      if (isNonZoneCell(cell)) continue;
       const zone = zoneById.get(cell);
       if (!zone) {
         return res.status(400).json({ success: false, error: `Unknown zone id in grid: ${cell}` });
@@ -229,7 +202,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   if (previousLayout?.cells) {
     for (const row of previousLayout.cells) {
       for (const cell of row) {
-        if (cell !== 'empty' && cell !== 'blocked' && cell !== 'stage') previouslyGridZoneIds.add(cell);
+        if (!isNonZoneCell(cell)) previouslyGridZoneIds.add(cell);
       }
     }
   }
@@ -331,15 +304,43 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         const existingByAnchor = new Map(gridTables.map(t => [`${t.row}-${t.col}`, t]));
 
         const toRemove = gridTables.filter(t => !desiredByAnchor.has(`${t.row}-${t.col}`));
-        const blocked = toRemove.find(t => t.tickets.length > 0);
-        if (blocked) {
+        const blockedRemove = toRemove.find(t => t.tickets.length > 0);
+        if (blockedRemove) {
           throw new GridConflictError(
-            `Zone "${zone.name}": table at row ${blocked.row! + 1}, col ${blocked.col! + 1} has active tickets and cannot be removed`,
+            `Zone "${zone.name}": table at row ${blockedRemove.row! + 1}, col ${blockedRemove.col! + 1} has active tickets and cannot be removed`,
+          );
+        }
+
+        // Tables kept at the same anchor still need chairCount/shape (and the
+        // footprint, if the admin resized the painted area without moving its
+        // top-left corner) refreshed to the zone's current settings — these
+        // otherwise get copied onto ZoneTable only once, at creation, so an
+        // edit to the zone's table config would never reach tables already
+        // placed on the grid.
+        const toKeep = gridTables.filter(t => desiredByAnchor.has(`${t.row}-${t.col}`));
+        const blockedShrink = toKeep.find(t => t.tickets.length > chairCount);
+        if (blockedShrink) {
+          throw new GridConflictError(
+            `Zone "${zone.name}": table at row ${blockedShrink.row! + 1}, col ${blockedShrink.col! + 1} ` +
+            `has ${blockedShrink.tickets.length} active ticket(s) and cannot be reduced to ${chairCount} chairs`,
           );
         }
 
         if (toRemove.length > 0) {
           await tx.zoneTable.deleteMany({ where: { id: { in: toRemove.map(t => t.id) } } });
+        }
+
+        for (const table of toKeep) {
+          const blob = desiredByAnchor.get(`${table.row}-${table.col}`)!;
+          if (
+            table.chairCount !== chairCount || table.shape !== shape ||
+            table.rows !== blob.rows || table.cols !== blob.cols
+          ) {
+            await tx.zoneTable.update({
+              where: { id: table.id },
+              data: { chairCount, shape, rows: blob.rows, cols: blob.cols },
+            });
+          }
         }
 
         const toAdd = desiredBlobs
@@ -381,13 +382,34 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   }
 });
 
+// req.params.id ends up in a filesystem path below (posters/floorplans/<id>/...) —
+// pin it to the shape a real cuid always has before it ever touches a path,
+// instead of trusting whatever was in the URL segment.
+const VENUE_ID_PATTERN = /^[a-z0-9]{20,32}$/;
+
+// Extension from the upload's mimetype (a small, server-controlled set —
+// multer's fileFilter above already restricts it to these three), not from
+// the client-supplied original filename.
+const IMAGE_EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+
 // POST /api/venues/:id/upload-floor-plan
 venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPlan'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+  if (!VENUE_ID_PATTERN.test(req.params.id)) {
+    return res.status(400).json({ success: false, error: 'Invalid venue id' });
+  }
   try {
-    const ext = req.file.originalname.split('.').pop() ?? 'jpg';
+    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!exists) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `floorplans/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
     const venue = await prisma.venue.update({
@@ -406,8 +428,15 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
+  if (!VENUE_ID_PATTERN.test(req.params.id)) {
+    return res.status(400).json({ success: false, error: 'Invalid venue id' });
+  }
   try {
-    const ext = req.file.originalname.split('.').pop() ?? 'jpg';
+    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
+    if (!exists) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `posters/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
     const venue = await prisma.venue.update({
@@ -418,5 +447,51 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
   } catch (err) {
     console.error('[upload-poster]', err);
     return res.status(500).json({ success: false, error: 'Failed to upload poster' });
+  }
+});
+
+// GET /api/venues/:id/grid-data
+// Seats and tables for every SEATED/TABLE zone of this venue in one call —
+// the buyer's grid map used to fetch these one zone at a time (N+1), same
+// shape as zones.ts's per-zone /seats and /tables, just batched by venueId.
+venuesRouter.get('/:id/grid-data', async (req, res) => {
+  try {
+    const zones = await prisma.zone.findMany({
+      where: { venueId: req.params.id },
+      select: { id: true, type: true },
+    });
+    const seatedZoneIds = zones.filter(z => z.type === 'SEATED').map(z => z.id);
+    const tableZoneIds = zones.filter(z => z.type === 'TABLE').map(z => z.id);
+
+    const [seats, tables] = await Promise.all([
+      seatedZoneIds.length > 0
+        ? prisma.seat.findMany({
+            where: { zoneId: { in: seatedZoneIds } },
+            orderBy: [{ row: 'asc' }, { sectionIndex: 'asc' }, { posInSection: 'asc' }],
+            include: {
+              ticket: { select: { id: true, status: true }, where: { status: { in: ACTIVE_TICKET_STATUSES } } },
+            },
+          })
+        : Promise.resolve([]),
+      tableZoneIds.length > 0
+        ? prisma.zoneTable.findMany({
+            where: { zoneId: { in: tableZoneIds } },
+            orderBy: { number: 'asc' },
+            include: {
+              _count: { select: { tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } } } } },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        seats: seats.map(s => ({ ...s, occupied: s.ticket !== null })),
+        tables: tables.map(t => ({ ...t, occupied: t._count.tickets, available: t.chairCount - t._count.tickets })),
+      },
+    });
+  } catch {
+    return res.status(500).json({ success: false, error: 'Failed to fetch grid data' });
   }
 });

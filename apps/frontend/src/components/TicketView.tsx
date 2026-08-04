@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
 import { toast } from '../services/toast';
-import type { Ticket, TicketStatus, Currency, TicketEmailDelivery, TicketEmailDeliveryStatus } from '../types';
+import type {
+  PublicTicket,
+  TicketStatus,
+  Currency,
+  TicketEmailDelivery,
+  TicketEmailDeliveryStatus,
+} from '../types';
 import { formatPrice } from '../types';
 import { Header } from './Header';
 import { Footer } from './Footer';
@@ -17,7 +23,7 @@ function formatCountdown(ms: number): string {
   return `${min}:${sec.toString().padStart(2, '0')}`;
 }
 
-function isHoldExpired(ticket: Ticket): boolean {
+function isHoldExpired(ticket: PublicTicket): boolean {
   if (ticket.status !== 'BOOKED' || !ticket.expiresAt) return false;
   return new Date(ticket.expiresAt).getTime() <= Date.now();
 }
@@ -36,8 +42,8 @@ function formatPaymentError(message: string): string {
 }
 
 async function reloadTicket(id: string): Promise<{
-  ticket: Ticket;
-  members: Ticket[] | null;
+  ticket: PublicTicket;
+  members: PublicTicket[] | null;
   currency: Currency;
   emailDelivery: TicketEmailDelivery | null;
 }> {
@@ -49,7 +55,7 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   PENDING: 'Чек на проверке',
   CONFIRMED: 'Подтверждён',
   REJECTED: 'Отклонён',
-  EXPIRED: 'Истёк',
+  EXPIRED: 'Бронь истекла',
 };
 
 const STATUS_COLORS: Record<TicketStatus, string> = {
@@ -57,7 +63,7 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
   PENDING: 'bg-amber-100 text-amber-800',
   CONFIRMED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
-  EXPIRED: 'bg-gray-100 text-gray-600',
+  EXPIRED: 'bg-gray-100 text-gray-700',
 };
 
 const EMAIL_STATUS_LABELS: Record<TicketEmailDeliveryStatus, string> = {
@@ -81,8 +87,8 @@ const EMAIL_STATUS_COLORS: Record<TicketEmailDeliveryStatus, string> = {
 };
 
 export function TicketView() {
-  const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [members, setMembers] = useState<Ticket[]>([]);
+  const [ticket, setTicket] = useState<PublicTicket | null>(null);
+  const [members, setMembers] = useState<PublicTicket[]>([]);
   const [currency, setCurrency] = useState<Currency>('₼');
   const [emailDelivery, setEmailDelivery] = useState<TicketEmailDelivery | null>(null);
   const [copied, setCopied] = useState(false);
@@ -100,8 +106,8 @@ export function TicketView() {
   const canShare = typeof navigator !== 'undefined' && 'share' in navigator;
 
   const applyTicketData = useCallback((data: {
-    ticket: Ticket;
-    members: Ticket[] | null;
+    ticket: PublicTicket;
+    members: PublicTicket[] | null;
     currency: Currency;
     emailDelivery?: TicketEmailDelivery | null;
   }) => {
@@ -257,7 +263,7 @@ export function TicketView() {
             </span>
           </div>
           <div className="text-sm text-gray-600 space-y-0.5 mt-1">
-            <div>Телефон: {ticket.phone}</div>
+            {ticket.phone && <div>Телефон: {ticket.phone}</div>}
             {ticket.email && <div>Email: {ticket.email}</div>}
             {emailDelivery && (
               <div className={EMAIL_STATUS_COLORS[emailDelivery.status]}>
@@ -372,6 +378,23 @@ export function TicketView() {
           </div>
         )}
 
+        {/* EXPIRED */}
+        {ticket.status === 'EXPIRED' && (
+          <div className="bg-gray-50 border border-gray-300 rounded-2xl p-6 text-center space-y-3">
+            <div className="text-4xl">⌛</div>
+            <h2 className="font-semibold text-gray-800">Время брони истекло</h2>
+            <p className="text-sm text-gray-600">
+              Оформите новую бронь на афише — места из этой брони уже освобождены.
+            </p>
+            <a
+              href="/"
+              className="inline-block w-full py-3 px-4 rounded-xl bg-gray-800 text-white font-semibold hover:bg-gray-900 transition-colors"
+            >
+              На афишу
+            </a>
+          </div>
+        )}
+
         {/* PENDING: waiting for admin */}
         {ticket.status === 'PENDING' && (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-center">
@@ -402,17 +425,6 @@ export function TicketView() {
             <h2 className="font-semibold text-red-800">Билет отклонён</h2>
             <p className="text-sm text-red-600 mt-1">
               Свяжитесь с организаторами для уточнения деталей.
-            </p>
-          </div>
-        )}
-
-        {/* EXPIRED */}
-        {ticket.status === 'EXPIRED' && (
-          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center">
-            <div className="text-4xl mb-2">⌛</div>
-            <h2 className="font-semibold text-gray-700">Бронь истекла</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Время оплаты вышло. Пожалуйста, зарегистрируйтесь снова.
             </p>
           </div>
         )}

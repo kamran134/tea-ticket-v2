@@ -1,7 +1,9 @@
 import express, { Express } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
+import { prisma as sharedPrisma } from './db';
 import { authRouter } from './routes/auth';
 import { ticketsRouter, setTicketsEmailProcessor } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
@@ -10,6 +12,7 @@ import { gridTemplatesRouter } from './routes/grid-templates';
 import { paymentsRouter } from './routes/payments';
 import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
+import { createResendInboundWebhookHandler } from './routes/resend-inbound';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { createPaymentProvider, loadPaymentProviderConfig } from './services/payments/factory';
 import {
@@ -36,7 +39,7 @@ export function createApp(options?: {
   paymentService?: PaymentService;
   emailSender?: TicketEmailSender;
 }): AppContext {
-  const prisma = options?.prisma ?? new PrismaClient();
+  const prisma = options?.prisma ?? sharedPrisma;
   const providerConfig = loadPaymentProviderConfig();
   const provider = createPaymentProvider(providerConfig);
 
@@ -56,6 +59,11 @@ export function createApp(options?: {
   const app = express();
   const UPLOADS_DIR = process.env.UPLOADS_DIR ?? '/app/uploads';
 
+  // Production traffic passes through one nginx proxy. This keeps req.ip
+  // client-specific so the authentication rate limiter works correctly.
+  app.set('trust proxy', 1);
+
+  app.use(helmet());
   app.use(cors({ origin: process.env.CORS_ORIGIN ?? '*' }));
 
   // Webhook до JSON parser — см. routes/webhooks.ts
@@ -71,7 +79,18 @@ export function createApp(options?: {
     createResendWebhookHandler(prisma, emailRuntime.config),
   );
 
+  app.post(
+    '/api/resend/inbound',
+    express.raw({ type: 'application/json', limit: '1mb' }),
+    createResendInboundWebhookHandler(),
+  );
+
   app.use(express.json({ limit: '10mb' }));
+  // Receipts contain sensitive payment data and are only available through
+  // the authenticated ticket receipt route.
+  app.use('/uploads/receipts', (_req, res) => {
+    res.status(404).json({ success: false, error: 'Not found' });
+  });
   app.use('/uploads', express.static(join(UPLOADS_DIR)));
 
   app.get('/health', (_req, res) => {

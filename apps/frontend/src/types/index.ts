@@ -1,10 +1,9 @@
 export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED';
 
-export type Currency = '₸' | '₼' | '$' | '₽';
+export type Currency = '₼';
 
 export function formatPrice(amount: number, currency: Currency | string): string {
   const formatted = amount.toLocaleString('ru-RU');
-  if (currency === '$') return `$${formatted}`;
   return `${formatted} ${currency}`;
 }
 
@@ -55,24 +54,6 @@ export interface Venue {
 export type ZoneType = 'GENERAL' | 'SEATED' | 'TABLE';
 export type TableShape = 'ROUND' | 'RECT' | 'SOFA';
 
-export interface ZoneSectionLayout {
-  sectionIndex: number;
-  label: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-export interface ZoneLayoutData {
-  color?: string;
-  x?: number;
-  y?: number;
-  w?: number;
-  h?: number;
-  sections?: ZoneSectionLayout[];
-}
-
 export interface Zone {
   id: string;
   venueId: string;
@@ -82,7 +63,6 @@ export interface Zone {
   sortOrder: number;
   type: ZoneType;
   color: string | null;
-  layoutData: ZoneLayoutData | null;
   tableChairs: number | null;
   tableShape: TableShape | null;
   available?: number;
@@ -95,7 +75,6 @@ export interface Seat {
   row: number;
   sectionIndex: number;
   posInSection: number;
-  label: string | null;
   occupied: boolean;
 }
 
@@ -105,7 +84,6 @@ export interface ZoneTable {
   number: number;
   shape: TableShape;
   chairCount: number;
-  layoutData: Record<string, unknown> | null;
   row: number | null;
   col: number | null;
   rows: number | null;
@@ -175,6 +153,15 @@ export interface RegisterResult {
   totalPrice: number;
   expiresAt?: string;
 }
+
+// What GET /api/tickets/:id and /group/:groupId actually return — the
+// backend strips phone/email for anyone but the exact ticket id requested
+// (and even then not when that id turns out to be a bare groupId, which has
+// no single established "owner"). See tickets.ts's withoutContactInfo.
+export type PublicTicket = Omit<Ticket, 'phone' | 'email'> & {
+  phone?: string;
+  email?: string | null;
+};
 
 export interface CartItem {
   zoneId: string;
