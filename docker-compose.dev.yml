@@ -50,9 +50,12 @@ services:
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_INBOUND_WEBHOOK_SECRET: ${RESEND_INBOUND_WEBHOOK_SECRET:-}
       EMAIL_FROM: ${EMAIL_FROM:-BirManat Tickets <no-reply@tickets.birmanat.band>}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@birmanat.band}
       EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     depends_on:
       db:
         condition: service_healthy
