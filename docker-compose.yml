@@ -1,3 +1,13 @@
+# Core stack: db + backend + frontend.
+#
+# Defaults target tea-ticket.com, which is deployed by CI without an .env file —
+# every value below must therefore work as-is when only the CI-exported variables
+# are present. Any deployment with its own .env (see .env.example) overrides them.
+#
+# To run the BirManatBank simulator alongside, add the overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.bank.yml up -d
+# or set COMPOSE_FILE=docker-compose.yml:docker-compose.bank.yml in .env
+
 services:
   db:
     image: postgres:${POSTGRES_VERSION:-17}-alpine
@@ -22,7 +32,7 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-    image: ${BACKEND_IMAGE:-tea-ticket-backend:latest}
+    image: ghcr.io/${GITHUB_REPOSITORY:-kamran134/tea-ticket-v2}/backend:${BACKEND_TAG:-latest}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3001}:3000"
@@ -33,15 +43,16 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       UPLOADS_DIR: /app/uploads
       PORT: 3000
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-bank}
+      # mock — self-contained hosted page; bank requires the docker-compose.bank.yml overlay
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
       PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
-      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tickets.birmanat.band}
-      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tickets.birmanat.band}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tea-ticket.com}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tea-ticket.com}
       PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
       MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
       BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
-      BANK_API_KEY: ${BANK_API_KEY}
-      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET}
+      BANK_API_KEY: ${BANK_API_KEY:-}
+      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET:-}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
@@ -52,11 +63,9 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
-      - ${UPLOADS_PATH}:/app/uploads
+      - ${UPLOADS_PATH:-/opt/tea-ticket-v2/uploads}:/app/uploads
     depends_on:
       db:
-        condition: service_healthy
-      birmanat-bank:
         condition: service_healthy
     networks:
       - internal
@@ -65,40 +74,15 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-    image: ${FRONTEND_IMAGE:-tea-ticket-frontend:latest}
+    image: ghcr.io/${GITHUB_REPOSITORY:-kamran134/tea-ticket-v2}/frontend:${FRONTEND_TAG:-latest}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     networks:
       - internal
 
-  birmanat-bank:
-    build:
-      context: ./apps/birmanat-bank
-      dockerfile: Dockerfile
-    image: ${BIRMANAT_BANK_IMAGE:-tea-ticket-birmanat-bank:latest}
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:${BIRMANAT_BANK_PORT:-8082}:80"
-    environment:
-      BIRMANAT_BANK_PUBLIC_URL: ${BIRMANAT_BANK_PUBLIC_URL:-https://tickets.birmanat.band/bank}
-      BIRMANAT_BANK_API_TOKEN: ${BIRMANAT_BANK_API_TOKEN}
-      BIRMANAT_BANK_WEBHOOK_SECRET: ${BIRMANAT_BANK_WEBHOOK_SECRET}
-      BIRMANAT_BANK_ALLOWED_HOSTS: ${BIRMANAT_BANK_ALLOWED_HOSTS:-tickets.birmanat.band,backend}
-      BIRMANAT_BANK_SQLITE_PATH: /var/www/html/var/bank.sqlite
-    volumes:
-      - birmanat_bank_data:/var/www/html/var
-    networks:
-      - internal
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
 volumes:
   postgres_data:
-  birmanat_bank_data:
 
 networks:
   internal:

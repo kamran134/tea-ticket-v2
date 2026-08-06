@@ -112,6 +112,7 @@ jobs:
             export JWT_SECRET='${{ secrets.JWT_SECRET }}'
             export ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}'
             export CORS_ORIGIN='https://tea-ticket.com'
+            export MOCK_WEBHOOK_SECRET='${{ secrets.MOCK_WEBHOOK_SECRET }}'
 
             docker compose pull
             docker compose up -d --remove-orphans
