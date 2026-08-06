@@ -37,14 +37,58 @@ services:
       S3_PUBLIC_URL: ${S3_PUBLIC_URL}
       CORS_ORIGIN: http://localhost:5173
       PORT: 3000
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-bank}
+      PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
+      PAYMENT_HOLD_SECONDS: ${PAYMENT_HOLD_SECONDS:-10}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3001}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:5173}
+      PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
+      MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
+      BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
+      BANK_API_KEY: ${BANK_API_KEY:-dev-birmanat-bank-token}
+      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET:-dev-birmanat-bank-webhook-secret}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_RECEIVING_WEBHOOK_SECRET: ${RESEND_RECEIVING_WEBHOOK_SECRET:-}
+      EMAIL_FROM: ${EMAIL_FROM:-BirManat Tickets <no-reply@tickets.birmanat.band>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@birmanat.band}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     depends_on:
       db:
+        condition: service_healthy
+      birmanat-bank:
         condition: service_healthy
     networks:
       - internal
 
+  birmanat-bank:
+    build:
+      context: ./apps/birmanat-bank
+      dockerfile: Dockerfile
+    ports:
+      - "8082:80"
+    environment:
+      BIRMANAT_BANK_PUBLIC_URL: ${BIRMANAT_BANK_PUBLIC_URL:-http://localhost:8082}
+      BIRMANAT_BANK_API_TOKEN: ${BIRMANAT_BANK_API_TOKEN:-dev-birmanat-bank-token}
+      BIRMANAT_BANK_WEBHOOK_SECRET: ${BIRMANAT_BANK_WEBHOOK_SECRET:-dev-birmanat-bank-webhook-secret}
+      BIRMANAT_BANK_ALLOWED_HOSTS: ${BIRMANAT_BANK_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,tickets.birmanat.band}
+      BIRMANAT_BANK_SQLITE_PATH: /var/www/html/var/bank.sqlite
+    volumes:
+      - birmanat_bank_data:/var/www/html/var
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
+  birmanat_bank_data:
 
 networks:
   internal:

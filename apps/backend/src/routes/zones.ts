@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma, TicketStatus } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
+import { expireStaleBookings } from '../services/booking-expiry';
 import { prisma } from '../db';
 import { z } from 'zod';
 
@@ -14,6 +15,8 @@ zonesRouter.get('/', async (req, res) => {
   }
 
   try {
+    await expireStaleBookings(prisma);
+
     const zones = await prisma.zone.findMany({
       where: { venueId },
       orderBy: { sortOrder: 'asc' },
@@ -64,7 +67,6 @@ zonesRouter.get('/', async (req, res) => {
     return res.status(500).json({ success: false, error: 'Failed to fetch zones' });
   }
 });
-
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
 const createZoneSchema = z.object({
@@ -140,6 +142,8 @@ zonesRouter.delete('/:id', requireAuth, async (req, res) => {
 // GET /api/zones/:id/seats
 zonesRouter.get('/:id/seats', async (req, res) => {
   try {
+    await expireStaleBookings(prisma);
+
     const seats = await prisma.seat.findMany({
       where: { zoneId: req.params.id },
       orderBy: [{ row: 'asc' }, { sectionIndex: 'asc' }, { posInSection: 'asc' }],
@@ -160,6 +164,8 @@ zonesRouter.get('/:id/seats', async (req, res) => {
 // GET /api/zones/:id/tables
 zonesRouter.get('/:id/tables', async (req, res) => {
   try {
+    await expireStaleBookings(prisma);
+
     const tables = await prisma.zoneTable.findMany({
       where: { zoneId: req.params.id },
       orderBy: { number: 'asc' },
@@ -181,4 +187,3 @@ zonesRouter.get('/:id/tables', async (req, res) => {
     return res.status(500).json({ success: false, error: 'Failed to fetch tables' });
   }
 });
-

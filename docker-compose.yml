@@ -1,7 +1,9 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:${POSTGRES_VERSION:-17}-alpine
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -17,34 +19,86 @@ services:
       retries: 5
 
   backend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/backend:latest
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    image: ${BACKEND_IMAGE:-tea-ticket-backend:latest}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3001:3000"
+      - "127.0.0.1:${BACKEND_PORT:-3001}:3000"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
-      CORS_ORIGIN: https://tea-ticket.com
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      UPLOADS_DIR: /app/uploads
       PORT: 3000
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-bank}
+      PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tickets.birmanat.band}
+      PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tickets.birmanat.band}
+      PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
+      MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
+      BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
+      BANK_API_KEY: ${BANK_API_KEY}
+      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET}
+      EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
+      RESEND_RECEIVING_WEBHOOK_SECRET: ${RESEND_RECEIVING_WEBHOOK_SECRET:-}
+      EMAIL_FROM: ${EMAIL_FROM:-BirManatBand Tickets <tickets@birmanat.band>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@birmanat.band}
+      EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
-      - /opt/tea-ticket-v2/uploads:/app/uploads
+      - ${UPLOADS_PATH}:/app/uploads
     depends_on:
       db:
+        condition: service_healthy
+      birmanat-bank:
         condition: service_healthy
     networks:
       - internal
 
   frontend:
-    image: ghcr.io/${GITHUB_REPOSITORY}/frontend:latest
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    image: ${FRONTEND_IMAGE:-tea-ticket-frontend:latest}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8080:80"
+      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
     networks:
       - internal
 
+  birmanat-bank:
+    build:
+      context: ./apps/birmanat-bank
+      dockerfile: Dockerfile
+    image: ${BIRMANAT_BANK_IMAGE:-tea-ticket-birmanat-bank:latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${BIRMANAT_BANK_PORT:-8082}:80"
+    environment:
+      BIRMANAT_BANK_PUBLIC_URL: ${BIRMANAT_BANK_PUBLIC_URL:-https://tickets.birmanat.band/bank}
+      BIRMANAT_BANK_API_TOKEN: ${BIRMANAT_BANK_API_TOKEN}
+      BIRMANAT_BANK_WEBHOOK_SECRET: ${BIRMANAT_BANK_WEBHOOK_SECRET}
+      BIRMANAT_BANK_ALLOWED_HOSTS: ${BIRMANAT_BANK_ALLOWED_HOSTS:-tickets.birmanat.band,backend}
+      BIRMANAT_BANK_SQLITE_PATH: /var/www/html/var/bank.sqlite
+    volumes:
+      - birmanat_bank_data:/var/www/html/var
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
 volumes:
   postgres_data:
+  birmanat_bank_data:
 
 networks:
   internal:

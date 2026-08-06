@@ -1,4 +1,23 @@
-import type { Ticket, PublicTicket, Venue, Zone, Seat, ZoneTable, RegisterResult, ApiResponse, Currency, TicketStatus, GridLayout, GridTemplate, GridTemplateSummary, GridTemplateZoneSlot, CartItem } from '../types';
+import type {
+  Ticket,
+  PublicTicket,
+  Venue,
+  Zone,
+  Seat,
+  ZoneTable,
+  RegisterResult,
+  ApiResponse,
+  Currency,
+  TicketStatus,
+  GridLayout,
+  GridTemplate,
+  GridTemplateSummary,
+  GridTemplateZoneSlot,
+  CartItem,
+  CreatePaymentResult,
+  PaymentStatusResult,
+  TicketEmailDelivery,
+} from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
@@ -110,11 +129,21 @@ export const api = {
     return request(`/api/zones?venueId=${encodeURIComponent(venueId)}`);
   },
 
-  async getTicket(id: string): Promise<{ ticket: PublicTicket; members: PublicTicket[] | null; currency: Currency }> {
+  async getTicket(id: string): Promise<{
+    ticket: PublicTicket;
+    members: PublicTicket[] | null;
+    currency: Currency;
+    emailDelivery: TicketEmailDelivery | null;
+  }> {
     return request(`/api/tickets/${encodeURIComponent(id)}`);
   },
 
-  async getTicketGroup(groupId: string): Promise<{ ticket: PublicTicket; members: PublicTicket[]; currency: Currency }> {
+  async getTicketGroup(groupId: string): Promise<{
+    ticket: PublicTicket;
+    members: PublicTicket[];
+    currency: Currency;
+    emailDelivery: TicketEmailDelivery | null;
+  }> {
     return request(`/api/tickets/group/${encodeURIComponent(groupId)}`);
   },
 
@@ -130,6 +159,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  async createPayment(ticketId: string): Promise<CreatePaymentResult> {
+    return request('/api/payments', {
+      method: 'POST',
+      body: JSON.stringify({ ticketId }),
+    });
+  },
+
+  async getPaymentStatus(paymentId: string, returnToken?: string): Promise<PaymentStatusResult> {
+    const params = returnToken ? `?token=${encodeURIComponent(returnToken)}` : '';
+    return request(`/api/payments/${encodeURIComponent(paymentId)}/status${params}`);
   },
 
   // Receipts are no longer plain static files — this hits the authenticated

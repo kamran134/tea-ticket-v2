@@ -154,3 +154,20 @@
 - `TableShape.SOFA` — добавлено значение в существующий Prisma enum
   (`ALTER TYPE ... ADD VALUE`, отдельной миграцией, без использования нового
   значения в той же транзакции — стандартное ограничение Postgres для enum)
+
+## Merge master → bank-emulation (2026-08-05)
+
+Ветка `bank-emulation` добавляет платёжный шлюз, истечение броней и отправку
+билетов через email. В `master` параллельно появились security/audit-фиксы,
+единый Prisma-клиент, ESLint и новый общий frontend renderer.
+
+При разрешении конфликтов сохраняются обе группы изменений:
+- payment/email routes и фоновые jobs остаются в `createApp`;
+- `createApp` использует общий Prisma-клиент и middleware из master
+  (`helmet`, `trust proxy`, закрытая статическая раздача чеков);
+- публичные ticket endpoints скрывают контакты участников группы, но продолжают
+  возвращать статус email-доставки;
+- небезопасный upload receipt не восстанавливается, admin использует
+  авторизованный endpoint чтения;
+- frontend сохраняет оплату и email-статусы, используя `PublicTicket` и общий
+  `renderApp`.

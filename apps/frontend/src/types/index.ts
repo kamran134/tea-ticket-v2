@@ -1,4 +1,4 @@
-export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED';
+export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED';
 
 export type Currency = '₼';
 
@@ -92,6 +92,21 @@ export interface ZoneTable {
   available: number;
 }
 
+export type TicketEmailDeliveryStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'ACCEPTED'
+  | 'DELIVERED'
+  | 'BOUNCED'
+  | 'COMPLAINED'
+  | 'FAILED';
+
+export interface TicketEmailDelivery {
+  status: TicketEmailDeliveryStatus;
+  acceptedAt: string | null;
+  deliveredAt: string | null;
+}
+
 export interface Ticket {
   id: string;
   name: string;
@@ -106,9 +121,37 @@ export interface Ticket {
   checkedIn: boolean;
   createdAt: string;
   bookedAt: string;
+  expiresAt: string | null;
   groupId: string | null;
   seatId: string | null;
   tableId: string | null;
+  emailDelivery?: TicketEmailDelivery | null;
+}
+
+export interface CreatePaymentResult {
+  paymentId: string;
+  redirectUrl: string;
+  status: string;
+  amount: string;
+  expiresAt: string | null;
+  returnToken: string;
+}
+
+export interface PaymentStatusResult {
+  paymentId: string;
+  status: string;
+  amount: string;
+  paidAt: string | null;
+  failureCode: string | null;
+  ticketStatus: TicketStatus | null;
+  ticketsConfirmed: boolean;
+}
+
+export interface RegisterResult {
+  id: string;
+  groupId: string | null;
+  totalPrice: number;
+  expiresAt?: string;
 }
 
 // What GET /api/tickets/:id and /group/:groupId actually return — the
@@ -125,12 +168,6 @@ export interface CartItem {
   seatIds?: string[];
   tableId?: string;
   quantity?: number;
-}
-
-export interface RegisterResult {
-  id: string;
-  groupId: string | null;
-  totalPrice: number;
 }
 
 export interface ApiResponse<T> {

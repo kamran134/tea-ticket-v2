@@ -12,6 +12,22 @@ enum TicketStatus {
   PENDING
   CONFIRMED
   REJECTED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  CREATED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+  REQUIRES_REVIEW
+}
+
+enum ConfirmationSource {
+  PAYMENT
+  MANUAL
 }
 
 enum ZoneType {
@@ -101,28 +117,116 @@ model ZoneTable {
 }
 
 model Ticket {
-  id          String       @id @default(cuid())
-  name        String
-  phone       String
-  email       String?
-  venueId     String
-  zoneId      String
-  zoneName    String
-  price       Float
-  receiptLink String?
-  status      TicketStatus @default(BOOKED)
-  checkedIn   Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  bookedAt    DateTime     @default(now())
-  groupId     String?
-  seatId      String?      @unique
-  tableId     String?
-  venue       Venue        @relation(fields: [venueId], references: [id])
-  zone        Zone         @relation(fields: [zoneId], references: [id])
-  seat        Seat?        @relation(fields: [seatId], references: [id])
-  table       ZoneTable?   @relation(fields: [tableId], references: [id])
+  id                 String              @id @default(cuid())
+  name               String
+  phone              String
+  email              String?
+  venueId            String
+  zoneId             String
+  zoneName           String
+  price              Float
+  receiptLink        String?
+  status             TicketStatus        @default(BOOKED)
+  checkedIn          Boolean             @default(false)
+  createdAt          DateTime            @default(now())
+  bookedAt           DateTime            @default(now())
+  expiresAt          DateTime?
+  groupId            String?
+  seatId             String?             @unique
+  tableId            String?
+  confirmationSource ConfirmationSource?
+  confirmedAt        DateTime?
+  confirmationNote   String?
+  venue              Venue               @relation(fields: [venueId], references: [id])
+  zone               Zone                @relation(fields: [zoneId], references: [id])
+  seat               Seat?               @relation(fields: [seatId], references: [id])
+  table              ZoneTable?          @relation(fields: [tableId], references: [id])
 
   @@index([groupId])
   @@index([status])
   @@index([venueId, status])
+  @@index([expiresAt])
+}
+
+model Payment {
+  id                String              @id @default(cuid())
+  checkoutId        String
+  provider          String
+  providerPaymentId String?             @unique
+  idempotencyKey    String              @unique
+  amount            Decimal             @db.Decimal(18, 4)
+  status            PaymentStatus       @default(CREATED)
+  redirectUrl       String?
+  returnToken       String              @unique @default(cuid())
+  expiresAt         DateTime?
+  paidAt            DateTime?
+  failureCode       String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  webhookEvents     PaymentWebhookEvent[]
+
+  @@index([checkoutId])
+  @@index([checkoutId, status])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model PaymentWebhookEvent {
+  id              String    @id @default(cuid())
+  paymentId       String?
+  provider        String
+  providerEventId String
+  payload         Json
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+  payment         Payment?  @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([paymentId])
+}
+
+enum EmailJobType {
+  TICKET_CONFIRMED
+}
+
+enum EmailJobStatus {
+  PENDING
+  PROCESSING
+  ACCEPTED
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+model EmailJob {
+  id                String         @id @default(cuid())
+  type              EmailJobType
+  status            EmailJobStatus @default(PENDING)
+  checkoutId        String
+  recipient         String
+  attempts          Int            @default(0)
+  nextAttemptAt     DateTime       @default(now())
+  lockedAt          DateTime?
+  providerMessageId String?        @unique
+  lastError         String?
+  acceptedAt        DateTime?
+  deliveredAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@unique([type, checkoutId])
+  @@index([status, nextAttemptAt])
+  @@index([lockedAt])
+}
+
+model EmailWebhookEvent {
+  id              String    @id @default(cuid())
+  providerEventId String    @unique
+  type            String
+  payload         Json
+  receivedAt      DateTime  @default(now())
+  processedAt     DateTime?
+
+  @@index([type])
 }
