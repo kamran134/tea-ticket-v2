@@ -8,13 +8,10 @@ import {
   INSTAGRAM,
   TIKTOK,
   SITE_URL,
-  ridersUrl,
 } from '../lib/site';
-import type { Lang } from '../i18n/types';
 
 export function Footer() {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language as Lang;
+  const { t } = useTranslation();
   const year = new Date().getFullYear();
 
   return (
@@ -30,9 +27,6 @@ export function Footer() {
               className="h-[4.6rem] w-auto"
             />
           </a>
-          <p className="mt-5 text-[var(--footer-muted)] max-w-md text-[15px] leading-relaxed">
-            {t('footer.tagline')}
-          </p>
           <div className="mt-6 flex flex-col items-start gap-3">
             <a
               href={INSTAGRAM}
@@ -80,14 +74,6 @@ export function Footer() {
             </li>
             <li className="text-[var(--footer-muted)]">Baku, Azerbaijan</li>
           </ul>
-        </div>
-      </div>
-
-      <div className="border-t border-[var(--footer-border)]">
-        <div className="site-container py-8 flex flex-wrap justify-center gap-3">
-          <a href={ridersUrl(lang)} target="_blank" rel="noreferrer" className="footer-btn-ghost">
-            {t('footer.riders')}
-          </a>
         </div>
       </div>
 
