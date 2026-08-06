@@ -40,12 +40,11 @@
     --header-muted: #c8c8c8;
     --header-border: #232323;
     --header-accent: #d4af37;
-    background: oklab(14.9577% -1.49012e-8 7.45058e-9 / 0.45);
-    transition: background-color 0.25s ease;
+    background: #0a0a0a;
   }
 
   .site-header.is-scrolled {
-    background: oklab(14.9577% -1.49012e-8 7.45058e-9 / 0.72);
+    background: #0a0a0a;
   }
 
   .btn-whatsapp {

@@ -93,7 +93,7 @@ export function Header() {
       </div>
 
       {open && (
-        <div className="lg:hidden border-t border-[var(--header-border)] bg-[oklab(14.9577%_-1.49012e-8_7.45058e-9_/_0.92)] max-h-[calc(100dvh-72px)] overflow-y-auto">
+        <div className="lg:hidden border-t border-[var(--header-border)] bg-[#0a0a0a] max-h-[calc(100dvh-72px)] overflow-y-auto">
           <div className="site-container py-6 flex flex-col gap-4">
             {sectionLinks.map(l => (
               <a
