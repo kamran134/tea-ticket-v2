@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
+import { translateApiError } from '../i18n/apiErrors';
+import { formatEventDateTime } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable, CartItem } from '../types';
 import { formatPrice } from '../types';
@@ -26,19 +29,12 @@ interface CartLine {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function pluralize(n: number, one: string, few: string, many: string): string {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return one;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
-  return many;
-}
-
 interface Props {
   slug: string;
 }
 
 export function RegisterForm({ slug }: Props) {
+  const { t } = useTranslation();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venueNotFound, setVenueNotFound] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -59,12 +55,12 @@ export function RegisterForm({ slug }: Props) {
   const [legacySeatsLoading, setLegacySeatsLoading] = useState(false);
 
   const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
-  // Holds the zone+table directly rather than just an id to re-look-up —
-  // grid-placed tables aren't in this component's own tablesByZone (that's
-  // fetched once by VenueGridMap itself, see P3 in the audit), so looking up
-  // by id here would silently fail to find them (this was a real regression).
   const [quantityModalTable, setQuantityModalTable] = useState<{ zone: Zone; table: ZoneTable } | null>(null);
   const [gridMapOpen, setGridMapOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = t('titles.register');
+  }, [t]);
 
   useEffect(() => {
     api.getVenueBySlug(slug)
@@ -87,13 +83,9 @@ export function RegisterForm({ slug }: Props) {
     }
   }
   const hasGridZones = gridZoneIds.size > 0;
-  // Grid-placed table zones are picked directly on the map; only legacy
-  // (un-positioned) table zones fall back to the flat TablePicker list.
   const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
   const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id));
 
-  // Only legacy (non-grid) table zones need fetching here — grid-placed ones
-  // are fetched once by VenueGridMap itself via getGridData (see P3 in the audit).
   const legacyTableZoneKey = tableZones.map(z => z.id).join(',');
   useEffect(() => {
     const tableZoneIds = legacyTableZoneKey ? legacyTableZoneKey.split(',') : [];
@@ -115,7 +107,6 @@ export function RegisterForm({ slug }: Props) {
   const cartTotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
   const gridCartCount = cart.filter(l => gridZoneIds.has(l.zoneId)).reduce((s, l) => s + l.quantity, 0);
 
-  // Keep the optional per-guest name inputs in sync with the cart size
   useEffect(() => {
     const needed = Math.max(0, cartCount - 1);
     setGuestNameInputs(prev => {
@@ -125,6 +116,11 @@ export function RegisterForm({ slug }: Props) {
       return next;
     });
   }, [cartCount]);
+
+  const ticketsLabel = (count: number) => t('register.totalTickets', {
+    count,
+    tickets: t('register.tickets', { count }),
+  });
 
   const toggleSeatInCart = (zone: Zone, seat: Seat) => {
     const key = `seat:${seat.id}`;
@@ -216,7 +212,8 @@ export function RegisterForm({ slug }: Props) {
       });
       window.location.href = `/ticket?id=${result.id}&new=1`;
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ошибка при регистрации');
+      const message = err instanceof Error ? err.message : '';
+      setError(message ? translateApiError(message, 'register.registerError') : t('register.registerError'));
     } finally {
       setLoading(false);
     }
@@ -229,9 +226,9 @@ export function RegisterForm({ slug }: Props) {
         <div className="flex-1 flex items-center justify-center p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
           <div className="text-center">
             <div className="text-4xl mb-2">🔍</div>
-            <h1 className="text-xl font-semibold text-gray-700">Мероприятие не найдено</h1>
-            <p className="text-gray-500 mt-1">Возможно, ссылка устарела или мероприятие уже прошло.</p>
-            <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">На афишу</a>
+            <h1 className="text-xl font-semibold text-gray-700">{t('register.notFoundTitle')}</h1>
+            <p className="text-gray-500 mt-1">{t('register.notFoundHint')}</p>
+            <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
           </div>
         </div>
         <Footer />
@@ -242,7 +239,7 @@ export function RegisterForm({ slug }: Props) {
   if (!venue) {
     return (
       <div className="min-h-screen flex items-center justify-center text-gray-400">
-        Загрузка...
+        {t('common.loading')}
       </div>
     );
   }
@@ -260,11 +257,7 @@ export function RegisterForm({ slug }: Props) {
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
-          <p className="text-gray-600 mt-2">
-            {new Date(venue.date).toLocaleString('ru-RU', {
-              day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
-            })}
-          </p>
+          <p className="text-gray-600 mt-2">{formatEventDateTime(venue.date)}</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -273,10 +266,9 @@ export function RegisterForm({ slug }: Props) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Grid / schema map */}
             {hasGridZones && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Места</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">{t('register.seats')}</label>
                 <button
                   type="button"
                   onClick={() => setGridMapOpen(true)}
@@ -286,7 +278,7 @@ export function RegisterForm({ slug }: Props) {
                   ].join(' ')}
                 >
                   <span className="font-medium text-gray-800">
-                    {gridCartCount > 0 ? 'Изменить выбор мест' : 'Выберите места'}
+                    {gridCartCount > 0 ? t('register.changeSeats') : t('register.chooseSeats')}
                   </span>
                   {gridCartCount > 0 && (
                     <span className="text-emerald-700 font-semibold text-sm shrink-0">× {gridCartCount}</span>
@@ -310,11 +302,10 @@ export function RegisterForm({ slug }: Props) {
               />
             )}
 
-            {/* Zones without any visual layout — plain cards */}
             {cardZones.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  {hasGridZones ? 'Другие зоны' : 'Зона'}
+                  {hasGridZones ? t('register.otherZones') : t('register.zone')}
                 </label>
                 <div className="grid grid-cols-1 gap-2">
                   {cardZones.map(z => {
@@ -339,14 +330,14 @@ export function RegisterForm({ slug }: Props) {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-gray-800">{z.name}</span>
                             {z.type === 'SEATED' && (
-                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">С местами</span>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{t('register.withSeats')}</span>
                             )}
                           </div>
                           <div className="text-sm text-gray-500 mt-0.5">
                             {formatPrice(z.price, currency)}
                             {z.available !== undefined && (
                               <span className={z.available <= 5 ? 'text-amber-600 ml-1' : 'ml-1'}>
-                                · {z.available} мест
+                                · {t('register.seatsCount', { count: z.available })}
                               </span>
                             )}
                           </div>
@@ -361,14 +352,13 @@ export function RegisterForm({ slug }: Props) {
               </div>
             )}
 
-            {/* Seats for a SEATED zone picked via the schema map or a card */}
             {legacySeatZoneId && legacySeatZone && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Места · {legacySeatZone.name}
+                  {t('register.seatsLabel', { name: legacySeatZone.name })}
                 </label>
                 {legacySeatsLoading ? (
-                  <div className="text-center text-gray-400 py-4 text-sm">Загрузка...</div>
+                  <div className="text-center text-gray-400 py-4 text-sm">{t('common.loading')}</div>
                 ) : (
                   <SeatPicker
                     seats={legacySeatsCache[legacySeatZoneId] ?? []}
@@ -379,10 +369,9 @@ export function RegisterForm({ slug }: Props) {
               </div>
             )}
 
-            {/* Tables */}
             {tableZones.length > 0 && (
               <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">Столы</label>
+                <label className="block text-sm font-medium text-gray-700">{t('register.tables')}</label>
                 {tableZones.map(zone => (
                   <div key={zone.id}>
                     {tableZones.length > 1 && (
@@ -398,10 +387,9 @@ export function RegisterForm({ slug }: Props) {
               </div>
             )}
 
-            {/* Cart */}
             {cart.length > 0 && (
               <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
-                <div className="text-sm font-medium text-gray-700">Корзина</div>
+                <div className="text-sm font-medium text-gray-700">{t('register.cart')}</div>
                 <div className="space-y-1.5">
                   {cart.map(line => {
                     const max = line.tableId
@@ -411,8 +399,12 @@ export function RegisterForm({ slug }: Props) {
                       <div key={line.key} className="flex items-center justify-between text-sm gap-2">
                         <div className="min-w-0 truncate">
                           <span className="text-gray-800">{line.zoneName}</span>
-                          {line.seatLabel && <span className="text-gray-400"> · место {line.seatLabel}</span>}
-                          {line.tableNumber !== undefined && <span className="text-gray-400"> · стол {line.tableNumber}</span>}
+                          {line.seatLabel && (
+                            <span className="text-gray-400"> · {t('register.seatLine', { number: line.seatLabel })}</span>
+                          )}
+                          {line.tableNumber !== undefined && (
+                            <span className="text-gray-400"> · {t('register.tableLine', { number: line.tableNumber })}</span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {line.seatId ? (
@@ -452,14 +444,14 @@ export function RegisterForm({ slug }: Props) {
                   })}
                 </div>
                 <div className="flex justify-between items-center border-t border-gray-200 pt-2 font-semibold text-gray-800 text-sm">
-                  <span>Итого · {cartCount} {pluralize(cartCount, 'билет', 'билета', 'билетов')}</span>
+                  <span>{ticketsLabel(cartCount)}</span>
                   <span>{formatPrice(cartTotal, currency)}</span>
                 </div>
               </div>
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ваше имя *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.yourName')}</label>
               <input
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
@@ -470,7 +462,7 @@ export function RegisterForm({ slug }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Телефон *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.phoneLabel')}</label>
               <PhoneInput
                 international
                 defaultCountry="AZ"
@@ -480,15 +472,15 @@ export function RegisterForm({ slug }: Props) {
                 required
               />
               {!!phone && !isValidPhoneNumber(phone) && (
-                <p className="text-xs text-red-500 mt-1">Проверьте номер телефона</p>
+                <p className="text-xs text-red-500 mt-1">{t('register.phoneInvalid')}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.emailLabel')}</label>
               <input
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t('register.emailPlaceholder')}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -505,11 +497,11 @@ export function RegisterForm({ slug }: Props) {
                     onChange={e => setNamedGuests(e.target.checked)}
                     className="rounded border-gray-300"
                   />
-                  Указать имена остальных ({cartCount - 1})
+                  {t('register.nameOtherGuests', { count: cartCount - 1 })}
                 </label>
                 {!namedGuests ? (
                   <p className="text-xs text-gray-400 mt-1">
-                    Будут отмечены как «Гость 1», «Гость 2»...
+                    {t('register.guestDefaultHint')}
                   </p>
                 ) : (
                   <div className="space-y-2 mt-2">
@@ -517,7 +509,7 @@ export function RegisterForm({ slug }: Props) {
                       <input
                         key={i}
                         type="text"
-                        placeholder={`Гость ${i + 1}`}
+                        placeholder={t('register.guestPlaceholder', { number: i + 1 })}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                         value={val}
                         onChange={e => setGuestNameInputs(g => g.map((x, idx) => (idx === i ? e.target.value : x)))}
@@ -533,7 +525,7 @@ export function RegisterForm({ slug }: Props) {
               <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-emerald-700">
-                    Итого · {cartCount} {pluralize(cartCount, 'билет', 'билета', 'билетов')}
+                    {ticketsLabel(cartCount)}
                   </span>
                   <span className="text-2xl font-bold text-emerald-800">{formatPrice(cartTotal, currency)}</span>
                 </div>
@@ -545,7 +537,7 @@ export function RegisterForm({ slug }: Props) {
               disabled={loading || !canSubmit}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? 'Покупка...' : 'Купить'}
+              {loading ? t('register.buying') : t('register.buy')}
             </button>
           </form>
         </div>
@@ -566,7 +558,7 @@ export function RegisterForm({ slug }: Props) {
 
       {quantityModalTable && (
         <QuantityModal
-          title={`Стол ${quantityModalTable.table.number}`}
+          title={t('register.tableTitle', { number: quantityModalTable.table.number })}
           price={quantityModalTable.zone.price}
           currency={currency}
           quantity={cartQuantityByTable[quantityModalTable.table.id] ?? 0}

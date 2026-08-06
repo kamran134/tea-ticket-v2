@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Seat } from '../types';
 
 interface Props {
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
+  const { t } = useTranslation();
+
   const grid = useMemo(() => {
     const sections = [...new Set(seats.map(s => s.sectionIndex))].sort((a, b) => a - b);
     const rows = [...new Set(seats.map(s => s.row))].sort((a, b) => a - b);
@@ -25,13 +28,12 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
   const sections = [...new Set(seats.map(s => s.sectionIndex))].sort((a, b) => a - b);
 
   if (seats.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-4">Места не настроены</p>;
+    return <p className="text-sm text-gray-400 text-center py-4">{t('seatPicker.notConfigured')}</p>;
   }
 
   return (
     <div className="overflow-x-auto">
       <div className="inline-block min-w-full">
-        {/* Section headers */}
         {sections.length > 1 && (
           <div
             className="grid gap-3 mb-2"
@@ -40,13 +42,12 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
             <div />
             {sections.map(si => (
               <div key={si} className="text-center text-xs font-medium text-gray-500">
-                Секция {si + 1}
+                {t('seatPicker.section', { number: si + 1 })}
               </div>
             ))}
           </div>
         )}
 
-        {/* Seat grid */}
         <div className="space-y-1.5">
           {grid.map(({ row, sections: rowSections }) => (
             <div
@@ -54,7 +55,7 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
               className="grid gap-3 items-center"
               style={{ gridTemplateColumns: `40px repeat(${sections.length}, 1fr)` }}
             >
-              <span className="text-xs text-gray-400 text-right pr-1">Ряд {row}</span>
+              <span className="text-xs text-gray-400 text-right pr-1">{t('seatPicker.row', { row })}</span>
               {rowSections.map(({ sectionIndex, seats: seatList }) => (
                 <div key={sectionIndex} className="flex gap-1 justify-center flex-wrap">
                   {seatList.map(seat => {
@@ -68,7 +69,7 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
                         type="button"
                         disabled={!canSelect}
                         onClick={() => onToggle(seat)}
-                        title={`Место ${seat.number}`}
+                        title={t('seatPicker.seat', { number: seat.number })}
                         className={[
                           'w-7 h-7 rounded text-xs font-bold transition-colors border relative',
                           isSelected
@@ -88,19 +89,18 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
           ))}
         </div>
 
-        {/* Legend */}
         <div className="flex gap-4 mt-3 text-xs text-gray-500 flex-wrap">
           <span className="flex items-center gap-1.5">
             <span className="w-4 h-4 rounded border border-gray-300 bg-white inline-block" />
-            Свободно
+            {t('seatPicker.free')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-4 h-4 rounded border border-emerald-700 bg-emerald-600 inline-block" />
-            В корзине
+            {t('seatPicker.inCart')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-4 h-4 rounded border border-gray-200 bg-gray-100 inline-block" />
-            Занято
+            {t('seatPicker.occupied')}
           </span>
         </div>
       </div>

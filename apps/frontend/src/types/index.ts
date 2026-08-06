@@ -2,10 +2,7 @@ export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EX
 
 export type Currency = '₼';
 
-export function formatPrice(amount: number, currency: Currency | string): string {
-  const formatted = amount.toLocaleString('ru-RU');
-  return `${formatted} ${currency}`;
-}
+export { formatPrice } from '../i18n/format';
 
 export type GridCellState = 'empty' | 'blocked' | 'stage' | string;
 

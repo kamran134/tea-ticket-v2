@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { formatEventDate } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue } from '../types';
 import { Header } from './Header';
 import { Footer } from './Footer';
 
-function formatEventDate(iso: string): string {
-  const d = new Date(iso);
-  const date = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
-  const time = d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-  return `${date} · ${time}`;
-}
-
 export function Afisha() {
+  const { t } = useTranslation();
   const [venues, setVenues] = useState<Venue[] | null>(null);
+
+  useEffect(() => {
+    document.title = t('titles.afisha');
+  }, [t]);
 
   useEffect(() => {
     api.getVenues({ upcoming: true }).then(setVenues);
@@ -24,17 +24,17 @@ export function Afisha() {
       <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
-            <h1 className="text-3xl font-bold text-emerald-800">🍵 Tea Ticket</h1>
-            <p className="text-gray-600 mt-2">Ближайшие мероприятия</p>
+            <h1 className="text-3xl font-bold text-emerald-800">🍵 {t('afisha.title')}</h1>
+            <p className="text-gray-600 mt-2">{t('afisha.subtitle')}</p>
           </div>
 
           {venues === null && (
-            <div className="text-center text-gray-400 py-16">Загрузка...</div>
+            <div className="text-center text-gray-400 py-16">{t('common.loading')}</div>
           )}
 
           {venues !== null && venues.length === 0 && (
             <div className="text-center text-gray-400 py-16">
-              Пока нет предстоящих мероприятий
+              {t('afisha.empty')}
             </div>
           )}
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
@@ -24,6 +25,7 @@ export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
   onZoneOpen, onSeatToggle, onTableOpen, onClose,
 }: Props) {
+  const { t } = useTranslation();
   const layout = venue.gridLayout;
 
   useEffect(() => {
@@ -36,8 +38,6 @@ export function VenueGridMap({
 
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
-  // Seats and tables for every zone of the venue, in one call — was one
-  // getSeats/getTables request per SEATED/TABLE zone (see P3 in the audit).
   const [seatsByZone, setSeatsByZone] = useState<Record<string, Seat[]>>({});
   const [tablesByZone, setTablesByZone] = useState<Record<string, ZoneTable[]>>({});
   const [loadingGrid, setLoadingGrid] = useState(false);
@@ -67,9 +67,6 @@ export function VenueGridMap({
     return map;
   }, [seatsByZone]);
 
-  // Maps every cell inside a table's footprint (not just its anchor) to that
-  // table, so a click anywhere on the drawn shape — not one specific cell —
-  // registers as a click on it.
   const tableByCell = useMemo(() => {
     const map = new Map<string, ZoneTable>();
     for (const [zoneId, tables] of Object.entries(tablesByZone)) {
@@ -98,12 +95,6 @@ export function VenueGridMap({
     return list;
   }, [zones, tablesByZone]);
 
-  // A single zone (or the stage) can be painted in more than one disconnected
-  // area of a large venue — a plain min/max bounding box would then span the
-  // whole gap between them, stretching the overlay across empty space (and,
-  // with grid-column/grid-row placement, forcing CSS to generate a pile of
-  // extra empty implicit rows to fit it). connectedComponents gives one
-  // correctly-sized box per physically separate area instead, same as tables.
   const generalZoneComponents = useMemo(() => {
     if (!layout) return [];
     const generalIds = new Set(zones.filter(z => z.type === 'GENERAL').map(z => z.id));
@@ -124,8 +115,6 @@ export function VenueGridMap({
     <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="65vh">
       {layout.cells.map((row, r) =>
         row.map((cell, c) => {
-          // Every cell is placed explicitly — see cellToGridArea for why this
-          // is required rather than cosmetic.
           const place = cellToGridArea(r, c);
 
           if (cell === 'stage') {
@@ -183,7 +172,12 @@ export function VenueGridMap({
               <div
                 key={`${r}-${c}`}
                 onClick={() => !isOccupied && onSeatToggle(zone, seat)}
-                title={`${zone.name} · Место ${seat.number} · ${formatPrice(zone.price, currency)}${isOccupied ? ' · занято' : ''}`}
+                title={t('gridMap.seatTooltip', {
+                  zone: zone.name,
+                  number: seat.number,
+                  price: formatPrice(zone.price, currency),
+                  occupied: isOccupied ? ` · ${t('gridMap.occupied')}` : '',
+                })}
                 style={{
                   ...place,
                   backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? color : `${color}55`,
@@ -228,7 +222,13 @@ export function VenueGridMap({
               <div
                 key={`${r}-${c}`}
                 onClick={() => !isFull && onTableOpen(zone, table)}
-                title={`${zone.name} · Стол ${table.number} · ${remaining}/${table.chairCount} своб. · ${formatPrice(zone.price, currency)}`}
+                title={t('gridMap.tableTooltip', {
+                  zone: zone.name,
+                  number: table.number,
+                  remaining,
+                  total: table.chairCount,
+                  price: formatPrice(zone.price, currency),
+                })}
                 style={{
                   ...place,
                   backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? '#d1fae5' : '#ffffff',
@@ -244,14 +244,17 @@ export function VenueGridMap({
             );
           }
 
-          // GENERAL (no specific seats): filled area, click opens the quantity picker
           const inCart = cartQuantityByZone[zone.id] ?? 0;
           const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
           return (
             <div
               key={`${r}-${c}`}
               onClick={() => !isEmpty && onZoneOpen(zone)}
-              title={`${zone.name} · ${formatPrice(zone.price, currency)}${isEmpty ? ' · мест нет' : ''}`}
+              title={t('gridMap.zoneTooltip', {
+                zone: zone.name,
+                price: formatPrice(zone.price, currency),
+                empty: isEmpty ? ` · ${t('gridMap.noSeats')}` : '',
+              })}
               style={{
                 ...place,
                 backgroundColor: inCart > 0 ? color : `${color}99`,
@@ -269,9 +272,6 @@ export function VenueGridMap({
         }),
       )}
 
-      {/* Zone name overlay for GENERAL areas — one per physically separate
-          painted region (see generalZoneComponents), drawn over the same
-          cells and clipped to them, clicks pass through to the cells below */}
       {generalZoneComponents.map(({ zoneId, box }, i) => {
         const zone = zones.find(z => z.id === zoneId);
         if (!zone) return null;
@@ -293,14 +293,13 @@ export function VenueGridMap({
             <span>{zone.name}</span>
             {zone.available !== undefined && (
               <span style={{ fontSize: 11, fontWeight: 500 }}>
-                {isEmpty ? 'мест нет' : `осталось: ${zone.available}`}
+                {isEmpty ? t('gridMap.noSeats') : t('gridMap.remaining', { count: zone.available })}
               </span>
             )}
           </div>
         );
       })}
 
-      {/* Stage label overlay — decorative, not sellable, one per separate area */}
       {stageComponents.map(({ box }, i) => (
         <div
           key={i}
@@ -313,11 +312,10 @@ export function VenueGridMap({
             lineHeight: 1.2,
           }}
         >
-          Сцена
+          {t('gridMap.stage')}
         </div>
       ))}
 
-      {/* Table icons — one per table, placed from its stored footprint */}
       {tableFootprints.map(({ table }) => {
         const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
         const isFull = table.available - inCartAtTable <= 0;
@@ -350,7 +348,7 @@ export function VenueGridMap({
           ? (seatsByZone[zone.id] ?? []).filter(s => cartSeatIds.includes(s.id)).length
           : 0;
         const tablesInCart = zone.type === 'TABLE'
-          ? (tablesByZone[zone.id] ?? []).reduce((s, t) => s + (cartQuantityByTable[t.id] ?? 0), 0)
+          ? (tablesByZone[zone.id] ?? []).reduce((s, tbl) => s + (cartQuantityByTable[tbl.id] ?? 0), 0)
           : 0;
         const isEmpty = inCart === 0 && tablesInCart === 0 && (zone.available ?? 0) <= 0;
         const className = [
@@ -368,7 +366,7 @@ export function VenueGridMap({
             <span className="text-gray-400">{formatPrice(zone.price, currency)}</span>
             {zone.available !== undefined && (
               <span className={isEmpty ? 'text-gray-400' : zone.available <= 5 ? 'text-amber-600' : 'text-gray-400'}>
-                · {isEmpty ? 'мест нет' : `${zone.available} мест`}
+                · {isEmpty ? t('gridMap.noSeats') : t('gridMap.seatsAvailable', { count: zone.available })}
               </span>
             )}
             {(inCart > 0 || seatsInCart > 0 || tablesInCart > 0) && (
@@ -396,25 +394,25 @@ export function VenueGridMap({
   return (
     <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
       <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
-        <span className="font-semibold text-gray-800">Выбор мест</span>
+        <span className="font-semibold text-gray-800">{t('gridMap.title')}</span>
         <button
           type="button"
           onClick={onClose}
-          title="Закрыть (Esc)"
+          title={t('common.closeEsc')}
           className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          Закрыть ✕
+          {t('common.close')} ✕
         </button>
       </div>
       {grid}
-      {loadingGrid && <p className="text-xs text-gray-400">Загрузка мест...</p>}
+      {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
       {legend}
       <button
         type="button"
         onClick={onClose}
         className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
       >
-        Готово
+        {t('common.done')}
       </button>
     </div>
   );

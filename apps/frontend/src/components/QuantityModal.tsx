@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { formatPrice } from '../types';
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export function QuantityModal({ title, price, currency, quantity, max, onChange, onClose }: Props) {
+  const { t } = useTranslation();
+
   return (
     <div
       className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
@@ -22,7 +25,7 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
       >
         <div>
           <h3 className="font-semibold text-gray-800 text-lg">{title}</h3>
-          <p className="text-sm text-gray-500">{formatPrice(price, currency)} за билет</p>
+          <p className="text-sm text-gray-500">{t('quantityModal.perTicket', { price: formatPrice(price, currency) })}</p>
         </div>
 
         <div className="flex items-center justify-center gap-5">
@@ -46,7 +49,11 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
         </div>
 
         <p className="text-center text-xs text-gray-400">
-          {max === 0 ? 'Мест нет' : quantity >= max ? `Доступно максимум ${max}` : `Доступно: ${max}`}
+          {max === 0
+            ? t('quantityModal.noSeats')
+            : quantity >= max
+              ? t('quantityModal.maxAvailable', { max })
+              : t('quantityModal.available', { max })}
         </p>
 
         <button
@@ -54,7 +61,7 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
           onClick={onClose}
           className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
         >
-          Готово
+          {t('common.done')}
         </button>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { ZoneTable } from '../types';
 
 interface Props {
@@ -7,8 +8,10 @@ interface Props {
 }
 
 export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
+  const { t } = useTranslation();
+
   if (tables.length === 0) {
-    return <p className="text-sm text-gray-400 text-center py-4">Столы не настроены</p>;
+    return <p className="text-sm text-gray-400 text-center py-4">{t('tablePicker.notConfigured')}</p>;
   }
 
   return (
@@ -38,7 +41,6 @@ export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
                 {inCart}
               </span>
             )}
-            {/* Table shape icon */}
             <div
               className={[
                 'mb-1.5 flex items-center justify-center border-2',
@@ -49,7 +51,7 @@ export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
               <span className="text-xs text-gray-500">{table.number}</span>
             </div>
 
-            <span className="text-xs font-medium text-gray-700">Стол {table.number}</span>
+            <span className="text-xs font-medium text-gray-700">{t('tablePicker.table', { number: table.number })}</span>
             <span
               className={[
                 'text-xs mt-0.5',
@@ -60,7 +62,7 @@ export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
                     : 'text-gray-400',
               ].join(' ')}
             >
-              {remaining}/{table.chairCount} своб.
+              {remaining}/{table.chairCount} {t('tablePicker.freeShort')}
             </span>
           </button>
         );

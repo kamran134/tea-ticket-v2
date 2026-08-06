@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import brandLogo from '../assets/brand-logo.svg';
 import {
   WHATSAPP_URL,
@@ -7,18 +8,13 @@ import {
   INSTAGRAM,
   TIKTOK,
   SITE_URL,
-  RIDERS_URL,
+  ridersUrl,
 } from '../lib/site';
-
-const copy = {
-  tagline: 'Премиальная кавер-группа Баку для корпоративов, свадеб и фестивалей.',
-  contactTitle: 'Контакты',
-  riders: 'Райдеры',
-  rights: 'BIR MANAT BAND',
-  legal: 'Все права защищены.',
-};
+import type { Lang } from '../i18n/types';
 
 export function Footer() {
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language as Lang;
   const year = new Date().getFullYear();
 
   return (
@@ -35,7 +31,7 @@ export function Footer() {
             />
           </a>
           <p className="mt-5 text-[var(--footer-muted)] max-w-md text-[15px] leading-relaxed">
-            {copy.tagline}
+            {t('footer.tagline')}
           </p>
           <div className="mt-6 flex flex-col items-start gap-3">
             <a
@@ -60,7 +56,7 @@ export function Footer() {
         </div>
 
         <div>
-          <p className="footer-eyebrow mb-4">{copy.contactTitle}</p>
+          <p className="footer-eyebrow mb-4">{t('footer.contactTitle')}</p>
           <ul className="space-y-2 text-[15px] text-[var(--footer-fg)]">
             <li>
               <a
@@ -89,8 +85,8 @@ export function Footer() {
 
       <div className="border-t border-[var(--footer-border)]">
         <div className="site-container py-8 flex flex-wrap justify-center gap-3">
-          <a href={RIDERS_URL} target="_blank" rel="noreferrer" className="footer-btn-ghost">
-            {copy.riders}
+          <a href={ridersUrl(lang)} target="_blank" rel="noreferrer" className="footer-btn-ghost">
+            {t('footer.riders')}
           </a>
         </div>
       </div>
@@ -98,7 +94,7 @@ export function Footer() {
       <div className="border-t border-[var(--footer-border)]">
         <div className="site-container py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] tracking-[0.18em] uppercase text-[var(--footer-muted)]">
           <p>
-            © {year} {copy.rights}. {copy.legal}
+            © {year} {t('footer.rights')}. {t('footer.legal')}
           </p>
           <p>Baku · AZ</p>
         </div>
