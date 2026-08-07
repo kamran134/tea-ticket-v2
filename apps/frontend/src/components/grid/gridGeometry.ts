@@ -4,11 +4,13 @@
 
 export const GRID_LINE = '#e5e7eb';
 
-// Fixed pixel size of one grid cell, on every screen. Because both track
-// dimensions are fixed, the canvas has a single intrinsic size that never
-// stretches to fill its container and never shrinks to fit it — a phone and a
-// desktop render the exact same picture, and whatever doesn't fit is reached
-// by scrolling (see GridCanvas).
+// Default/maximum pixel size of one grid cell. On mobile — and on desktop
+// when GridCanvas isn't given a fitCols target — both track dimensions are
+// fixed at this size, so the canvas has a single intrinsic size that never
+// stretches to fill its container and never shrinks to fit it, and whatever
+// doesn't fit is reached by scrolling. On desktop with fitCols set, the cell
+// shrinks below this size so that many columns fit without horizontal
+// scrolling (see GridCanvas).
 export const GRID_CELL_SIZE = 40;
 
 export interface ZoneBox { minRow: number; maxRow: number; minCol: number; maxCol: number }
