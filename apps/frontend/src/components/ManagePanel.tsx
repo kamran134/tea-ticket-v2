@@ -86,6 +86,7 @@ export function ManagePanel() {
   const [ticketFilter, setTicketFilter] = useState<TicketFilter>('BOOKED');
   const [filterVenueId, setFilterVenueId] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Confirm dialog
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
@@ -294,6 +295,14 @@ export function ManagePanel() {
     }
   };
 
+  const toggleGroupExpanded = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   // --- Derived state ---
 
   const selectedVenue = venues.find(v => v.id === selectedVenueId);
@@ -314,6 +323,19 @@ export function ManagePanel() {
     ticketFilter === 'ALL' ? allTickets : allTickets.filter(t => t.status === ticketFilter),
     [allTickets, ticketFilter],
   );
+
+  // Group tickets sharing a groupId into one accordion row; solo tickets
+  // (groupId === null) stay as their own single-item "group".
+  const displayedGroups = useMemo(() => {
+    const order: string[] = [];
+    const byKey = new Map<string, Ticket[]>();
+    for (const t of displayedTickets) {
+      const key = t.groupId ?? t.id;
+      if (!byKey.has(key)) { byKey.set(key, []); order.push(key); }
+      byKey.get(key)!.push(t);
+    }
+    return order.map(key => ({ key, tickets: byKey.get(key)! }));
+  }, [displayedTickets]);
 
   const TAB_LABELS: Record<Tab, string> = {
     venues: 'Мероприятия',
@@ -635,80 +657,179 @@ export function ManagePanel() {
               <div className="text-center text-gray-400 py-10">Загрузка...</div>
             )}
 
-            {!ticketsLoading && displayedTickets.length === 0 && (
+            {!ticketsLoading && displayedGroups.length === 0 && (
               <div className="text-center text-gray-400 py-10">Нет билетов</div>
             )}
 
             <div className="space-y-3">
-              {displayedTickets.map(t => {
-                const badge = STATUS_STYLE[t.status];
-                return (
-                  <div key={t.id} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold text-gray-800">{t.name}</div>
-                        <div className="text-sm text-gray-500">
-                          {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+              {displayedGroups.map(group => {
+                if (group.tickets.length === 1) {
+                  const t = group.tickets[0];
+                  const badge = STATUS_STYLE[t.status];
+                  return (
+                    <div key={group.key} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-semibold text-gray-800">{t.name}</div>
+                          <div className="text-sm text-gray-500">
+                            {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                          </div>
+                          {t.emailDelivery && (
+                            <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[t.emailDelivery.status].className}`}>
+                              {EMAIL_STATUS_STYLE[t.emailDelivery.status].label}
+                            </div>
+                          )}
+                          {t.status === 'CONFIRMED' && t.email && !t.emailDelivery && (
+                            <div className="text-xs mt-0.5 text-gray-400">Email ещё не в очереди</div>
+                          )}
                         </div>
-                        {t.groupId && (
-                          <div className="text-xs text-emerald-700 mt-0.5">Групповой билет</div>
+                        <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium ${badge.className}`}>
+                          {badge.label}
+                        </span>
+                      </div>
+
+                      {t.receiptLink && (
+                        <button
+                          type="button"
+                          onClick={() => openReceipt(t.id)}
+                          className="text-sm text-emerald-700 hover:underline block text-left"
+                        >
+                          Открыть чек →
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => copyTicketLink(t.id)}
+                        className="text-sm text-emerald-700 hover:underline block"
+                      >
+                        Скопировать ссылку на билет
+                      </button>
+
+                      <div className="flex gap-2">
+                        {(t.status === 'PENDING' || t.status === 'BOOKED') && (
+                          <>
+                            <button
+                              onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
+                              className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                            >
+                              Подтвердить
+                            </button>
+                            <button
+                              onClick={() => handleTicketStatus(t.id, 'REJECTED')}
+                              className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
+                            >
+                              Отклонить
+                            </button>
+                          </>
                         )}
-                        {t.emailDelivery && (
-                          <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[t.emailDelivery.status].className}`}>
-                            {EMAIL_STATUS_STYLE[t.emailDelivery.status].label}
+                        <button
+                          onClick={() => deleteTicket(t)}
+                          className="px-3 py-2 text-gray-400 hover:text-red-600 transition-colors text-sm rounded-xl hover:bg-red-50"
+                          title="Удалить"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Group of tickets sharing a groupId — status/email changes always
+                // cascade to every member on the backend, so members share one
+                // status badge and one confirm/reject action.
+                const primary = group.tickets[0];
+                const badge = STATUS_STYLE[primary.status];
+                const totalPrice = group.tickets.reduce((sum, t) => sum + t.price, 0);
+                const zoneNames = [...new Set(group.tickets.map(t => t.zoneName))].join(', ');
+                const isExpanded = expandedGroups.has(group.key);
+
+                return (
+                  <div key={group.key} className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroupExpanded(group.key)}
+                      className="w-full flex justify-between items-start text-left"
+                    >
+                      <div>
+                        <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                          <span className={`inline-block text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}>
+                            ›
+                          </span>
+                          Групповой билет · {group.tickets.length} чел.
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {primary.phone}{primary.email && ` · ${primary.email}`} · {zoneNames} · {formatPrice(totalPrice, ticketCurrency)}
+                        </div>
+                        {primary.emailDelivery && (
+                          <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[primary.emailDelivery.status].className}`}>
+                            {EMAIL_STATUS_STYLE[primary.emailDelivery.status].label}
                           </div>
                         )}
-                        {t.status === 'CONFIRMED' && t.email && !t.emailDelivery && (
+                        {primary.status === 'CONFIRMED' && primary.email && !primary.emailDelivery && (
                           <div className="text-xs mt-0.5 text-gray-400">Email ещё не в очереди</div>
                         )}
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full shrink-0 font-medium ${badge.className}`}>
                         {badge.label}
                       </span>
-                    </div>
+                    </button>
 
-                    {t.receiptLink && (
-                      <button
-                        type="button"
-                        onClick={() => openReceipt(t.id)}
-                        className="text-sm text-emerald-700 hover:underline block text-left"
-                      >
-                        Открыть чек →
-                      </button>
+                    {isExpanded && (
+                      <div className="space-y-2 border-t border-gray-100 pt-3">
+                        {group.tickets.map(t => (
+                          <div key={t.id} className="flex justify-between items-center gap-2 text-sm">
+                            <div>
+                              <div className="text-gray-700 font-medium">{t.name}</div>
+                              <div className="text-gray-400 text-xs">
+                                {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              {t.receiptLink && (
+                                <button
+                                  type="button"
+                                  onClick={() => openReceipt(t.id)}
+                                  className="text-emerald-700 hover:underline text-xs"
+                                >
+                                  Чек
+                                </button>
+                              )}
+                              <button
+                                onClick={() => deleteTicket(t)}
+                                className="px-2 py-1 text-gray-400 hover:text-red-600 transition-colors text-xs rounded-lg hover:bg-red-50"
+                                title="Удалить"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
 
                     <button
-                      onClick={() => copyTicketLink(t.id)}
+                      onClick={() => copyTicketLink(group.key)}
                       className="text-sm text-emerald-700 hover:underline block"
                     >
                       Скопировать ссылку на билет
                     </button>
 
-                    <div className="flex gap-2">
-                      {(t.status === 'PENDING' || t.status === 'BOOKED') && (
-                        <>
-                          <button
-                            onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
-                            className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
-                          >
-                            Подтвердить
-                          </button>
-                          <button
-                            onClick={() => handleTicketStatus(t.id, 'REJECTED')}
-                            className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
-                          >
-                            Отклонить
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => deleteTicket(t)}
-                        className="px-3 py-2 text-gray-400 hover:text-red-600 transition-colors text-sm rounded-xl hover:bg-red-50"
-                        title="Удалить"
-                      >
-                        🗑
-                      </button>
-                    </div>
+                    {(primary.status === 'PENDING' || primary.status === 'BOOKED') && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleTicketStatus(primary.id, 'CONFIRMED')}
+                          className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                        >
+                          Подтвердить группу
+                        </button>
+                        <button
+                          onClick={() => handleTicketStatus(primary.id, 'REJECTED')}
+                          className="flex-1 py-2 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
+                        >
+                          Отклонить группу
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
