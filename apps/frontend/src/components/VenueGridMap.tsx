@@ -8,6 +8,10 @@ import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footpr
 import { GridCanvas } from './grid/GridCanvas';
 import { zoneColor } from './grid/zoneColors';
 
+// On desktop, shrink cells so up to this many columns fit in the canvas
+// without a horizontal scrollbar; beyond it cells stay at GRID_CELL_SIZE.
+const DESKTOP_FIT_COLS = 45;
+
 interface Props {
   venue: Venue;
   zones: Zone[];
@@ -112,7 +116,7 @@ export function VenueGridMap({
   if (usedZones.length === 0) return null;
 
   const grid = (
-    <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="65vh">
+    <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="80vh" fitCols={DESKTOP_FIT_COLS}>
       {layout.cells.map((row, r) =>
         row.map((cell, c) => {
           const place = cellToGridArea(r, c);
