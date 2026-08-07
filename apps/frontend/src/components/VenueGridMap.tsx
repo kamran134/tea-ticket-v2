@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
@@ -7,6 +7,7 @@ import { TableIcon, type Footprint } from './TableIcon';
 import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea, cellToGridArea } from './grid/gridGeometry';
 import { GridCanvas } from './grid/GridCanvas';
 import { zoneColor } from './grid/zoneColors';
+import { ConfirmDialog } from './ConfirmDialog';
 
 // On desktop, shrink cells so up to this many columns fit in the canvas
 // without a horizontal scrollbar; beyond it cells stay at GRID_CELL_SIZE.
@@ -22,23 +23,43 @@ interface Props {
   onZoneOpen: (zone: Zone) => void;
   onSeatToggle: (zone: Zone, seat: Seat) => void;
   onTableOpen: (zone: Zone, table: ZoneTable) => void;
+  /** Proceed: keep the current selection and close (top "Buy" / bottom "Done"). */
   onClose: () => void;
+  /** Cancel: confirmed via the dialog below, discards the selection made since the map was opened. */
+  onCancel: () => void;
+  /** True while a QuantityModal (the +/- counter for a table or a seatless zone) is open on top of this map — Escape should close that first. */
+  quantityModalOpen: boolean;
 }
 
 export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
-  onZoneOpen, onSeatToggle, onTableOpen, onClose,
+  onZoneOpen, onSeatToggle, onTableOpen, onClose, onCancel, quantityModalOpen,
 }: Props) {
   const { t } = useTranslation();
   const layout = venue.gridLayout;
 
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const hasSelection = cartSeatIds.length > 0
+    || Object.values(cartQuantityByZone).some(q => q > 0)
+    || Object.values(cartQuantityByTable).some(q => q > 0);
+
+  // Close (X / Escape) is a cancel, not a proceed — warn before throwing away
+  // a selection; an empty selection has nothing to lose, so skip the dialog.
+  const requestClose = useCallback(() => {
+    if (hasSelection) setConfirmingCancel(true);
+    else onCancel();
+  }, [hasSelection, onCancel]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      // A QuantityModal layered on top handles its own Escape; let that
+      // happen first and only close this map once it's gone.
+      if (e.key !== 'Escape' || quantityModalOpen) return;
+      requestClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [quantityModalOpen, requestClose]);
 
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
@@ -396,28 +417,51 @@ export function VenueGridMap({
   );
 
   return (
-    <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
-      <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
-        <span className="font-semibold text-gray-800">{t('gridMap.title')}</span>
+    <>
+      <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
+        <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
+          <span className="font-semibold text-gray-800">{t('gridMap.title')}</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-9 px-4 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              {t('gridMap.buy')}
+            </button>
+            <button
+              type="button"
+              onClick={requestClose}
+              title={t('common.closeEsc')}
+              aria-label={t('common.close')}
+              className="h-9 w-9 shrink-0 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        {grid}
+        {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
+        {legend}
         <button
           type="button"
           onClick={onClose}
-          title={t('common.closeEsc')}
-          className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
         >
-          {t('common.close')} ✕
+          {t('common.done')}
         </button>
       </div>
-      {grid}
-      {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
-      {legend}
-      <button
-        type="button"
-        onClick={onClose}
-        className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-      >
-        {t('common.done')}
-      </button>
-    </div>
+
+      {confirmingCancel && (
+        <ConfirmDialog
+          title={t('gridMap.cancelSelectionTitle')}
+          message={t('gridMap.cancelSelectionMessage')}
+          confirmLabel={t('gridMap.cancelSelectionConfirm')}
+          cancelLabel={t('gridMap.cancelSelectionKeep')}
+          onConfirm={onCancel}
+          onCancel={() => setConfirmingCancel(false)}
+        />
+      )}
+    </>
   );
 }

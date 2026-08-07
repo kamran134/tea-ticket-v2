@@ -123,6 +123,11 @@ const en = {
     seatTooltip: '{{zone}} · Seat {{number}} · {{price}}{{occupied}}',
     tableTooltip: '{{zone}} · Table {{number}} · {{remaining}}/{{total}} free · {{price}}',
     zoneTooltip: '{{zone}} · {{price}}{{empty}}',
+    buy: 'Buy',
+    cancelSelectionTitle: 'Cancel seat selection?',
+    cancelSelectionMessage: 'Do you want to cancel your seat selection?',
+    cancelSelectionConfirm: 'Yes, cancel',
+    cancelSelectionKeep: 'No, keep going',
   },
   seatPicker: {
     notConfigured: 'Seats not configured',

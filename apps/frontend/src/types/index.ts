@@ -63,6 +63,7 @@ export interface Zone {
   tableChairs: number | null;
   tableShape: TableShape | null;
   available?: number;
+  totalCapacity?: number;
 }
 
 export interface Seat {

@@ -125,6 +125,11 @@ const ru = {
     seatTooltip: '{{zone}} · Место {{number}} · {{price}}{{occupied}}',
     tableTooltip: '{{zone}} · Стол {{number}} · {{remaining}}/{{total}} своб. · {{price}}',
     zoneTooltip: '{{zone}} · {{price}}{{empty}}',
+    buy: 'Купить',
+    cancelSelectionTitle: 'Отменить выбор мест?',
+    cancelSelectionMessage: 'Вы хотите отменить выбор мест?',
+    cancelSelectionConfirm: 'Да, отменить',
+    cancelSelectionKeep: 'Нет, продолжить',
   },
   seatPicker: {
     notConfigured: 'Места не настроены',

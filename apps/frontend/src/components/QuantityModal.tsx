@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatPrice } from '../types';
 
@@ -13,6 +14,17 @@ interface Props {
 
 export function QuantityModal({ title, price, currency, quantity, max, onChange, onClose }: Props) {
   const { t } = useTranslation();
+
+  // Every +/- click already commits straight to the cart, so there's nothing
+  // to discard here — Escape just closes the popup, same as the backdrop
+  // click and the "Done" button below.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   return (
     <div
