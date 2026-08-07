@@ -125,6 +125,11 @@ const az = {
     seatTooltip: '{{zone}} · Yer {{number}} · {{price}}{{occupied}}',
     tableTooltip: '{{zone}} · Masa {{number}} · {{remaining}}/{{total}} boş · {{price}}',
     zoneTooltip: '{{zone}} · {{price}}{{empty}}',
+    buy: 'Al',
+    cancelSelectionTitle: 'Yer seçimini ləğv edim?',
+    cancelSelectionMessage: 'Yer seçimini ləğv etmək istəyirsiniz?',
+    cancelSelectionConfirm: 'Bəli, ləğv et',
+    cancelSelectionKeep: 'Xeyr, davam et',
   },
   seatPicker: {
     notConfigured: 'Yerlər konfiqurasiya edilməyib',

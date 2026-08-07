@@ -49,17 +49,20 @@ zonesRouter.get('/', async (req, res) => {
 
     const zonesWithAvailability = zones.map(z => {
       let available: number;
+      let totalCapacity: number;
       if (z.type === 'SEATED') {
         const occupied = ticketCountMap[z.id] ?? 0;
-        available = (seatTotalMap[z.id] ?? 0) - occupied;
+        totalCapacity = seatTotalMap[z.id] ?? 0;
+        available = totalCapacity - occupied;
       } else if (z.type === 'TABLE') {
-        const totalChairs = tableCapMap[z.id] ?? 0;
         const occupied = ticketCountMap[z.id] ?? 0;
-        available = totalChairs - occupied;
+        totalCapacity = tableCapMap[z.id] ?? 0;
+        available = totalCapacity - occupied;
       } else {
+        totalCapacity = z.capacity;
         available = z.capacity - (ticketCountMap[z.id] ?? 0);
       }
-      return { ...z, available };
+      return { ...z, available, totalCapacity };
     });
 
     return res.json({ success: true, data: zonesWithAvailability });

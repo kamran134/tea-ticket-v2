@@ -57,6 +57,7 @@ export function RegisterForm({ slug }: Props) {
   const [quantityModalZoneId, setQuantityModalZoneId] = useState<string | null>(null);
   const [quantityModalTable, setQuantityModalTable] = useState<{ zone: Zone; table: ZoneTable } | null>(null);
   const [gridMapOpen, setGridMapOpen] = useState(false);
+  const [gridCartSnapshot, setGridCartSnapshot] = useState<CartLine[] | null>(null);
 
   useEffect(() => {
     document.title = t('titles.register');
@@ -83,8 +84,13 @@ export function RegisterForm({ slug }: Props) {
     }
   }
   const hasGridZones = gridZoneIds.size > 0;
-  const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id));
-  const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id));
+  // A SEATED/TABLE zone with zero ever-created seats/tables is an unfinished
+  // admin draft (created but never drawn on the grid) — not a sellable legacy
+  // zone. GENERAL zones are excluded from this check: their capacity is a
+  // standalone field set by the admin and is valid without any drawing.
+  const isPhantomZone = (z: Zone) => (z.type === 'SEATED' || z.type === 'TABLE') && (z.totalCapacity ?? 0) === 0;
+  const tableZones = zones.filter(z => z.type === 'TABLE' && !gridZoneIds.has(z.id) && !isPhantomZone(z));
+  const cardZones = zones.filter(z => z.type !== 'TABLE' && !gridZoneIds.has(z.id) && !isPhantomZone(z));
 
   const legacyTableZoneKey = tableZones.map(z => z.id).join(',');
   useEffect(() => {
@@ -191,6 +197,21 @@ export function RegisterForm({ slug }: Props) {
     else if (zone.type === 'GENERAL') setQuantityModalZoneId(zone.id);
   };
 
+  const openGridMap = () => {
+    setGridCartSnapshot(cart);
+    setGridMapOpen(true);
+  };
+
+  const closeGridMap = () => {
+    setGridMapOpen(false);
+    setGridCartSnapshot(null);
+  };
+
+  const cancelGridSelection = () => {
+    if (gridCartSnapshot) setCart(gridCartSnapshot);
+    closeGridMap();
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!venue || cart.length === 0) return;
@@ -271,7 +292,7 @@ export function RegisterForm({ slug }: Props) {
                 <label className="block text-sm font-medium text-gray-700 mb-2">{t('register.seats')}</label>
                 <button
                   type="button"
-                  onClick={() => setGridMapOpen(true)}
+                  onClick={openGridMap}
                   className={[
                     'w-full flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
                     gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-emerald-300',
@@ -298,7 +319,9 @@ export function RegisterForm({ slug }: Props) {
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                 onSeatToggle={toggleSeatInCart}
                 onTableOpen={(zone, table) => setQuantityModalTable({ zone, table })}
-                onClose={() => setGridMapOpen(false)}
+                onClose={closeGridMap}
+                onCancel={cancelGridSelection}
+                quantityModalOpen={!!quantityModalZoneId || !!quantityModalTable}
               />
             )}
 
