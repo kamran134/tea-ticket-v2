@@ -22,7 +22,7 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
-    image: ${BACKEND_IMAGE:-tea-ticket-backend:latest}
+    image: ghcr.io/${GITHUB_REPOSITORY:-kamran134/tea-ticket-v2}/backend:${BACKEND_TAG:-bmb}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${BACKEND_PORT:-3001}:3000"
@@ -52,7 +52,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
-      - ${UPLOADS_PATH}:/app/uploads
+      - ${UPLOADS_PATH:-/var/www/tickets.birmanatband/uploads}:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -65,7 +65,7 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
-    image: ${FRONTEND_IMAGE:-tea-ticket-frontend:latest}
+    image: ghcr.io/${GITHUB_REPOSITORY:-kamran134/tea-ticket-v2}/frontend:${FRONTEND_TAG:-bmb}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
@@ -76,7 +76,7 @@ services:
     build:
       context: ./apps/birmanat-bank
       dockerfile: Dockerfile
-    image: ${BIRMANAT_BANK_IMAGE:-tea-ticket-birmanat-bank:latest}
+    image: ghcr.io/${GITHUB_REPOSITORY:-kamran134/tea-ticket-v2}/birmanat-bank:${BIRMANAT_BANK_TAG:-bmb}
     restart: unless-stopped
     ports:
       - "127.0.0.1:${BIRMANAT_BANK_PORT:-8082}:80"
