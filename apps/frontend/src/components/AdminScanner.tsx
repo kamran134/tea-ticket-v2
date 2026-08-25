@@ -26,6 +26,7 @@ export function AdminScanner() {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [manualId, setManualId] = useState('');
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const lastScanRef = useRef('');
 
@@ -163,9 +164,11 @@ export function AdminScanner() {
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
           )}
-          <form onSubmit={login} className="space-y-3">
+          <form data-testid="admin-login" onSubmit={login} className="space-y-3">
             <input
               type="password"
+              data-testid="admin-password"
+              aria-label="Пароль"
               placeholder="Пароль"
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={password}
@@ -174,6 +177,7 @@ export function AdminScanner() {
             />
             <button
               type="submit"
+              data-testid="admin-login-submit"
               className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
             >
               Войти
@@ -185,7 +189,7 @@ export function AdminScanner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
+    <div data-testid="scanner" className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-md mx-auto space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">QR Сканер</h1>
@@ -196,6 +200,7 @@ export function AdminScanner() {
 
         {message && (
           <div
+            data-testid={messageType === 'success' ? 'scanner-success' : 'scanner-error'}
             className={`p-3 rounded-xl text-center font-semibold transition-all ${
               messageType === 'success' ? 'bg-green-600' : 'bg-red-600'
             }`}
@@ -216,8 +221,26 @@ export function AdminScanner() {
           {scanning ? 'Остановить сканер' : 'Сканировать'}
         </button>
 
+        <div className="flex gap-2">
+          <input
+            data-testid="scanner-input"
+            value={manualId}
+            onChange={e => setManualId(e.target.value)}
+            placeholder="ID билета"
+            className="flex-1 rounded-xl bg-gray-800 border border-gray-700 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            data-testid="scanner-submit"
+            onClick={() => { if (manualId.trim()) void handleScan(manualId.trim()); }}
+            className="px-4 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-sm font-semibold"
+          >
+            Найти
+          </button>
+        </div>
+
         {ticket && (
-          <div className="bg-gray-800 rounded-2xl p-4 space-y-3">
+          <div data-testid="scanner-result" className="bg-gray-800 rounded-2xl p-4 space-y-3">
             <div className="flex justify-between items-start">
               <div>
                 <div className="font-semibold">
@@ -259,6 +282,7 @@ export function AdminScanner() {
                   </div>
                 )}
                 <button
+                  data-testid="checkin-submit"
                   onClick={confirmEntry}
                   disabled={confirming || (isGroup && selectedMemberIds.size === 0)}
                   className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-xl font-semibold transition-colors"

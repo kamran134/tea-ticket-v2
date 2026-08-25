@@ -44,6 +44,7 @@ export function Afisha() {
                 <a
                   key={v.id}
                   href={`/e/${v.slug}`}
+                  data-testid={`event-card-${v.id}`}
                   className="group block bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                 >
                   <div className="aspect-[4/3] bg-gradient-to-br from-emerald-100 to-amber-100 overflow-hidden">
@@ -58,7 +59,7 @@ export function Afisha() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h2 className="font-semibold text-gray-800 text-lg">{v.name}</h2>
+                    <h2 data-testid="event-open" className="font-semibold text-gray-800 text-lg">{v.name}</h2>
                     <p className="text-sm text-gray-500 mt-1">{formatEventDate(v.date)}</p>
                   </div>
                 </a>

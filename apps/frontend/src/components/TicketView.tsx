@@ -208,10 +208,7 @@ export function TicketView() {
       const payment = await api.createPayment(ticket.id);
       window.location.href = payment.redirectUrl;
     } catch (err) {
-      const msg = translateApiError(
-        err instanceof Error ? err.message : '',
-        'ticket.paymentStartError',
-      );
+      const msg = translateApiError(err, 'ticket.paymentStartError');
       setPaymentMessage(msg);
       toast.error(msg);
       setPaying(false);
@@ -242,7 +239,7 @@ export function TicketView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
+    <div data-testid="ticket-page" className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
       <Header />
       <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
       <div className="max-w-md mx-auto space-y-4">
@@ -251,8 +248,11 @@ export function TicketView() {
             <div>
               <h1 className="text-xl font-bold text-gray-800">{ticket.name}</h1>
               <p className="text-gray-500 text-sm">{ticket.zoneName}</p>
+              <span data-testid="ticket-number" className="sr-only">{ticket.groupId ?? ticket.id}</span>
             </div>
             <span
+              data-testid="ticket-status"
+              data-ticket-status={ticket.status}
               className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[ticket.status]}`}
             >
               {statusLabels[ticket.status]}
@@ -274,7 +274,7 @@ export function TicketView() {
             <span className="text-sm text-gray-500">
               {members.length > 1 ? `${t('common.total')} · ${t('common.people', { count: members.length })}` : t('common.cost')}
             </span>
-            <span className="text-xl font-bold text-emerald-700">
+            <span data-testid="ticket-total" className="text-xl font-bold text-emerald-700">
               {formatPrice(
                 members.length > 1 ? members.reduce((sum, m) => sum + m.price, 0) : ticket.price,
                 currency,
@@ -323,8 +323,10 @@ export function TicketView() {
           </div>
         )}
 
-        {ticket.status === 'BOOKED' && (
-          <div className={`rounded-2xl p-6 text-center space-y-4 border ${
+          {ticket.status === 'BOOKED' && (
+          <div
+            data-payment-status={pollingPayment ? 'PROCESSING' : isHoldExpired(ticket) ? 'EXPIRED' : 'CREATED'}
+            className={`rounded-2xl p-6 text-center space-y-4 border ${
             isHoldExpired(ticket)
               ? 'bg-gray-50 border-gray-300'
               : 'bg-yellow-50 border-yellow-200'
@@ -354,6 +356,7 @@ export function TicketView() {
             {!isHoldExpired(ticket) && (
               <button
                 type="button"
+                data-testid="payment-button"
                 onClick={() => { void handlePay(); }}
                 disabled={paying || pollingPayment}
                 className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
@@ -402,7 +405,7 @@ export function TicketView() {
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center gap-3">
             <div className="text-2xl">✅</div>
             <h2 className="font-semibold text-green-800">{t('ticket.confirmed')}</h2>
-            <div className="p-3 bg-gray-50 rounded-xl">
+            <div data-testid="ticket-qr" className="p-3 bg-gray-50 rounded-xl">
               <QRCodeSVG value={ticket.groupId ?? ticket.id} size={200} />
             </div>
             <p className="text-xs text-gray-500">{t('ticket.showQr')}</p>

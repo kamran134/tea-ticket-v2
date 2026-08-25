@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import rateLimit from 'express-rate-limit';
 import { env } from '../env';
+import { ErrorCodes, fail } from '../errors';
 
 export const authRouter = Router();
 
@@ -13,23 +14,23 @@ const loginRateLimit = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, error: 'Too many login attempts, please try again later' },
+  message: { success: false, error: { code: 'RATE_LIMITED', message: 'Too many login attempts, please try again later' } },
 });
 
 authRouter.post('/login', loginRateLimit, async (req, res) => {
   const { password } = req.body as { password?: string };
   if (!password) {
-    return res.status(400).json({ success: false, error: 'Password required' });
+    return fail(res, 400, ErrorCodes.VALIDATION_ERROR, 'Password required');
   }
 
   const hash = process.env.ADMIN_PASSWORD_HASH;
   if (!hash) {
-    return res.status(500).json({ success: false, error: 'Admin password not configured' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Admin password not configured');
   }
 
   const valid = await bcrypt.compare(password, hash);
   if (!valid) {
-    return res.status(401).json({ success: false, error: 'Invalid password' });
+    return fail(res, 401, ErrorCodes.UNAUTHORIZED, 'Invalid password');
   }
 
   const token = jwt.sign({ admin: true }, env.JWT_SECRET, { expiresIn: '24h' });

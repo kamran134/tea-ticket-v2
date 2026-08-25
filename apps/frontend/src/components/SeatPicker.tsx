@@ -69,6 +69,9 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
                         type="button"
                         disabled={!canSelect}
                         onClick={() => onToggle(seat)}
+                        data-testid={`seat-${seat.id}`}
+                        data-seat-id={seat.id}
+                        data-seat-status={isOccupied ? 'occupied' : isSelected ? 'selected' : 'available'}
                         title={t('seatPicker.seat', { number: seat.number })}
                         className={[
                           'w-7 h-7 rounded text-xs font-bold transition-colors border relative',

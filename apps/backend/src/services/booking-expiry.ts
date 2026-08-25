@@ -36,8 +36,11 @@ export async function expireStalePayments(prisma: PrismaClient): Promise<number>
 }
 
 export function getExpiryCronExpression(): string {
-  // 6-field cron (seconds): быстрее в dev при коротком hold
-  if (process.env.PAYMENT_HOLD_SECONDS) {
+  if (
+    process.env.PAYMENT_HOLD_SECONDS ||
+    process.env.BOOKING_TTL_SECONDS ||
+    process.env.PAYMENT_TTL_SECONDS
+  ) {
     return '*/5 * * * * *';
   }
   return '0 * * * * *';

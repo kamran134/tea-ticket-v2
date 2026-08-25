@@ -32,18 +32,18 @@ export function mockPaymentsRouter(): Router {
     .cancel { background: #fff3e0; }
   </style>
 </head>
-<body>
+<body data-testid="mock-payment-page" data-payment-status="${session.status}">
   <h1>Mock Bank — оплата</h1>
   <p>${session.description}</p>
-  <p class="amount">${session.amount} ${session.currency}</p>
+  <p class="amount" data-testid="mock-payment-amount">${session.amount} ${session.currency}</p>
   <form method="post" action="/api/mock-payments/${req.params.token}/success">
-    <button type="submit" class="success">Успешная оплата</button>
+    <button type="submit" class="success" data-testid="mock-payment-success">Успешная оплата</button>
   </form>
   <form method="post" action="/api/mock-payments/${req.params.token}/failure">
-    <button type="submit" class="failure">Отклонить платёж</button>
+    <button type="submit" class="failure" data-testid="mock-payment-failure">Отклонить платёж</button>
   </form>
   <form method="post" action="/api/mock-payments/${req.params.token}/cancel">
-    <button type="submit" class="cancel">Отмена</button>
+    <button type="submit" class="cancel" data-testid="mock-payment-cancel">Отмена</button>
   </form>
 </body>
 </html>`;

@@ -20,5 +20,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Uploads
-uploads/
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

@@ -43,15 +43,17 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
         <div className="flex items-center justify-center gap-5">
           <button
             type="button"
+            data-testid="quantity-minus"
             onClick={() => onChange(Math.max(0, quantity - 1))}
             disabled={quantity <= 0}
             className="w-11 h-11 rounded-full bg-gray-100 hover:bg-gray-200 text-2xl font-bold text-gray-700 disabled:opacity-40 transition-colors"
           >
             −
           </button>
-          <span className="text-3xl font-bold text-gray-800 w-10 text-center">{quantity}</span>
+          <span data-testid="quantity-value" className="text-3xl font-bold text-gray-800 w-10 text-center">{quantity}</span>
           <button
             type="button"
+            data-testid="quantity-plus"
             onClick={() => onChange(Math.min(max, quantity + 1))}
             disabled={quantity >= max}
             className="w-11 h-11 rounded-full bg-gray-100 hover:bg-gray-200 text-2xl font-bold text-gray-700 disabled:opacity-40 transition-colors"
@@ -70,10 +72,19 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
 
         <button
           type="button"
+          data-testid="quantity-confirm"
           onClick={onClose}
           className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
         >
           {t('common.done')}
+        </button>
+        <button
+          type="button"
+          data-testid="quantity-cancel"
+          onClick={onClose}
+          className="w-full py-2 text-sm text-gray-500 hover:text-gray-700"
+        >
+          {t('common.close')}
         </button>
       </div>
     </div>

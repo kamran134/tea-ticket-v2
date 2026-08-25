@@ -153,6 +153,14 @@ const en = {
     bookingExpired: 'Booking time expired. Make a new booking on the events page.',
     ticketNotPayable: 'Ticket is not available for payment.',
     checkoutNotPayable: 'Payment is no longer available for this booking.',
+    eventNotFound: 'Event not found.',
+    eventNotAvailable: 'This event is not available for purchase.',
+    seatAlreadyBooked: 'This seat is already booked.',
+    tableCapacityExceeded: 'Not enough chairs at this table.',
+    zoneCapacityExceeded: 'Not enough seats in this zone.',
+    ticketNotConfirmed: 'Ticket is not confirmed.',
+    ticketAlreadyCheckedIn: 'This ticket is already checked in.',
+    paymentAlreadyCompleted: 'Payment is already completed.',
   },
 } as const;
 

@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../env';
+import { ErrorCodes, fail } from '../errors';
 
 export function requireAuth(req: Request, res: Response, next: NextFunction): void {
   const header = req.headers.authorization;
   if (!header?.startsWith('Bearer ')) {
-    res.status(401).json({ success: false, error: 'Unauthorized' });
+    fail(res, 401, ErrorCodes.UNAUTHORIZED, 'Unauthorized');
     return;
   }
 
@@ -14,6 +15,6 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     jwt.verify(token, env.JWT_SECRET);
     next();
   } catch {
-    res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    fail(res, 401, ErrorCodes.UNAUTHORIZED, 'Invalid or expired token');
   }
 }

@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [bank-emulation, master, main]
+  pull_request:
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: teaticket_test
+          POSTGRES_USER: teaticket
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U teaticket"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://teaticket:secret@localhost:5432/teaticket_test
+      JWT_SECRET: ci-jwt-secret
+      TEST_MODE: 'true'
+      PAYMENT_PROVIDER: mock
+      BOOKING_TTL_SECONDS: '30'
+      PAYMENT_TTL_SECONDS: '30'
+      MOCK_WEBHOOK_SECRET: test-mock-webhook-secret
+      PUBLIC_APP_URL: http://localhost:3001
+      PUBLIC_FRONTEND_URL: http://localhost:5173
+      EMAIL_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate --schema apps/backend/prisma/schema.prisma
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npx prisma migrate deploy --schema apps/backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+      - run: npm test --workspace=apps/backend
+      - run: npm test --workspace=apps/frontend
+      - run: npm run build
+
+  e2e:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    needs: verify
+    if: false
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Enable after a dedicated e2e environment is wired with TEST_MODE and mock payments."

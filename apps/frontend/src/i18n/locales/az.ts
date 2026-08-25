@@ -155,6 +155,14 @@ const az = {
     bookingExpired: 'Rezervasiya vaxtı bitdi. Afışada yeni rezervasiya edin.',
     ticketNotPayable: 'Bilet ödəniş üçün mövcud deyil.',
     checkoutNotPayable: 'Bu rezervasiya üçün ödəniş artıq mövcud deyil.',
+    eventNotFound: 'Tədbir tapılmadı.',
+    eventNotAvailable: 'Bu tədbir satış üçün mövcud deyil.',
+    seatAlreadyBooked: 'Bu yer artıq tutulub.',
+    tableCapacityExceeded: 'Bu masada boş yer yoxdur.',
+    zoneCapacityExceeded: 'Bu zonada boş yer yoxdur.',
+    ticketNotConfirmed: 'Bilet təsdiqlənməyib.',
+    ticketAlreadyCheckedIn: 'Bu bilet artıq qeydiyyatdan keçib.',
+    paymentAlreadyCompleted: 'Ödəniş artıq tamamlanıb.',
   },
 } as const;
 
