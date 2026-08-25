@@ -193,10 +193,14 @@ export function VenueGridMap({
             }
             const isSelected = cartSeatIds.includes(seat.id);
             const isOccupied = seat.occupied;
+            const seatStatus = isOccupied ? 'occupied' : isSelected ? 'selected' : 'available';
             return (
               <div
                 key={`${r}-${c}`}
                 onClick={() => !isOccupied && onSeatToggle(zone, seat)}
+                data-testid={`seat-${seat.id}`}
+                data-seat-id={seat.id}
+                data-seat-status={seatStatus}
                 title={t('gridMap.seatTooltip', {
                   zone: zone.name,
                   number: seat.number,
@@ -243,10 +247,20 @@ export function VenueGridMap({
             const remaining = table.available - inCartAtTable;
             const isFull = remaining <= 0;
             const sameTable = (nr: number, nc: number) => tableByCell.get(`${zone.id}|${nr}|${nc}`) === table;
+            const isAnchor = r === table.row && c === table.col;
             return (
               <div
                 key={`${r}-${c}`}
                 onClick={() => !isFull && onTableOpen(zone, table)}
+                {...(isAnchor
+                  ? {
+                      'data-testid': `table-${table.id}`,
+                    }
+                  : {})}
+                data-table-id={table.id}
+                data-table-status={isFull ? 'occupied' : inCartAtTable > 0 ? 'selected' : 'available'}
+                data-table-capacity={table.chairCount}
+                data-table-available={remaining}
                 title={t('gridMap.tableTooltip', {
                   zone: zone.name,
                   number: table.number,

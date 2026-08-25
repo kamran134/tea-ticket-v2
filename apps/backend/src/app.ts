@@ -14,6 +14,8 @@ import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { createResendInboundWebhookHandler } from './routes/resend-inbound';
 import { mockPaymentsRouter } from './routes/mock-payments';
+import { testRouter } from './routes/test';
+import { requestIdMiddleware } from './middleware/requestId';
 import { createPaymentProvider, loadPaymentProviderConfig } from './services/payments/factory';
 import {
   getPaymentHoldMs,
@@ -64,6 +66,7 @@ export function createApp(options?: {
   app.set('trust proxy', 1);
 
   app.use(helmet());
+  app.use(requestIdMiddleware);
   app.use(cors({ origin: process.env.CORS_ORIGIN ?? '*' }));
 
   // Webhook до JSON parser — см. routes/webhooks.ts
@@ -103,6 +106,7 @@ export function createApp(options?: {
   app.use('/api/zones', zonesRouter);
   app.use('/api/grid-templates', gridTemplatesRouter);
   app.use('/api/payments', paymentsRouter(paymentService));
+  app.use('/api/test', testRouter(paymentService));
 
   // Mock hosted page — только для PAYMENT_PROVIDER=mock
   if (providerConfig.provider === 'mock') {

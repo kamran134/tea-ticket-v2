@@ -152,10 +152,8 @@ export interface RegisterResult {
   expiresAt?: string;
 }
 
-// What GET /api/tickets/:id and /group/:groupId actually return — the
-// backend strips phone/email for anyone but the exact ticket id requested
-// (and even then not when that id turns out to be a bare groupId, which has
-// no single established "owner"). See tickets.ts's withoutContactInfo.
+// What GET /api/tickets/:id and /group/:groupId actually return — phone/email
+// are omitted on public ticket URLs (AUDIT S5). Admin list keeps contacts.
 export type PublicTicket = Omit<Ticket, 'phone' | 'email'> & {
   phone?: string;
   email?: string | null;
@@ -168,8 +166,13 @@ export interface CartItem {
   quantity?: number;
 }
 
+export interface ApiErrorBody {
+  code: string;
+  message: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: string;
+  error?: string | ApiErrorBody;
 }

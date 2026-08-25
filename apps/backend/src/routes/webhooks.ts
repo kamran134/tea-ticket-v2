@@ -5,6 +5,8 @@ import {
   kickEmailJobProcessing,
   type EmailJobProcessor,
 } from '../services/email';
+import { ErrorCodes, fail } from '../errors';
+import { logScope } from '../middleware/requestId';
 
 // POST /api/webhooks/payments/:provider
 // Webhook от платёжного провайдера (server-to-server). Подключается в app.ts до express.json(),
@@ -16,7 +18,7 @@ export function createWebhookHandler(
   return async (req: Request, res: Response): Promise<void> => {
     const rawBody = req.body as Buffer;
     if (!Buffer.isBuffer(rawBody)) {
-      res.status(400).json({ success: false, error: 'Expected raw body' });
+      fail(res, 400, ErrorCodes.VALIDATION_ERROR, 'Expected raw body');
       return;
     }
 
@@ -26,6 +28,12 @@ export function createWebhookHandler(
         rawBody,
         req.headers,
       );
+
+      logScope('webhooks/payments', 'webhook handled', {
+        provider: req.params.provider,
+        processed: result.processed,
+        paymentId: result.paymentId,
+      });
 
       if (emailJobProcessor) {
         res.on('finish', () => {
@@ -38,11 +46,11 @@ export function createWebhookHandler(
       res.status(200).json({ success: true, data: result });
     } catch (err) {
       if (err instanceof PaymentError) {
-        res.status(err.status).json({ success: false, error: err.message });
+        fail(res, err.status, err.code, err.message);
         return;
       }
       console.error('[webhooks/payments]', err);
-      res.status(500).json({ success: false, error: 'Webhook processing failed' });
+      fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Webhook processing failed');
     }
   };
 }

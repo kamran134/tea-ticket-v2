@@ -15,6 +15,7 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.zoneTable.deleteMany();
   await prisma.zone.deleteMany();
   await prisma.venue.deleteMany();
+  await prisma.gridTemplate.deleteMany();
 }
 
 export async function seedVenueWithZone(prisma: PrismaClient): Promise<{

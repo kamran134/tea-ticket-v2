@@ -47,7 +47,7 @@ export function createResendWebhookHandler(
         },
         webhookSecret: config.webhookSecret,
       }) as ResendEventLike;
-    } catch (err) {
+    } catch {
       console.warn('[email-webhook] invalid signature');
       res.status(401).json({ success: false, error: 'Invalid webhook signature' });
       return;

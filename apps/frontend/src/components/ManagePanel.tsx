@@ -352,9 +352,11 @@ export function ManagePanel() {
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
           )}
-          <form onSubmit={login} className="space-y-3">
+          <form data-testid="admin-login" onSubmit={login} className="space-y-3">
             <input
               type="password"
+              data-testid="admin-password"
+              aria-label="Пароль"
               placeholder="Пароль"
               className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
               value={password}
@@ -363,6 +365,7 @@ export function ManagePanel() {
             />
             <button
               type="submit"
+              data-testid="admin-login-submit"
               className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
             >
               Войти

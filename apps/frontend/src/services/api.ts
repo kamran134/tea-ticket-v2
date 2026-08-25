@@ -21,14 +21,51 @@ import type {
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
 
+export class ApiError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function readError(json: ApiResponse<unknown>): { code: string; message: string } {
+  const e = json.error;
+  if (typeof e === 'string') return { code: e, message: e };
+  if (e && typeof e === 'object') {
+    return { code: e.code || 'UNKNOWN', message: e.message || 'Unknown error' };
+  }
+  return { code: 'UNKNOWN', message: 'Unknown error' };
+}
+
+function throwApiError(json: ApiResponse<unknown>, fallback: string): never {
+  const err = readError(json.success === false ? json : { success: false, error: fallback });
+  throw new ApiError(err.code, err.message || fallback);
+}
+
+function clearExpiredAdminSession(path: string): void {
+  if (path.includes('/api/auth/login')) return;
+  localStorage.removeItem('admin_token');
+  const page = window.location.pathname;
+  if (page.startsWith('/manage') || page.startsWith('/admin')) {
+    window.location.reload();
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
+  if (res.status === 401) {
+    clearExpiredAdminSession(path);
+  }
   const json: ApiResponse<T> = await res.json();
   if (!json.success || json.data === undefined) {
-    throw new Error(json.error ?? 'Unknown error');
+    const err = readError(json);
+    throw new ApiError(err.code, err.message);
   }
   return json.data;
 }
@@ -92,7 +129,7 @@ export const api = {
       body: formData,
     });
     const json: ApiResponse<Venue> = await res.json();
-    if (!json.success || !json.data) throw new Error(json.error ?? 'Upload failed');
+    if (!json.success || !json.data) throwApiError(json, 'Upload failed');
     return json.data;
   },
 
@@ -113,7 +150,7 @@ export const api = {
       body: formData,
     });
     const json: ApiResponse<Venue> = await res.json();
-    if (!json.success || !json.data) throw new Error(json.error ?? 'Upload failed');
+    if (!json.success || !json.data) throwApiError(json, 'Upload failed');
     return json.data;
   },
 
@@ -182,7 +219,7 @@ export const api = {
     });
     if (!res.ok) {
       const json = (await res.json().catch(() => null)) as ApiResponse<never> | null;
-      throw new Error(json?.error ?? 'Failed to load receipt');
+      throwApiError(json ?? { success: false, error: 'Failed to load receipt' }, 'Failed to load receipt');
     }
     return res.blob();
   },

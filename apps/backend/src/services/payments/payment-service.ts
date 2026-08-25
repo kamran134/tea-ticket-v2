@@ -9,9 +9,13 @@ import type { IncomingHttpHeaders } from 'http';
 import { amountsEqual, formatAmount, sumAmounts } from './decimal';
 import type { PaymentProvider } from './payment-provider';
 import type { ProviderPaymentStatus, WebhookEvent } from './types';
-import { ACTIVE_PAYMENT_STATUSES } from './types';
+import { ACTIVE_PAYMENT_STATUSES, TERMINAL_PAYMENT_STATUSES } from './types';
 import { expireStaleBookings as expireBookings, expireStalePayments as expirePayments } from '../booking-expiry';
 import { enqueueTicketConfirmedEmail } from '../email';
+import { ErrorCodes } from '../../errors';
+import { logScope } from '../../middleware/requestId';
+
+export { getBookingHoldMs, getPaymentHoldMs } from '../ttl';
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
 
@@ -48,10 +52,13 @@ export class PaymentService {
   async createPaymentForTicket(ticketId: string): Promise<CreatePaymentResponse> {
     const ticket = await this.deps.prisma.ticket.findUnique({ where: { id: ticketId } });
     if (!ticket) {
-      throw new PaymentError(404, 'Ticket not found');
+      throw new PaymentError(404, 'Ticket not found', ErrorCodes.TICKET_NOT_FOUND);
+    }
+    if (ticket.status === 'CONFIRMED') {
+      throw new PaymentError(409, 'Payment already completed', ErrorCodes.PAYMENT_ALREADY_COMPLETED);
     }
     if (ticket.status !== 'BOOKED') {
-      throw new PaymentError(409, 'Ticket is not available for payment');
+      throw new PaymentError(409, 'Ticket is not available for payment', ErrorCodes.VALIDATION_ERROR);
     }
     if (ticket.expiresAt && ticket.expiresAt <= new Date()) {
       throw new PaymentError(409, 'Booking has expired');
@@ -127,7 +134,7 @@ export class PaymentService {
       where: { returnToken },
     });
     if (!payment) {
-      throw new PaymentError(404, 'Return token not found');
+      throw new PaymentError(404, 'Return token not found', ErrorCodes.PAYMENT_NOT_FOUND);
     }
     const frontendUrl = process.env.PUBLIC_FRONTEND_URL ?? process.env.PUBLIC_APP_URL ?? 'http://localhost:5173';
     const url = new URL(`${frontendUrl}/ticket`);
@@ -143,7 +150,7 @@ export class PaymentService {
       where: returnToken ? { id: paymentId, returnToken } : { id: paymentId },
     });
     if (!payment) {
-      throw new PaymentError(404, 'Payment not found');
+      throw new PaymentError(404, 'Payment not found', ErrorCodes.PAYMENT_NOT_FOUND);
     }
 
     const tickets = await this.getCheckoutTickets(payment.checkoutId);
@@ -170,7 +177,23 @@ export class PaymentService {
       throw new PaymentError(404, 'Unknown payment provider');
     }
 
-    const event = this.deps.provider.verifyAndParseWebhook(rawBody, headers);
+    let event: WebhookEvent;
+    try {
+      event = this.deps.provider.verifyAndParseWebhook(rawBody, headers);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid webhook';
+      if (/signature/i.test(message)) {
+        throw new PaymentError(400, 'Invalid webhook signature', ErrorCodes.INVALID_WEBHOOK_SIGNATURE);
+      }
+      throw new PaymentError(400, message, ErrorCodes.VALIDATION_ERROR);
+    }
+
+    logScope('webhook', 'payment webhook received', {
+      provider: providerName,
+      providerEventId: event.providerEventId,
+      orderId: event.orderId,
+      status: event.status,
+    });
 
     const existingEvent = await this.deps.prisma.paymentWebhookEvent.findUnique({
       where: {
@@ -181,6 +204,10 @@ export class PaymentService {
       },
     });
     if (existingEvent?.processedAt) {
+      logScope('webhook', 'duplicate webhook ignored', {
+        providerEventId: event.providerEventId,
+        paymentId: existingEvent.paymentId,
+      });
       return { processed: false, paymentId: existingEvent.paymentId ?? undefined };
     }
 
@@ -193,11 +220,11 @@ export class PaymentService {
       },
     });
     if (!payment) {
-      throw new PaymentError(404, 'Payment not found for webhook');
+      throw new PaymentError(404, 'Payment not found for webhook', ErrorCodes.PAYMENT_NOT_FOUND);
     }
 
     if (!amountsEqual(formatAmount(payment.amount), event.amount)) {
-      throw new PaymentError(400, 'Webhook amount mismatch');
+      throw new PaymentError(400, 'Webhook amount mismatch', ErrorCodes.PAYMENT_AMOUNT_MISMATCH);
     }
 
     await this.deps.prisma.paymentWebhookEvent.upsert({
@@ -268,7 +295,7 @@ export class PaymentService {
       const payment = await tx.payment.findUnique({ where: { id: paymentId } });
       if (!payment) return;
 
-      if (payment.status === 'SUCCEEDED' || payment.status === 'REQUIRES_REVIEW') {
+      if ((TERMINAL_PAYMENT_STATUSES as readonly string[]).includes(payment.status)) {
         return;
       }
 
@@ -466,6 +493,7 @@ export class PaymentError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    readonly code: string = ErrorCodes.INTERNAL_ERROR,
   ) {
     super(message);
     this.name = 'PaymentError';
@@ -474,22 +502,4 @@ export class PaymentError extends Error {
 
 export function resolveCheckoutId(ticket: { id: string; groupId: string | null }): string {
   return ticket.groupId ?? ticket.id;
-}
-
-export function getPaymentHoldMinutes(): number {
-  const raw = process.env.PAYMENT_HOLD_MINUTES;
-  const parsed = raw ? Number.parseInt(raw, 10) : 15;
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
-}
-
-/** PAYMENT_HOLD_SECONDS overrides PAYMENT_HOLD_MINUTES when set (useful for local testing). */
-export function getPaymentHoldMs(): number {
-  const secondsRaw = process.env.PAYMENT_HOLD_SECONDS;
-  if (secondsRaw) {
-    const seconds = Number.parseInt(secondsRaw, 10);
-    if (Number.isFinite(seconds) && seconds > 0) {
-      return seconds * 1000;
-    }
-  }
-  return getPaymentHoldMinutes() * 60 * 1000;
 }

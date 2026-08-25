@@ -101,7 +101,10 @@ describe('Payment API', () => {
       .set('Content-Type', 'application/json')
       .set('X-Mock-Payment-Signature', 'invalid')
       .send(body)
-      .expect(500);
+      .expect(400)
+      .expect(res => {
+        expect(res.body.error.code).toBe('INVALID_WEBHOOK_SIGNATURE');
+      });
   });
 
   it('rejects webhook with wrong amount', async () => {
@@ -119,7 +122,10 @@ describe('Payment API', () => {
       currency: 'AZN',
       status: 'SUCCEEDED',
       paidAt: new Date().toISOString(),
-    }).expect(400);
+    }).expect(400)
+      .expect(res => {
+        expect(res.body.error.code).toBe('PAYMENT_AMOUNT_MISMATCH');
+      });
   });
 
   it('rejects webhook with non-AZN currency', async () => {
@@ -137,7 +143,7 @@ describe('Payment API', () => {
       currency: 'USD',
       status: 'SUCCEEDED',
       paidAt: new Date().toISOString(),
-    }).expect(500);
+    }).expect(400);
   });
 
   it('handles duplicate webhook idempotently', async () => {
@@ -209,6 +215,69 @@ describe('Payment API', () => {
 
     expect(res.body.data.paymentId).toBe(payment.paymentId);
     expect(res.body.data.status).toBe('CREATED');
+  });
+
+  it('does not confirm tickets on failed or cancelled payment', async () => {
+    const { venueId, zoneId } = await seedVenueWithZone(prisma);
+    const { ticketId } = await registerTicket(app, venueId, zoneId);
+    const payment = await createPayment(app, ticketId);
+    const dbPayment = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+
+    await postMockWebhook(app, 'mock', {
+      eventId: 'evt_failed',
+      event: 'payment.failed',
+      paymentId: dbPayment.providerPaymentId,
+      orderId: payment.paymentId,
+      amount: payment.amount,
+      currency: 'AZN',
+      status: 'FAILED',
+    }).expect(200);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    expect(ticket.status).toBe('BOOKED');
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+    expect(updated.status).toBe('FAILED');
+  });
+
+  it('ignores a success webhook after a terminal failure', async () => {
+    const { venueId, zoneId } = await seedVenueWithZone(prisma);
+    const { ticketId } = await registerTicket(app, venueId, zoneId);
+    const payment = await createPayment(app, ticketId);
+    const dbPayment = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+
+    await postMockWebhook(app, 'mock', {
+      eventId: 'evt_fail_then_success_1',
+      event: 'payment.failed',
+      paymentId: dbPayment.providerPaymentId,
+      orderId: payment.paymentId,
+      amount: payment.amount,
+      currency: 'AZN',
+      status: 'FAILED',
+    }).expect(200);
+
+    await postMockWebhook(app, 'mock', {
+      eventId: 'evt_fail_then_success_2',
+      event: 'payment.succeeded',
+      paymentId: dbPayment.providerPaymentId,
+      orderId: payment.paymentId,
+      amount: payment.amount,
+      currency: 'AZN',
+      status: 'SUCCEEDED',
+      paidAt: new Date().toISOString(),
+    }).expect(200);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    expect(ticket.status).toBe('BOOKED');
+    const updated = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+    expect(updated.status).toBe('FAILED');
+  });
+
+  it('echoes X-Request-ID when provided', async () => {
+    const res = await request(app)
+      .get('/health')
+      .set('X-Request-ID', 'qa-corr-1')
+      .expect(200);
+    expect(res.headers['x-request-id']).toBe('qa-corr-1');
   });
 });
 
