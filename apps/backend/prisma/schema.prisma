@@ -85,14 +85,14 @@ model Zone {
 }
 
 model Seat {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   zoneId       String
   number       Int
   row          Int
-  sectionIndex Int     @default(0)
+  sectionIndex Int      @default(0)
   posInSection Int
-  zone         Zone    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  ticket       Ticket?
+  zone         Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
 
   @@unique([zoneId, number])
   @@unique([zoneId, row, sectionIndex, posInSection])
@@ -132,20 +132,24 @@ model Ticket {
   bookedAt           DateTime            @default(now())
   expiresAt          DateTime?
   groupId            String?
-  seatId             String?             @unique
+  // Uniqueness for live bookings is a partial unique index in SQL
+  // (Ticket_seatId_active_key): BOOKED/PENDING/CONFIRMED only. Expired and
+  // rejected tickets keep seatId for history without blocking resale.
+  seatId             String?
   tableId            String?
   confirmationSource ConfirmationSource?
   confirmedAt        DateTime?
   confirmationNote   String?
   venue              Venue               @relation(fields: [venueId], references: [id])
   zone               Zone                @relation(fields: [zoneId], references: [id])
-  seat               Seat?               @relation(fields: [seatId], references: [id])
+  seat               Seat?               @relation(fields: [seatId], references: [id], onDelete: SetNull)
   table              ZoneTable?          @relation(fields: [tableId], references: [id])
 
   @@index([groupId])
   @@index([status])
   @@index([venueId, status])
   @@index([expiresAt])
+  @@index([seatId])
 }
 
 model Payment {

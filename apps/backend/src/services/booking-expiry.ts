@@ -1,7 +1,8 @@
 import { PrismaClient } from '@prisma/client';
 import { ACTIVE_PAYMENT_STATUSES } from './payments/types';
 
-/** Переводит просроченные BOOKED-брони в EXPIRED и освобождает инвентарь. */
+/** Переводит просроченные BOOKED-брони в EXPIRED. Место снова продаётся,
+ *  потому что unique по seatId действует только на BOOKED/PENDING/CONFIRMED. */
 export async function expireStaleBookings(prisma: PrismaClient): Promise<number> {
   const result = await prisma.ticket.updateMany({
     where: {

@@ -209,13 +209,17 @@ zonesRouter.get('/:id/seats', async (req, res) => {
       where: { zoneId: req.params.id },
       orderBy: [{ row: 'asc' }, { sectionIndex: 'asc' }, { posInSection: 'asc' }],
       include: {
-        ticket: {
+        tickets: {
           select: { id: true, status: true },
           where: { status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } },
+          take: 1,
         },
       },
     });
-    const data = seats.map(s => ({ ...s, occupied: s.ticket !== null }));
+    const data = seats.map(({ tickets, ...s }) => {
+      const ticket = tickets[0] ?? null;
+      return { ...s, ticket, occupied: ticket !== null };
+    });
     return res.json({ success: true, data });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch seats' });

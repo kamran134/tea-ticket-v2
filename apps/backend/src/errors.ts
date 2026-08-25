@@ -67,6 +67,17 @@ export function registerValidationCode(error: ZodError): string {
   return ErrorCodes.VALIDATION_ERROR;
 }
 
+export function isPrismaErrorCode(err: unknown, code: string): boolean {
+  let current: unknown = err;
+  for (let i = 0; i < 5 && current && typeof current === 'object'; i++) {
+    if ('code' in current && (current as { code: unknown }).code === code) {
+      return true;
+    }
+    current = 'cause' in current ? (current as { cause: unknown }).cause : undefined;
+  }
+  return false;
+}
+
 export function isTestMode(): boolean {
   return process.env.TEST_MODE === 'true';
 }
