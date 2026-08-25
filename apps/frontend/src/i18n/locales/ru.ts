@@ -155,6 +155,14 @@ const ru = {
     bookingExpired: 'Время брони истекло. Оформите новую бронь на афише.',
     ticketNotPayable: 'Билет недоступен для оплаты.',
     checkoutNotPayable: 'Оплата для этой брони больше недоступна.',
+    eventNotFound: 'Мероприятие не найдено.',
+    eventNotAvailable: 'Мероприятие недоступно для покупки.',
+    seatAlreadyBooked: 'Это место уже занято.',
+    tableCapacityExceeded: 'За этим столом не осталось свободных мест.',
+    zoneCapacityExceeded: 'В этой зоне не осталось свободных мест.',
+    ticketNotConfirmed: 'Билет не подтверждён.',
+    ticketAlreadyCheckedIn: 'По этому билету уже прошли.',
+    paymentAlreadyCompleted: 'Оплата уже завершена.',
   },
 } as const;
 

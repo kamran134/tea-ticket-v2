@@ -116,6 +116,10 @@ export class MockPaymentProvider implements PaymentProvider {
     return Promise.resolve(this.toState(session));
   }
 
+  getSessionByProviderPaymentId(providerPaymentId: string): MockSession | undefined {
+    return this.sessions.get(providerPaymentId);
+  }
+
   getSessionByToken(token: string): MockSession | undefined {
     for (const session of this.sessions.values()) {
       if (session.token === token) {
@@ -230,6 +234,5 @@ export function getMockProvider(): MockPaymentProvider | null {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __mockPaymentProvider: MockPaymentProvider | undefined;
 }

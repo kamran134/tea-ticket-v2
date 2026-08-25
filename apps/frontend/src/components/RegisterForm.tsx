@@ -233,8 +233,7 @@ export function RegisterForm({ slug }: Props) {
       });
       window.location.href = `/ticket?id=${result.id}&new=1`;
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : '';
-      setError(message ? translateApiError(message, 'register.registerError') : t('register.registerError'));
+      setError(translateApiError(err, 'register.registerError'));
     } finally {
       setLoading(false);
     }
@@ -411,7 +410,7 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             {cart.length > 0 && (
-              <div className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
+              <div data-testid="cart" className="bg-gray-50 rounded-xl p-3 space-y-2 border border-gray-200">
                 <div className="text-sm font-medium text-gray-700">{t('register.cart')}</div>
                 <div className="space-y-1.5">
                   {cart.map(line => {
@@ -419,7 +418,7 @@ export function RegisterForm({ slug }: Props) {
                       ? (line.tableAvailable ?? Infinity)
                       : (zoneById.get(line.zoneId)?.available ?? Infinity);
                     return (
-                      <div key={line.key} className="flex items-center justify-between text-sm gap-2">
+                      <div key={line.key} data-testid="cart-item" className="flex items-center justify-between text-sm gap-2">
                         <div className="min-w-0 truncate">
                           <span className="text-gray-800">{line.zoneName}</span>
                           {line.seatLabel && (
@@ -433,6 +432,7 @@ export function RegisterForm({ slug }: Props) {
                           {line.seatId ? (
                             <button
                               type="button"
+                              data-testid="cart-remove"
                               onClick={() => removeLine(line.key)}
                               className="text-red-400 hover:text-red-600 text-xs px-1"
                             >
@@ -466,7 +466,7 @@ export function RegisterForm({ slug }: Props) {
                     );
                   })}
                 </div>
-                <div className="flex justify-between items-center border-t border-gray-200 pt-2 font-semibold text-gray-800 text-sm">
+                <div data-testid="cart-total" className="flex justify-between items-center border-t border-gray-200 pt-2 font-semibold text-gray-800 text-sm">
                   <span>{ticketsLabel(cartCount)}</span>
                   <span>{formatPrice(cartTotal, currency)}</span>
                 </div>
@@ -474,8 +474,10 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.yourName')}</label>
+              <label htmlFor="register-name" className="block text-sm font-medium text-gray-700 mb-1">{t('register.yourName')}</label>
               <input
+                id="register-name"
+                data-testid="register-name"
                 type="text"
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
                 value={name}
@@ -485,13 +487,14 @@ export function RegisterForm({ slug }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.phoneLabel')}</label>
+              <label htmlFor="register-phone" className="block text-sm font-medium text-gray-700 mb-1">{t('register.phoneLabel')}</label>
               <PhoneInput
                 international
                 defaultCountry="AZ"
                 placeholder="XX XXX XX XX"
                 value={phone}
                 onChange={setPhone}
+                numberInputProps={{ id: 'register-phone', 'data-testid': 'register-phone' }}
                 required
               />
               {!!phone && !isValidPhoneNumber(phone) && (
@@ -500,8 +503,10 @@ export function RegisterForm({ slug }: Props) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">{t('register.emailLabel')}</label>
+              <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-1">{t('register.emailLabel')}</label>
               <input
+                id="register-email"
+                data-testid="register-email"
                 type="email"
                 placeholder={t('register.emailPlaceholder')}
                 className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
@@ -557,10 +562,13 @@ export function RegisterForm({ slug }: Props) {
 
             <button
               type="submit"
+              data-testid="register-submit"
               disabled={loading || !canSubmit}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
-              {loading ? t('register.buying') : t('register.buy')}
+              <span data-testid="cart-checkout">
+                {loading ? t('register.buying') : t('register.buy')}
+              </span>
             </button>
           </form>
         </div>

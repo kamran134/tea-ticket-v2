@@ -7,6 +7,7 @@ import { generateVenueSlug, slugify } from '../services/slug';
 import { isNonZoneCell, findTableBlobs } from '../services/gridCells';
 import { prisma } from '../db';
 import { z } from 'zod';
+import { AppError, ErrorCodes, failApp } from '../errors';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -158,7 +159,12 @@ const gridLayoutSchema = z.object({
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
 
-class GridConflictError extends Error {}
+class GridConflictError extends AppError {
+  constructor(message: string, code: string = ErrorCodes.VALIDATION_ERROR) {
+    super(code, message, 409);
+    this.name = 'GridConflictError';
+  }
+}
 
 venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   const parsed = gridLayoutSchema.safeParse(req.body);
@@ -260,6 +266,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         if (blocked) {
           throw new GridConflictError(
             `Zone "${zone.name}": seat at row ${blocked.row + 1}, col ${blocked.posInSection + 1} is booked and cannot be removed`,
+            ErrorCodes.SEAT_ALREADY_BOOKED,
           );
         }
 
@@ -323,6 +330,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
           throw new GridConflictError(
             `Zone "${zone.name}": table at row ${blockedShrink.row! + 1}, col ${blockedShrink.col! + 1} ` +
             `has ${blockedShrink.tickets.length} active ticket(s) and cannot be reduced to ${chairCount} chairs`,
+            ErrorCodes.TABLE_CAPACITY_EXCEEDED,
           );
         }
 
@@ -372,7 +380,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
     return res.json({ success: true, data: result });
   } catch (err) {
     if (err instanceof GridConflictError) {
-      return res.status(409).json({ success: false, error: err.message });
+      return failApp(res, err);
     }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Venue not found' });

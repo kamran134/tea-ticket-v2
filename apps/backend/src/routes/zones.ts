@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { Prisma, TicketStatus } from '@prisma/client';
+import { Prisma, TicketStatus, TableShape } from '@prisma/client';
 import { requireAuth } from '../middleware/auth';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { prisma } from '../db';
 import { z } from 'zod';
+import { AppError, ErrorCodes, fail, failApp, failZod } from '../errors';
+import { tableFootprint } from '../services/tableFootprint';
 
 export const zonesRouter = Router();
 
@@ -117,16 +119,72 @@ const updateZoneSchema = z.object({
 zonesRouter.put('/:id', requireAuth, async (req, res) => {
   const parsed = updateZoneSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
+    return failZod(res, parsed.error);
   }
+  const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
   try {
-    const zone = await prisma.zone.update({
-      where: { id: req.params.id },
-      data: parsed.data,
+    const result = await prisma.$transaction(async tx => {
+      const existing = await tx.zone.findUnique({ where: { id: req.params.id } });
+      if (!existing) {
+        throw new AppError(ErrorCodes.ZONE_NOT_FOUND, 'Zone not found', 404);
+      }
+
+      const nextChairs = parsed.data.tableChairs !== undefined
+        ? parsed.data.tableChairs
+        : existing.tableChairs;
+      const nextShape = (parsed.data.tableShape !== undefined
+        ? parsed.data.tableShape
+        : existing.tableShape) as TableShape | null;
+      const tableConfigChanged = existing.type === 'TABLE' && (
+        (parsed.data.tableChairs !== undefined && parsed.data.tableChairs !== existing.tableChairs) ||
+        (parsed.data.tableShape !== undefined && parsed.data.tableShape !== existing.tableShape)
+      );
+
+      if (tableConfigChanged) {
+        if (!nextChairs || !nextShape) {
+          throw new AppError(ErrorCodes.VALIDATION_ERROR, 'tableChairs and tableShape are required for TABLE zones', 400);
+        }
+        const tables = await tx.zoneTable.findMany({
+          where: { zoneId: existing.id },
+          include: {
+            tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } }, select: { id: true } },
+          },
+        });
+        const blocked = tables.find(t => t.tickets.length > nextChairs);
+        if (blocked) {
+          throw new AppError(
+            ErrorCodes.TABLE_CAPACITY_EXCEEDED,
+            `Table ${blocked.number} has ${blocked.tickets.length} active ticket(s) and cannot be reduced to ${nextChairs} chairs`,
+            409,
+          );
+        }
+        const footprint = tableFootprint(nextShape, nextChairs);
+        for (const table of tables) {
+          await tx.zoneTable.update({
+            where: { id: table.id },
+            data: {
+              chairCount: nextChairs,
+              shape: nextShape,
+              rows: footprint.rows,
+              cols: footprint.cols,
+            },
+          });
+        }
+        parsed.data.capacity = tables.length * nextChairs;
+      }
+
+      const zone = await tx.zone.update({
+        where: { id: req.params.id },
+        data: parsed.data,
+      });
+      return zone;
     });
-    return res.json({ success: true, data: zone });
-  } catch {
-    return res.status(500).json({ success: false, error: 'Failed to update zone' });
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof AppError) {
+      return failApp(res, err);
+    }
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to update zone');
   }
 });
 

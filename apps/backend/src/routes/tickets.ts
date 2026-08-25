@@ -9,11 +9,13 @@ import { randomUUID } from 'crypto';
 import { requireAuth } from '../middleware/auth';
 import { resolveUploadPath } from '../services/storage';
 import { prisma } from '../db';
-import { getPaymentHoldMs } from '../services/payments/payment-service';
+import { getBookingHoldMs } from '../services/payments/payment-service';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { enqueueTicketConfirmedEmail, kickEmailJobProcessing } from '../services/email';
 import type { EmailJobProcessor } from '../services/email';
 import { z } from 'zod';
+import { AppError, ErrorCodes, fail, failApp, failZod, registerValidationCode } from '../errors';
+import { logScope } from '../middleware/requestId';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
 
@@ -68,10 +70,9 @@ function toEmailDeliveryDto(job: {
   };
 }
 
-// A ticket id or groupId reveals every member of the same group (see the two
-// GET routes below) — phone/email must never leak for anyone but the ticket
-// the caller can prove ownership of by knowing its own specific id (and even
-// then only when that id names a real ticket, not a bare groupId — see /:id).
+// Public ticket URLs are capability-links, but they still must not leak
+// phone/email (AUDIT S5). Name/status/zone stay; contacts stay on requireAuth
+// list endpoints only. TicketView already hides missing phone/email.
 function withoutContactInfo<T extends { phone: string; email: string | null }>(
   ticket: T,
 ): Omit<T, 'phone' | 'email'> {
@@ -121,7 +122,7 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
 
     return res.json({ success: true, data });
   } catch {
-    return res.status(500).json({ success: false, error: 'Failed to fetch tickets' });
+    return res.status(500).json({ success: false, error: { code: ErrorCodes.INTERNAL_ERROR, message: 'Failed to fetch tickets' } });
   }
 });
 
@@ -136,7 +137,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
       orderBy: { createdAt: 'asc' },
     });
     if (!members.length) {
-      return res.status(404).json({ success: false, error: 'Group not found' });
+      return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Group not found');
     }
     const mainTicket = members[0];
     const venue = await prisma.venue.findUnique({
@@ -154,7 +155,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
       },
     });
   } catch {
-    return res.status(500).json({ success: false, error: 'Failed to fetch group' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to fetch group');
   }
 });
 
@@ -164,28 +165,20 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
 // member's own id (see /register). Try a direct lookup first, then fall back
 // to treating id as a groupId, so scanning the group QR keeps working no
 // matter which member ticket gets deleted later.
-//
-// Contact info (phone/email) is only ever returned for the exact ticket id
-// requested — never for group members, since one member's link must not leak
-// everyone else's phone number. When id resolves via the groupId fallback
-// there's no single ticket the caller proved they own, so it's stripped there
-// too (matches /group/:groupId above).
 ticketsRouter.get('/:id', async (req, res) => {
   try {
     let ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     let members: Ticket[] | null = null;
-    let stripOwnContactInfo = false;
     if (!ticket) {
       const groupMembers = await prisma.ticket.findMany({
         where: { groupId: req.params.id },
         orderBy: { createdAt: 'asc' },
       });
       if (groupMembers.length === 0) {
-        return res.status(404).json({ success: false, error: 'Ticket not found' });
+        return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found');
       }
       ticket = groupMembers[0];
       members = groupMembers;
-      stripOwnContactInfo = true;
     } else if (ticket.groupId) {
       members = await prisma.ticket.findMany({
         where: { groupId: ticket.groupId },
@@ -201,14 +194,14 @@ ticketsRouter.get('/:id', async (req, res) => {
     return res.json({
       success: true,
       data: {
-        ticket: stripOwnContactInfo ? withoutContactInfo(ticket) : ticket,
+        ticket: withoutContactInfo(ticket),
         members: members?.map(withoutContactInfo) ?? null,
         currency: venue?.currency ?? '₼',
         emailDelivery,
       },
     });
   } catch {
-    return res.status(500).json({ success: false, error: 'Failed to fetch ticket' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to fetch ticket');
   }
 });
 
@@ -239,18 +232,10 @@ const registerSchema = z.object({
 // checkout for this many tickets is always anomalous for this use case.
 const MAX_SLOTS_PER_ORDER = 50;
 
-class RegisterError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
-
 ticketsRouter.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
+    return failZod(res, parsed.error, registerValidationCode(parsed.error));
   }
   const { name, phone, email, venueId, items, guestNames } = parsed.data;
   const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
@@ -265,15 +250,18 @@ ticketsRouter.post('/register', async (req, res) => {
       // hidden or the date passed, so this must be re-checked here too, not
       // just when the page first loads.
       const venue = await tx.venue.findUnique({ where: { id: venueId } });
-      if (!venue || !venue.active || venue.date < now) {
-        throw new RegisterError(404, 'Venue not found');
+      if (!venue) {
+        throw new AppError(ErrorCodes.EVENT_NOT_FOUND, 'Event not found', 404);
+      }
+      if (!venue.active || venue.date < now) {
+        throw new AppError(ErrorCodes.EVENT_NOT_AVAILABLE, 'Event is not available for purchase', 409);
       }
 
       const zoneIds = [...new Set(items.map(i => i.zoneId))];
       const zones = await tx.zone.findMany({ where: { id: { in: zoneIds }, venueId } });
       const zoneById = new Map(zones.map(z => [z.id, z]));
       if (zoneById.size !== zoneIds.length) {
-        throw new RegisterError(404, 'One or more zones not found');
+        throw new AppError(ErrorCodes.ZONE_NOT_FOUND, 'One or more zones not found', 404);
       }
 
       interface Slot { zoneId: string; zone: (typeof zones)[number]; seatId?: string; tableId?: string }
@@ -284,59 +272,59 @@ ticketsRouter.post('/register', async (req, res) => {
 
         if (item.seatIds && item.seatIds.length > 0) {
           if (zone.type !== 'SEATED') {
-            throw new RegisterError(400, `Zone "${zone.name}" is not a seated zone`);
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" is not a seated zone`, 400);
           }
           if (new Set(item.seatIds).size !== item.seatIds.length) {
-            throw new RegisterError(400, 'Duplicate seats selected');
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Duplicate seats selected', 400);
           }
           for (const seatId of item.seatIds) slots.push({ zoneId: zone.id, zone, seatId });
         } else if (item.tableId) {
           if (zone.type !== 'TABLE') {
-            throw new RegisterError(400, `Zone "${zone.name}" is not a table zone`);
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" is not a table zone`, 400);
           }
           const qty = item.quantity ?? 0;
           if (qty < 1) {
-            throw new RegisterError(400, 'quantity is required for table items');
+            throw new AppError(ErrorCodes.INVALID_QUANTITY, 'quantity is required for table items', 400);
           }
           for (let i = 0; i < qty; i++) slots.push({ zoneId: zone.id, zone, tableId: item.tableId });
         } else if (item.quantity) {
           if (zone.type !== 'GENERAL') {
-            throw new RegisterError(400, `Zone "${zone.name}" requires seatIds or a tableId`);
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" requires seatIds or a tableId`, 400);
           }
           for (let i = 0; i < item.quantity; i++) slots.push({ zoneId: zone.id, zone });
         } else {
-          throw new RegisterError(400, 'Each item needs seatIds, tableId+quantity, or quantity');
+          throw new AppError(ErrorCodes.INVALID_QUANTITY, 'Each item needs seatIds, tableId+quantity, or quantity', 400);
         }
       }
 
       if (slots.length === 0) {
-        throw new RegisterError(400, 'Cart is empty');
+        throw new AppError(ErrorCodes.INVALID_QUANTITY, 'Cart is empty', 400);
       }
       if (slots.length > MAX_SLOTS_PER_ORDER) {
-        throw new RegisterError(400, `Cannot register more than ${MAX_SLOTS_PER_ORDER} tickets in one order`);
+        throw new AppError(ErrorCodes.INVALID_QUANTITY, `Cannot register more than ${MAX_SLOTS_PER_ORDER} tickets in one order`, 400);
       }
 
       // Seats: exist, belong to the right zone, not already taken
       const allSeatIds = slots.map(s => s.seatId).filter((x): x is string => !!x);
       if (new Set(allSeatIds).size !== allSeatIds.length) {
-        throw new RegisterError(400, 'Duplicate seats selected');
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Duplicate seats selected', 400);
       }
       if (allSeatIds.length > 0) {
         const seats = await tx.seat.findMany({ where: { id: { in: allSeatIds } } });
         if (seats.length !== allSeatIds.length) {
-          throw new RegisterError(404, 'One or more seats not found');
+          throw new AppError(ErrorCodes.SEAT_NOT_FOUND, 'One or more seats not found', 404);
         }
         const seatById = new Map(seats.map(s => [s.id, s]));
         for (const slot of slots) {
           if (slot.seatId && seatById.get(slot.seatId)!.zoneId !== slot.zoneId) {
-            throw new RegisterError(400, 'Seat does not belong to the selected zone');
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Seat does not belong to the selected zone', 400);
           }
         }
         const taken = await tx.ticket.findFirst({
           where: { seatId: { in: allSeatIds }, status: { in: activeStatuses } },
         });
         if (taken) {
-          throw new RegisterError(409, 'One or more seats are already taken');
+          throw new AppError(ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is already booked', 409);
         }
       }
 
@@ -346,7 +334,7 @@ ticketsRouter.post('/register', async (req, res) => {
         const tables = await tx.zoneTable.findMany({ where: { id: { in: tableIds } } });
         const tableById = new Map(tables.map(t => [t.id, t]));
         if (tableById.size !== tableIds.length) {
-          throw new RegisterError(404, 'One or more tables not found');
+          throw new AppError(ErrorCodes.TABLE_NOT_FOUND, 'One or more tables not found', 404);
         }
         for (const tableId of tableIds) {
           const table = tableById.get(tableId)!;
@@ -358,7 +346,7 @@ ticketsRouter.post('/register', async (req, res) => {
           const requested = slots.filter(s => s.tableId === tableId).length;
           const occupied = await tx.ticket.count({ where: { tableId, status: { in: activeStatuses } } });
           if (occupied + requested > table.chairCount) {
-            throw new RegisterError(409, 'Not enough chairs available at the selected table');
+            throw new AppError(ErrorCodes.TABLE_CAPACITY_EXCEEDED, 'Not enough chairs available at the selected table', 409);
           }
         }
       }
@@ -375,11 +363,11 @@ ticketsRouter.post('/register', async (req, res) => {
         const requested = slots.filter(s => s.zoneId === zoneId && !s.seatId && !s.tableId).length;
         const occupied = await tx.ticket.count({ where: { zoneId, status: { in: activeStatuses } } });
         if (occupied + requested > zone.capacity) {
-          throw new RegisterError(409, `Not enough seats available in zone "${zone.name}"`);
+          throw new AppError(ErrorCodes.ZONE_CAPACITY_EXCEEDED, `Not enough seats available in zone "${zone.name}"`, 409);
         }
       }
 
-      const holdMs = getPaymentHoldMs();
+      const holdMs = getBookingHoldMs();
       const expiresAt = new Date(now.getTime() + holdMs);
 
       const names = [
@@ -416,10 +404,15 @@ ticketsRouter.post('/register', async (req, res) => {
       return { id: mainTicket.id, groupId, totalPrice, expiresAt: expiresAt.toISOString() };
     });
 
-    return res.status(201).json({ success: true, data: result });
+      logScope('tickets/register', 'checkout created', {
+        ticketId: result.id,
+        groupId: result.groupId,
+        totalPrice: result.totalPrice,
+      });
+      return res.status(201).json({ success: true, data: result });
   } catch (err) {
-    if (err instanceof RegisterError) {
-      return res.status(err.status).json({ success: false, error: err.message });
+    if (err instanceof AppError) {
+      return failApp(res, err);
     }
     // SEATED zones have no row-lock (unlike tables/GENERAL zones above) —
     // Ticket.seatId's unique constraint is the actual guard against a double
@@ -427,10 +420,10 @@ ticketsRouter.post('/register', async (req, res) => {
     // as a unique-violation on insert rather than failing the earlier
     // findFirst pre-check.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return res.status(409).json({ success: false, error: 'One or more seats are already taken' });
+      return fail(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is already booked');
     }
     console.error('[register] error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to register' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to register');
   }
 });
 
@@ -452,13 +445,13 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
     const result = await prisma.$transaction(async tx => {
       const ticket = await tx.ticket.findUnique({ where: { id: req.params.id } });
       if (!ticket) {
-        throw new RegisterError(404, 'Ticket not found');
+        throw new AppError(ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found', 404);
       }
       if (ticket.status === 'CONFIRMED' && ticket.confirmationSource === 'MANUAL') {
         return { ticket, alreadyConfirmed: true };
       }
       if (ticket.status !== 'BOOKED') {
-        throw new RegisterError(409, 'Only booked tickets can be confirmed manually');
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Only booked tickets can be confirmed manually', 409);
       }
 
       const filter = confirmGroup && ticket.groupId
@@ -467,7 +460,7 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
 
       const targets = await tx.ticket.findMany({ where: filter });
       if (targets.some(t => t.status !== 'BOOKED')) {
-        throw new RegisterError(409, 'Not all tickets in the group are booked');
+        throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Not all tickets in the group are booked', 409);
       }
 
       for (const target of targets) {
@@ -480,7 +473,7 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
             },
           });
           if (conflict) {
-            throw new RegisterError(409, 'Seat is no longer available');
+            throw new AppError(ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is no longer available', 409);
           }
         }
       }
@@ -510,11 +503,11 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
 
     return res.json({ success: true, data: result });
   } catch (err) {
-    if (err instanceof RegisterError) {
-      return res.status(err.status).json({ success: false, error: err.message });
+    if (err instanceof AppError) {
+      return failApp(res, err);
     }
     console.error('[confirm-manually] error:', err);
-    return res.status(500).json({ success: false, error: 'Failed to confirm manually' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to confirm manually');
   }
 });
 
@@ -544,21 +537,22 @@ ticketsRouter.post('/:id/checkin', requireAuth, async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     if (!ticket) {
-      return res.status(404).json({ success: false, error: 'Ticket not found' });
+      return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found');
     }
     if (ticket.status !== 'CONFIRMED') {
-      return res.status(409).json({ success: false, error: 'Ticket is not confirmed' });
+      return fail(res, 409, ErrorCodes.TICKET_NOT_CONFIRMED, 'Ticket is not confirmed');
     }
     if (ticket.checkedIn) {
-      return res.status(409).json({ success: false, error: 'Already checked in' });
+      return fail(res, 409, ErrorCodes.TICKET_ALREADY_CHECKED_IN, 'Ticket already checked in');
     }
     const updated = await prisma.ticket.update({
       where: { id: req.params.id },
       data: { checkedIn: true },
     });
+    logScope('tickets/checkin', 'ticket checked in', { ticketId: ticket.id, groupId: ticket.groupId });
     return res.json({ success: true, data: updated });
   } catch {
-    return res.status(500).json({ success: false, error: 'Failed to check in' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to check in');
   }
 });
 
@@ -573,19 +567,39 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
   try {
+    const members = await prisma.ticket.findMany({
+      where: { groupId: req.params.groupId },
+    });
+    if (!members.length) {
+      return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Group not found');
+    }
+    const targets = members.filter(m => parsed.data.personIds.includes(m.id));
+    if (targets.length === 0) {
+      return fail(res, 400, ErrorCodes.VALIDATION_ERROR, 'No matching tickets in group');
+    }
+    if (targets.some(t => t.status !== 'CONFIRMED')) {
+      return fail(res, 409, ErrorCodes.TICKET_NOT_CONFIRMED, 'Ticket is not confirmed');
+    }
+    if (targets.every(t => t.checkedIn)) {
+      return fail(res, 409, ErrorCodes.TICKET_ALREADY_CHECKED_IN, 'Ticket already checked in');
+    }
     await prisma.ticket.updateMany({
       where: {
-        id: { in: parsed.data.personIds },
+        id: { in: targets.filter(t => !t.checkedIn).map(t => t.id) },
         groupId: req.params.groupId,
         status: 'CONFIRMED',
         checkedIn: false,
       },
       data: { checkedIn: true },
     });
-    const members = await prisma.ticket.findMany({
+    const updatedMembers = await prisma.ticket.findMany({
       where: { groupId: req.params.groupId },
     });
-    return res.json({ success: true, data: { groupId: req.params.groupId, members } });
+    logScope('tickets/checkin-group', 'group checked in', {
+      groupId: req.params.groupId,
+      count: targets.filter(t => !t.checkedIn).length,
+    });
+    return res.json({ success: true, data: { groupId: req.params.groupId, members: updatedMembers } });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to check in group' });
   }
@@ -633,7 +647,7 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
     const result = await prisma.$transaction(async tx => {
       const ticket = await tx.ticket.findUnique({ where: { id: req.params.id } });
       if (!ticket) {
-        throw new RegisterError(404, 'Ticket not found');
+        throw new AppError(ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found', 404);
       }
 
       const checkoutId = ticket.groupId ?? ticket.id;
@@ -671,9 +685,9 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
 
     return res.json({ success: true, data: result.ticket });
   } catch (err) {
-    if (err instanceof RegisterError) {
-      return res.status(err.status).json({ success: false, error: err.message });
+    if (err instanceof AppError) {
+      return failApp(res, err);
     }
-    return res.status(500).json({ success: false, error: 'Failed to update status' });
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to update status');
   }
 });

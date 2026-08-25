@@ -41,8 +41,14 @@ services:
       # works out of the box with no extra setup — those are the bank's own published
       # test credentials (pg.kapitalbank.az/docs), not a secret. Override for prod.
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-kapital}
+      # BOOKING_TTL_SECONDS / PAYMENT_TTL_SECONDS supersede PAYMENT_HOLD_*, which
+      # services/ttl.ts still honours as a fallback. Both kept so existing .env files work.
       PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
       PAYMENT_HOLD_SECONDS: ${PAYMENT_HOLD_SECONDS:-10}
+      BOOKING_TTL_SECONDS: ${BOOKING_TTL_SECONDS:-900}
+      PAYMENT_TTL_SECONDS: ${PAYMENT_TTL_SECONDS:-900}
+      # Guards /api/test (seed + reset, which wipe data). Never true outside local QA.
+      TEST_MODE: ${TEST_MODE:-false}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:3001}
       PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-http://localhost:5173}
       PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}

@@ -27,6 +27,11 @@ export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
             type="button"
             disabled={isDisabled}
             onClick={() => onAdd(table)}
+            data-testid={`table-${table.id}`}
+            data-table-id={table.id}
+            data-table-status={isDisabled ? 'occupied' : inCart > 0 ? 'selected' : 'available'}
+            data-table-capacity={table.chairCount}
+            data-table-available={remaining}
             className={[
               'relative flex flex-col items-center justify-center rounded-xl border-2 p-3 transition-colors',
               inCart > 0
