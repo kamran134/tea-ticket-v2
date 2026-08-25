@@ -238,6 +238,11 @@ export function TicketView() {
     );
   }
 
+  const holdExpired = isHoldExpired(ticket);
+  const displayStatus: TicketStatus = holdExpired ? 'EXPIRED' : ticket.status;
+  const showSaveLink =
+    displayStatus === 'BOOKED' || displayStatus === 'PENDING' || displayStatus === 'CONFIRMED';
+
   return (
     <div data-testid="ticket-page" className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
       {/* Header stays hidden on public pages — it carries the other instance's branding. */}
@@ -254,10 +259,10 @@ export function TicketView() {
             </div>
             <span
               data-testid="ticket-status"
-              data-ticket-status={ticket.status}
-              className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[ticket.status]}`}
+              data-ticket-status={displayStatus}
+              className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[displayStatus]}`}
             >
-              {statusLabels[ticket.status]}
+              {statusLabels[displayStatus]}
             </span>
           </div>
           <div className="text-sm text-gray-600 space-y-0.5 mt-1">
@@ -285,7 +290,7 @@ export function TicketView() {
           </div>
         </div>
 
-        {(ticket.status === 'BOOKED' || ticket.status === 'PENDING' || ticket.status === 'CONFIRMED') && (
+        {showSaveLink && (
           <div className="bg-white rounded-2xl shadow-sm px-5 py-3 flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium text-gray-700">{t('ticket.saveLink')}</p>
@@ -327,17 +332,17 @@ export function TicketView() {
 
           {ticket.status === 'BOOKED' && (
           <div
-            data-payment-status={pollingPayment ? 'PROCESSING' : isHoldExpired(ticket) ? 'EXPIRED' : 'CREATED'}
+            data-payment-status={pollingPayment ? 'PROCESSING' : holdExpired ? 'EXPIRED' : 'CREATED'}
             className={`rounded-2xl p-6 text-center space-y-4 border ${
-            isHoldExpired(ticket)
+            holdExpired
               ? 'bg-gray-50 border-gray-300'
               : 'bg-yellow-50 border-yellow-200'
           }`}>
-            <div className="text-4xl mb-1">{isHoldExpired(ticket) ? '⌛' : '🕐'}</div>
-            <h2 className={`font-semibold ${isHoldExpired(ticket) ? 'text-gray-700' : 'text-yellow-900'}`}>
-              {isHoldExpired(ticket) ? t('ticket.holdExpired') : t('ticket.holdActive')}
+            <div className="text-4xl mb-1">{holdExpired ? '⌛' : '🕐'}</div>
+            <h2 className={`font-semibold ${holdExpired ? 'text-gray-700' : 'text-yellow-900'}`}>
+              {holdExpired ? t('ticket.holdExpired') : t('ticket.holdActive')}
             </h2>
-            {!isHoldExpired(ticket) && holdCountdown && (
+            {!holdExpired && holdCountdown && (
               <p className="text-sm text-yellow-800">
                 {t('ticket.payWithin')} <span className="font-semibold tabular-nums">{holdCountdown}</span>
               </p>
@@ -346,7 +351,7 @@ export function TicketView() {
               <p className="text-sm text-yellow-800 animate-pulse">{paymentMessage}</p>
             ) : paymentMessage ? (
               <p className="text-sm text-red-700 font-medium">{paymentMessage}</p>
-            ) : isHoldExpired(ticket) ? (
+            ) : holdExpired ? (
               <p className="text-sm text-gray-600">
                 {t('ticket.holdExpiredHint')}
               </p>
@@ -355,7 +360,7 @@ export function TicketView() {
                 {t('ticket.payHint')}
               </p>
             )}
-            {!isHoldExpired(ticket) && (
+            {!holdExpired && (
               <button
                 type="button"
                 data-testid="payment-button"
@@ -366,7 +371,7 @@ export function TicketView() {
                 {paying ? t('ticket.paying') : t('ticket.pay')}
               </button>
             )}
-            {isHoldExpired(ticket) && (
+            {holdExpired && (
               <a
                 href="/"
                 className="inline-block w-full py-3 px-4 rounded-xl bg-gray-800 text-white font-semibold hover:bg-gray-900 transition-colors"
