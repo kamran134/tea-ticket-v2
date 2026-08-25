@@ -6,6 +6,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app';
 import { registerTicket, resetDatabase, seedVenueWithZone } from './helpers';
+import { expireStaleBookings } from '../src/services/booking-expiry';
 import { ErrorCodes } from '../src/errors';
 
 const prisma = new PrismaClient();
@@ -190,6 +191,81 @@ describe('Ticket registration', () => {
         items: [{ zoneId, seatIds: [seats[0].id] }],
       });
     expectError(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED);
+  });
+
+  it('allows rebooking a seat after the previous booking expires', async () => {
+    const { venueId, zoneId, seats } = await seedSeatedZone(2);
+    const created = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'First',
+        phone: '+994501234567',
+        email: 'a@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    await prisma.ticket.update({
+      where: { id: created.body.data.id },
+      data: { expiresAt: new Date('2020-01-01T00:00:00Z') },
+    });
+    await expireStaleBookings(prisma);
+
+    const expired = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.data.id } });
+    expect(expired.status).toBe('EXPIRED');
+    expect(expired.seatId).toBe(seats[0].id);
+
+    const listed = await request(app).get(`/api/zones/${zoneId}/seats`).expect(200);
+    const listedSeat = listed.body.data.find((s: { id: string }) => s.id === seats[0].id);
+    expect(listedSeat.occupied).toBe(false);
+
+    await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Second',
+        phone: '+994501234568',
+        email: 'b@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    const live = await prisma.ticket.findMany({
+      where: { seatId: seats[0].id, status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } },
+    });
+    expect(live).toHaveLength(1);
+  });
+
+  it('allows rebooking a seat after the previous booking is rejected', async () => {
+    const { venueId, zoneId, seats } = await seedSeatedZone(2);
+    const created = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'First',
+        phone: '+994501234567',
+        email: 'a@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    await request(app)
+      .patch(`/api/tickets/${created.body.data.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'REJECTED' })
+      .expect(200);
+
+    await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Second',
+        phone: '+994501234568',
+        email: 'b@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
   });
 
   it('rejects table overbooking with TABLE_CAPACITY_EXCEEDED', async () => {

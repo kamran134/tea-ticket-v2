@@ -256,13 +256,13 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         const existingSeats = await tx.seat.findMany({
           where: { zoneId, sectionIndex: 0 },
           include: {
-            ticket: { select: { status: true } },
+            tickets: { where: { status: { in: ACTIVE_TICKET_STATUSES } }, select: { status: true } },
           },
         });
         const existingByKey = new Map(existingSeats.map(s => [`${s.row}-${s.posInSection}`, s]));
 
         const toRemove = existingSeats.filter(s => !desired.has(`${s.row}-${s.posInSection}`));
-        const blocked = toRemove.find(s => s.ticket && ACTIVE_TICKET_STATUSES.includes(s.ticket.status));
+        const blocked = toRemove.find(s => s.tickets.length > 0);
         if (blocked) {
           throw new GridConflictError(
             `Zone "${zone.name}": seat at row ${blocked.row + 1}, col ${blocked.posInSection + 1} is booked and cannot be removed`,
@@ -477,7 +477,11 @@ venuesRouter.get('/:id/grid-data', async (req, res) => {
             where: { zoneId: { in: seatedZoneIds } },
             orderBy: [{ row: 'asc' }, { sectionIndex: 'asc' }, { posInSection: 'asc' }],
             include: {
-              ticket: { select: { id: true, status: true }, where: { status: { in: ACTIVE_TICKET_STATUSES } } },
+              tickets: {
+                select: { id: true, status: true },
+                where: { status: { in: ACTIVE_TICKET_STATUSES } },
+                take: 1,
+              },
             },
           })
         : Promise.resolve([]),
@@ -495,7 +499,10 @@ venuesRouter.get('/:id/grid-data', async (req, res) => {
     return res.json({
       success: true,
       data: {
-        seats: seats.map(s => ({ ...s, occupied: s.ticket !== null })),
+        seats: seats.map(({ tickets, ...s }) => {
+          const ticket = tickets[0] ?? null;
+          return { ...s, ticket, occupied: ticket !== null };
+        }),
         tables: tables.map(t => ({ ...t, occupied: t._count.tickets, available: t.chairCount - t._count.tickets })),
       },
     });

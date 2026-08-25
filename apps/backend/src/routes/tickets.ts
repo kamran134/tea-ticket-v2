@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import {
   EmailJobStatus,
-  Prisma,
   Ticket,
   TicketStatus as PrismaTicketStatus,
 } from '@prisma/client';
@@ -14,7 +13,7 @@ import { expireStaleBookings } from '../services/booking-expiry';
 import { enqueueTicketConfirmedEmail, kickEmailJobProcessing } from '../services/email';
 import type { EmailJobProcessor } from '../services/email';
 import { z } from 'zod';
-import { AppError, ErrorCodes, fail, failApp, failZod, registerValidationCode } from '../errors';
+import { AppError, ErrorCodes, fail, failApp, failZod, isPrismaErrorCode, registerValidationCode } from '../errors';
 import { logScope } from '../middleware/requestId';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
@@ -415,11 +414,12 @@ ticketsRouter.post('/register', async (req, res) => {
       return failApp(res, err);
     }
     // SEATED zones have no row-lock (unlike tables/GENERAL zones above) —
-    // Ticket.seatId's unique constraint is the actual guard against a double
-    // booking race, so a concurrent checkout for the same seat surfaces here
-    // as a unique-violation on insert rather than failing the earlier
-    // findFirst pre-check.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    // the partial unique index on live seatId is the actual guard against a
+    // double-booking race. Concurrent checkout for the same seat surfaces
+    // here as P2002 rather than failing the earlier findFirst pre-check.
+    // Check .code (and nested cause) rather than instanceof: Prisma may wrap
+    // the error across the transaction boundary or a duplicate client copy.
+    if (isPrismaErrorCode(err, 'P2002')) {
       return fail(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is already booked');
     }
     console.error('[register] error:', err);
