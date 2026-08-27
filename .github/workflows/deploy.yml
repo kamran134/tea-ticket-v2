@@ -114,6 +114,19 @@ jobs:
             export CORS_ORIGIN='https://tea-ticket.com'
             export MOCK_WEBHOOK_SECRET='${{ secrets.MOCK_WEBHOOK_SECRET }}'
 
+            # tea-ticket.com is the sandbox environment (see .claude/plan-branching.md),
+            # so it points at the Kapital Bank TEST gateway. The values below are the
+            # published sandbox credentials from pg.kapitalbank.az/docs, not secrets.
+            #
+            # Test contour only: real cards do not work here and no money moves. A real
+            # production deployment must switch KAPITAL_API_BASE_URL to
+            # https://e-commerce.kapitalbank.az/api and supply merchant credentials
+            # issued under an acquiring contract, moved into GitHub Secrets.
+            export PAYMENT_PROVIDER='kapital'
+            export KAPITAL_API_BASE_URL='https://txpgtst.kapitalbank.az/api'
+            export KAPITAL_USERNAME='TerminalSys/kapital'
+            export KAPITAL_PASSWORD='kapital123'
+
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -af
