@@ -3,10 +3,6 @@
 # Defaults target tea-ticket.com, which is deployed by CI without an .env file —
 # every value below must therefore work as-is when only the CI-exported variables
 # are present. Any deployment with its own .env (see .env.example) overrides them.
-#
-# To run the BirManatBank simulator alongside, add the overlay:
-#   docker compose -f docker-compose.yml -f docker-compose.bank.yml up -d
-# or set COMPOSE_FILE=docker-compose.yml:docker-compose.bank.yml in .env
 
 services:
   db:
@@ -43,22 +39,22 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       UPLOADS_DIR: /app/uploads
       PORT: 3000
-      # mock — self-contained hosted page; bank requires the docker-compose.bank.yml overlay
+      # mock — self-contained hosted page, no external calls; kapital — Kapital Bank TXPG
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
       PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tea-ticket.com}
       PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tea-ticket.com}
       PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
       MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
-      BANK_API_BASE_URL: ${BANK_API_BASE_URL:-http://birmanat-bank}
-      BANK_API_KEY: ${BANK_API_KEY:-}
-      BANK_WEBHOOK_SECRET: ${BANK_WEBHOOK_SECRET:-}
+      KAPITAL_API_BASE_URL: ${KAPITAL_API_BASE_URL:-}
+      KAPITAL_USERNAME: ${KAPITAL_USERNAME:-}
+      KAPITAL_PASSWORD: ${KAPITAL_PASSWORD:-}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       RESEND_RECEIVING_WEBHOOK_SECRET: ${RESEND_RECEIVING_WEBHOOK_SECRET:-}
-      EMAIL_FROM: ${EMAIL_FROM:-BirManatBand Tickets <tickets@birmanat.band>}
-      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@birmanat.band}
+      EMAIL_FROM: ${EMAIL_FROM:-TeaTicket <tickets@tea-ticket.com>}
+      EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@tea-ticket.com}
       EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}

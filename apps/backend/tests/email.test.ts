@@ -387,7 +387,7 @@ describe('Resend webhook', () => {
       created_at: new Date().toISOString(),
       data: {
         email_id: 're_delivered_1',
-        from: 'no-reply@tickets.birmanat.band',
+        from: 'no-reply@tea-ticket.com',
         to: ['buyer@example.com'],
         subject: 'test',
         created_at: new Date().toISOString(),
@@ -426,7 +426,7 @@ describe('Resend webhook', () => {
       created_at: new Date().toISOString(),
       data: {
         email_id: 're_bounced_1',
-        from: 'no-reply@tickets.birmanat.band',
+        from: 'no-reply@tea-ticket.com',
         to: ['buyer@example.com'],
         subject: 'test',
         created_at: new Date().toISOString(),
@@ -466,7 +466,7 @@ describe('Resend webhook', () => {
       created_at: new Date().toISOString(),
       data: {
         email_id: 're_dup_1',
-        from: 'no-reply@tickets.birmanat.band',
+        from: 'no-reply@tea-ticket.com',
         to: ['buyer@example.com'],
         subject: 'test',
         created_at: new Date().toISOString(),

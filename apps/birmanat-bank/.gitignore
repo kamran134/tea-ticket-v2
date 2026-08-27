@@ -1,6 +1,0 @@
-/vendor/
-/var/*.sqlite
-/var/*.sqlite-*
-/var/.phpunit.cache/
-/.env
-!var/.gitkeep

@@ -83,7 +83,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
   const total = formatPrice(data.totalAmount, data.currency);
 
   const e = {
-    brand: escapeHtml('BirManat'),
+    brand: escapeHtml('TeaTicket'),
     eventName: escapeHtml(data.eventName),
     buyerName: escapeHtml(data.buyerName),
     zoneName: escapeHtml(data.zoneName),
@@ -97,7 +97,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     supportEmail: escapeHtml(data.supportEmail),
   };
 
-  const subject = `BirManat — Bilet təsdiqləndi / Билет подтверждён · ${data.eventName}`;
+  const subject = `TeaTicket — Bilet təsdiqləndi / Билет подтверждён · ${data.eventName}`;
 
   const html = `<!DOCTYPE html>
 <html lang="az">
@@ -143,7 +143,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
 </html>`;
 
   const text = [
-    'BirManat',
+    'TeaTicket',
     'Bilet təsdiqləndi / Билет подтверждён',
     '',
     data.eventName,

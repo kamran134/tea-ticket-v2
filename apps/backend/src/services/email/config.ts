@@ -12,7 +12,7 @@ export function loadEmailConfig(env: NodeJS.ProcessEnv = process.env): EmailConf
   const enabled = (env.EMAIL_ENABLED ?? 'false').toLowerCase() === 'true';
   const apiKey = env.RESEND_API_KEY ?? '';
   const from = env.EMAIL_FROM ?? '';
-  const replyTo = env.EMAIL_REPLY_TO ?? 'support@birmanat.band';
+  const replyTo = env.EMAIL_REPLY_TO ?? 'support@tea-ticket.com';
   const webhookSecret = env.RESEND_WEBHOOK_SECRET ?? '';
   const maxAttemptsRaw = env.EMAIL_MAX_ATTEMPTS ? Number.parseInt(env.EMAIL_MAX_ATTEMPTS, 10) : 5;
   const maxAttempts = Number.isFinite(maxAttemptsRaw) && maxAttemptsRaw > 0 ? maxAttemptsRaw : 5;
