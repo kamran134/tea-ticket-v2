@@ -66,7 +66,11 @@ describe('KapitalProvider', () => {
     expect(body.order.hppRedirectUrl).toBe(baseInput.returnUrl);
   });
 
-  it('builds redirectUrl from hppUrl + id + password', async () => {
+  // Regression: the docs template is `{{order.hppUrl}}/flex?id=...`, but the live API
+  // returns hppUrl with /flex already included. Appending it again produced
+  // .../flex/flex?id=... which the gateway serves as "not found" — confirmed against
+  // the real sandbox, and it reached tea-ticket.com before being caught.
+  it('does not double the /flex segment when hppUrl already contains it', async () => {
     fetchMock.mockResolvedValueOnce(
       fakeResponse(200, {
         order: { id: 265855, hppUrl: 'https://txpgtst.kapitalbank.az/flex', password: 'nnoerzar64sm', status: 'Preparing' },
@@ -78,9 +82,23 @@ describe('KapitalProvider', () => {
 
     expect(result.providerPaymentId).toBe('265855');
     expect(result.redirectUrl).toBe(
-      'https://txpgtst.kapitalbank.az/flex/flex?id=265855&password=nnoerzar64sm',
+      'https://txpgtst.kapitalbank.az/flex?id=265855&password=nnoerzar64sm',
     );
+    expect(result.redirectUrl).not.toContain('/flex/flex');
     expect(result.status).toBe('CREATED');
+  });
+
+  it('appends /flex when hppUrl is a bare origin, as the docs describe it', async () => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse(200, {
+        order: { id: 265855, hppUrl: 'https://txpgtst.kapitalbank.az', password: 'pw', status: 'Preparing' },
+      }),
+    );
+
+    const provider = newProvider();
+    const result = await provider.createPayment(baseInput);
+
+    expect(result.redirectUrl).toBe('https://txpgtst.kapitalbank.az/flex?id=265855&password=pw');
   });
 
   it('throws when the create-order response is missing password', async () => {

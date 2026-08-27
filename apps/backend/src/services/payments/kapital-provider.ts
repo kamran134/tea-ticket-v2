@@ -99,7 +99,7 @@ export class KapitalProvider implements PaymentProvider {
     return {
       providerPaymentId: String(order.id),
       // order.password is the auth token for the hosted payment page — never log this URL whole.
-      redirectUrl: `${order.hppUrl}/flex?id=${order.id}&password=${encodeURIComponent(order.password)}`,
+      redirectUrl: `${this.hppBase(order.hppUrl)}?id=${order.id}&password=${encodeURIComponent(order.password)}`,
       status: this.mapStatus(order.status),
     };
   }
@@ -129,6 +129,18 @@ export class KapitalProvider implements PaymentProvider {
 
   // cancelPayment / refundPayment intentionally not implemented in this iteration —
   // see TZ-KAPITAL-TXPG.md §A9.
+
+  /**
+   * The docs show the redirect as `{{order.hppUrl}}/flex?id=...`, but the API actually
+   * returns hppUrl with /flex already on it ("https://txpgtst.kapitalbank.az/flex").
+   * Following the docs literally yields /flex/flex, which the gateway answers with
+   * "not found" — verified against the live sandbox. Tolerate both shapes so this keeps
+   * working whichever way the bank reconciles its docs with its API.
+   */
+  private hppBase(hppUrl: string): string {
+    const trimmed = hppUrl.replace(/\/$/, '');
+    return trimmed.endsWith('/flex') ? trimmed : `${trimmed}/flex`;
+  }
 
   private mapStatus(status: string): ProviderPaymentStatus {
     switch (status) {
