@@ -11,8 +11,8 @@ import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueGridMap } from './VenueGridMap';
 import { QuantityModal } from './QuantityModal';
-import { Header } from './Header';
-import { Footer } from './Footer';
+// import { Header } from './Header';
+// import { Footer } from './Footer';
 
 interface CartLine {
   key: string;
@@ -222,8 +222,8 @@ export function RegisterForm({ slug }: Props) {
   if (venueNotFound) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
-        <Header />
-        <div className="flex-1 flex items-center justify-center p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
+        {/* <Header /> */}
+        <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-4xl mb-2">🔍</div>
             <h1 className="text-xl font-semibold text-gray-700">{t('register.notFoundTitle')}</h1>
@@ -231,7 +231,7 @@ export function RegisterForm({ slug }: Props) {
             <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
           </div>
         </div>
-        <Footer />
+        {/* <Footer /> */}
       </div>
     );
   }
@@ -252,8 +252,8 @@ export function RegisterForm({ slug }: Props) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
-      <Header />
-      <div className="flex-1 flex items-center justify-center p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
+      {/* <Header /> */}
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
@@ -567,7 +567,7 @@ export function RegisterForm({ slug }: Props) {
           onClose={() => setQuantityModalTable(null)}
         />
       )}
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 }

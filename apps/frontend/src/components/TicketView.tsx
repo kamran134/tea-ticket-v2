@@ -12,8 +12,8 @@ import type {
   TicketEmailDeliveryStatus,
 } from '../types';
 import { formatPrice } from '../types';
-import { Header } from './Header';
-import { Footer } from './Footer';
+// import { Header } from './Header';
+// import { Footer } from './Footer';
 
 const TERMINAL_PAYMENT_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'REQUIRES_REVIEW']);
 
@@ -243,8 +243,8 @@ export function TicketView() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
-      <Header />
-      <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
+      {/* <Header /> */}
+      <div className="flex-1 p-4">
       <div className="max-w-md mx-auto space-y-4">
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-start mb-3">
@@ -445,7 +445,7 @@ export function TicketView() {
         )}
       </div>
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 }

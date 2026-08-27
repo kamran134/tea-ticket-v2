@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { formatEventDate } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue } from '../types';
-import { Header } from './Header';
-import { Footer } from './Footer';
+// import { Header } from './Header';
+// import { Footer } from './Footer';
 
 export function Afisha() {
   const { t } = useTranslation();
@@ -20,8 +20,8 @@ export function Afisha() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
-      <Header />
-      <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
+      {/* <Header /> */}
+      <div className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
             <h1 className="text-3xl font-bold text-emerald-800">🍵 {t('afisha.title')}</h1>
@@ -67,7 +67,7 @@ export function Afisha() {
           )}
         </div>
       </div>
-      <Footer />
+      {/* <Footer /> */}
     </div>
   );
 }
