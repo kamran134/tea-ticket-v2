@@ -26,6 +26,7 @@ interface MockSession {
 
 export class MockPaymentProvider implements PaymentProvider {
   readonly name = 'mock';
+  readonly supportsWebhooks = true;
 
   private readonly sessions = new Map<string, MockSession>();
   private readonly tokenByPaymentId = new Map<string, string>();

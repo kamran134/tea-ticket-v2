@@ -2,8 +2,49 @@ import { createHmac } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import type { Express } from 'express';
+import type { PaymentProvider } from '../src/services/payments/payment-provider';
+import type {
+  CreatePaymentInput,
+  CreatePaymentResult,
+  ProviderPaymentState,
+} from '../src/services/payments/types';
 
 export const TEST_WEBHOOK_SECRET = process.env.MOCK_WEBHOOK_SECRET ?? 'test-mock-webhook-secret';
+
+/**
+ * Stand-in for a webhook-less provider (Kapital TXPG in production) — status is only
+ * ever available via getPaymentStatus(), same as the real thing. Lets tests exercise
+ * payment-service.ts's sync/reconcile/amount-guard logic through the real HTTP stack
+ * without a network call to the actual bank sandbox.
+ */
+export class FakeSyncProvider implements PaymentProvider {
+  readonly name = 'kapital-fake';
+  readonly supportsWebhooks = false;
+
+  /** Set by the test before a call that should trigger a status sync. */
+  nextState: ProviderPaymentState | null = null;
+  /** Incremented on every getPaymentStatus() call — used to assert throttling. */
+  statusCallCount = 0;
+
+  private counter = 0;
+
+  createPayment(_input: CreatePaymentInput): Promise<CreatePaymentResult> {
+    this.counter += 1;
+    return Promise.resolve({
+      providerPaymentId: `fake_${this.counter}`,
+      redirectUrl: `https://fake-bank.test/pay/${this.counter}`,
+      status: 'CREATED',
+    });
+  }
+
+  getPaymentStatus(providerPaymentId: string): Promise<ProviderPaymentState> {
+    this.statusCallCount += 1;
+    if (!this.nextState) {
+      throw new Error('FakeSyncProvider.nextState was not set by the test');
+    }
+    return Promise.resolve({ ...this.nextState, providerPaymentId });
+  }
+}
 
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.emailWebhookEvent.deleteMany();

@@ -48,7 +48,7 @@ export function startCronJobs(options?: {
   });
 
   cron.schedule('*/10 * * * *', () => {
-    void paymentService.reconcileProcessingPayments().then(count => {
+    void paymentService.reconcilePendingPayments().then(count => {
       if (count > 0) console.log(`[cron] reconciled ${count} payments`);
     });
   });

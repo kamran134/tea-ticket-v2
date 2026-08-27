@@ -8,12 +8,24 @@ import { randomBytes } from 'crypto';
 import type { IncomingHttpHeaders } from 'http';
 import { amountsEqual, formatAmount, sumAmounts } from './decimal';
 import type { PaymentProvider } from './payment-provider';
-import type { ProviderPaymentStatus, WebhookEvent } from './types';
-import { ACTIVE_PAYMENT_STATUSES } from './types';
+import type { ProviderPaymentState, ProviderPaymentStatus, WebhookEvent } from './types';
+import { ACTIVE_PAYMENT_STATUSES, TERMINAL_PAYMENT_STATUSES } from './types';
 import { expireStaleBookings as expireBookings, expireStalePayments as expirePayments } from '../booking-expiry';
 import { enqueueTicketConfirmedEmail } from '../email';
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
+
+// Terminal provider-side statuses that end the "keep polling" loop in reconcile/sync.
+// Distinct from TERMINAL_PAYMENT_STATUSES (DB enum, includes REQUIRES_REVIEW which
+// has no provider-side equivalent).
+const PROVIDER_TERMINAL_STATUSES: readonly ProviderPaymentStatus[] = [
+  'SUCCEEDED',
+  'FAILED',
+  'CANCELLED',
+  'EXPIRED',
+];
+
+const SYNC_THROTTLE_MS = 2000;
 
 export interface PaymentServiceDeps {
   prisma: PrismaClient;
@@ -43,6 +55,11 @@ export interface PaymentStatusResponse {
 }
 
 export class PaymentService {
+  // Per-payment throttle for syncFromProvider, so a poll-happy frontend can't hammer
+  // the bank API. In-memory only — fine for a single instance; see TZ §A7(д) if this
+  // ever needs to survive across instances (would need a lastSyncedAt DB column instead).
+  private readonly lastSyncAttempt = new Map<string, number>();
+
   constructor(private readonly deps: PaymentServiceDeps) {}
 
   async createPaymentForTicket(ticketId: string): Promise<CreatePaymentResponse> {
@@ -129,6 +146,21 @@ export class PaymentService {
     if (!payment) {
       throw new PaymentError(404, 'Return token not found');
     }
+
+    // Best-effort: sync status now so the first status poll after the redirect already
+    // sees the outcome, instead of waiting for the next cron tick. Never let a failure
+    // here break the redirect itself.
+    //
+    // Note: the bank appends its own ?ID=&STATUS= to this return URL. Those are NOT read
+    // here or anywhere else — they arrive via the user's browser and are trivially
+    // forgeable. The payment is identified solely by returnToken from the path. The bank's
+    // docs themselves warn STATUS can be stale; GET /order/{id} is the only source of truth.
+    try {
+      await this.syncFromProvider(payment.id);
+    } catch (err) {
+      console.error(`[return] sync failed for payment ${payment.id}:`, err);
+    }
+
     const frontendUrl = process.env.PUBLIC_FRONTEND_URL ?? process.env.PUBLIC_APP_URL ?? 'http://localhost:5173';
     const url = new URL(`${frontendUrl}/ticket`);
     url.searchParams.set('id', payment.checkoutId);
@@ -139,11 +171,22 @@ export class PaymentService {
   }
 
   async getPaymentStatus(paymentId: string, returnToken?: string): Promise<PaymentStatusResponse> {
-    const payment = await this.deps.prisma.payment.findFirst({
+    let payment = await this.deps.prisma.payment.findFirst({
       where: returnToken ? { id: paymentId, returnToken } : { id: paymentId },
     });
     if (!payment) {
       throw new PaymentError(404, 'Payment not found');
+    }
+
+    // Providers without webhooks (Kapital TXPG) never push us an update — this poll
+    // endpoint is the only place status gets refreshed after the user returns from the
+    // hosted payment page. Throttled internally (syncFromProvider), safe on every call.
+    if (
+      !this.deps.provider.supportsWebhooks &&
+      !(TERMINAL_PAYMENT_STATUSES as readonly string[]).includes(payment.status)
+    ) {
+      await this.syncFromProvider(payment.id);
+      payment = (await this.deps.prisma.payment.findUnique({ where: { id: payment.id } })) ?? payment;
     }
 
     const tickets = await this.getCheckoutTickets(payment.checkoutId);
@@ -168,6 +211,9 @@ export class PaymentService {
   ): Promise<{ processed: boolean; paymentId?: string }> {
     if (providerName !== this.deps.provider.name) {
       throw new PaymentError(404, 'Unknown payment provider');
+    }
+    if (!this.deps.provider.supportsWebhooks || !this.deps.provider.verifyAndParseWebhook) {
+      throw new PaymentError(404, 'Provider does not support webhooks');
     }
 
     const event = this.deps.provider.verifyAndParseWebhook(rawBody, headers);
@@ -239,20 +285,27 @@ export class PaymentService {
     return expirePayments(this.deps.prisma);
   }
 
-  async reconcileProcessingPayments(): Promise<number> {
-    const processing = await this.deps.prisma.payment.findMany({
+  /**
+   * Renamed from reconcileProcessingPayments: the old filter only looked at status
+   * PROCESSING, which a webhook-only provider transitions into but Kapital never does —
+   * its orders sit in CREATED until confirmed. Without this broadened filter, a Kapital
+   * payment abandoned mid-flow (browser closed on the HPP) would never get picked up
+   * by the cron and would sit unconfirmed forever. See TZ-KAPITAL-TXPG.md §A7(б).
+   */
+  async reconcilePendingPayments(): Promise<number> {
+    const pending = await this.deps.prisma.payment.findMany({
       where: {
-        status: 'PROCESSING',
+        status: { in: ['CREATED', 'PROCESSING'] },
         providerPaymentId: { not: null },
       },
     });
 
     let count = 0;
-    for (const payment of processing) {
+    for (const payment of pending) {
       if (!payment.providerPaymentId) continue;
       try {
         const state = await this.deps.provider.getPaymentStatus(payment.providerPaymentId);
-        if (state.status === 'SUCCEEDED' || state.status === 'FAILED' || state.status === 'CANCELLED') {
+        if (PROVIDER_TERMINAL_STATUSES.includes(state.status)) {
           await this.applyProviderState(payment.id, state);
           count++;
         }
@@ -261,6 +314,39 @@ export class PaymentService {
       }
     }
     return count;
+  }
+
+  /**
+   * Single-payment counterpart to reconcilePendingPayments, used by getPaymentStatus and
+   * getReturnRedirect so a webhook-less provider's status is refreshed synchronously on
+   * request instead of waiting up to 10 minutes for the next cron tick. Throttled per
+   * payment (SYNC_THROTTLE_MS) so a poll-happy frontend can't hammer the bank API.
+   */
+  private async syncFromProvider(paymentId: string): Promise<void> {
+    const now = Date.now();
+    const last = this.lastSyncAttempt.get(paymentId) ?? 0;
+    if (now - last < SYNC_THROTTLE_MS) {
+      return;
+    }
+    this.lastSyncAttempt.set(paymentId, now);
+    if (this.lastSyncAttempt.size > 10_000) {
+      for (const [id, ts] of this.lastSyncAttempt) {
+        if (now - ts > 60_000) this.lastSyncAttempt.delete(id);
+      }
+    }
+
+    const payment = await this.deps.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment || !payment.providerPaymentId) return;
+    if ((TERMINAL_PAYMENT_STATUSES as readonly string[]).includes(payment.status)) return;
+
+    try {
+      const state = await this.deps.provider.getPaymentStatus(payment.providerPaymentId);
+      if (PROVIDER_TERMINAL_STATUSES.includes(state.status)) {
+        await this.applyProviderState(paymentId, state);
+      }
+    } catch (err) {
+      console.error(`[sync] payment ${paymentId}:`, err);
+    }
   }
 
   private async applyWebhookEvent(paymentId: string, event: WebhookEvent): Promise<void> {
@@ -290,27 +376,43 @@ export class PaymentService {
     });
   }
 
-  private async applyProviderState(
-    paymentId: string,
-    state: { status: ProviderPaymentStatus; paidAt: string | null; failureCode: string | null },
-  ): Promise<void> {
+  /**
+   * Was previously blind to the amount the provider actually reported: it discarded
+   * state.amount and always substituted the DB's own amount before handing off to
+   * applyWebhookEvent, which itself does no amount check on the reconcile path (only
+   * handleWebhook's real-webhook path validates amount, at line ~199). That was tolerable
+   * while every provider spoke webhooks and that check ran; for Kapital this reconcile/sync
+   * path is the *only* path, so the amount check has to live here now. See TZ §A7(в).
+   */
+  private async applyProviderState(paymentId: string, state: ProviderPaymentState): Promise<void> {
+    const payment = await this.deps.prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment) return;
+    if (payment.status === 'SUCCEEDED' || payment.status === 'REQUIRES_REVIEW') return;
+
+    if (!amountsEqual(formatAmount(payment.amount), state.amount)) {
+      // Money may have already moved on the bank's side — this is for a human to look
+      // at, not for us to guess and either confirm a short payment or cancel a paid one.
+      console.error(
+        `[reconcile] amount mismatch for payment ${paymentId}: db=${formatAmount(payment.amount)} provider=${state.amount}`,
+      );
+      await this.deps.prisma.payment.update({
+        where: { id: paymentId },
+        data: { status: 'REQUIRES_REVIEW', failureCode: 'AMOUNT_MISMATCH' },
+      });
+      return;
+    }
+
     const event: WebhookEvent = {
       providerEventId: `reconcile_${paymentId}_${Date.now()}`,
-      providerPaymentId: '',
+      providerPaymentId: payment.providerPaymentId ?? '',
       orderId: paymentId,
-      amount: '0.0000',
+      amount: state.amount,
       currency: 'AZN',
       status: state.status,
       paidAt: state.paidAt,
       failureCode: state.failureCode,
       rawPayload: { source: 'reconciliation' },
     };
-
-    const payment = await this.deps.prisma.payment.findUnique({ where: { id: paymentId } });
-    if (!payment) return;
-
-    event.amount = formatAmount(payment.amount);
-    event.providerPaymentId = payment.providerPaymentId ?? '';
 
     await this.applyWebhookEvent(paymentId, event);
   }
