@@ -25,15 +25,29 @@ export function startCronJobs(options?: {
   started = true;
 
   const prisma = options?.prisma ?? new PrismaClient();
-  const config = loadPaymentProviderConfig();
-  const provider = createPaymentProvider(config);
-  const paymentService = options?.paymentService ?? new PaymentService({
-    prisma,
-    provider,
-    publicAppUrl: config.publicAppUrl,
-    webhookBaseUrl: config.webhookBaseUrl,
-    paymentHoldMs: getPaymentHoldMs(),
-  });
+
+  // createPaymentProvider() has a side effect for the mock provider: it overwrites
+  // globalThis.__mockPaymentProvider (factory.ts), which the /api/mock-payments routes
+  // read from to find the session a checkout just created. index.ts always passes an
+  // already-built paymentService here, but this used to call createPaymentProvider()
+  // unconditionally anyway -- clobbering the app's real mock instance (built in
+  // createApp()) with a second, throwaway one whose session Map was always empty. Every
+  // mock checkout would 404 with "Payment session not found" as soon as this ran, which
+  // happens on every boot since index.ts calls startCronJobs() right after createApp().
+  // Only build a provider (and trigger that side effect) when one isn't already injected.
+  const paymentService =
+    options?.paymentService ??
+    (() => {
+      const config = loadPaymentProviderConfig();
+      const provider = createPaymentProvider(config);
+      return new PaymentService({
+        prisma,
+        provider,
+        publicAppUrl: config.publicAppUrl,
+        webhookBaseUrl: config.webhookBaseUrl,
+        paymentHoldMs: getPaymentHoldMs(),
+      });
+    })();
   const emailJobProcessor =
     options?.emailJobProcessor ?? createEmailRuntime(prisma).processor;
 
