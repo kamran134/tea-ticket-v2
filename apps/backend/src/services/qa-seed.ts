@@ -1,5 +1,6 @@
 import type { PrismaClient } from '@prisma/client';
 import { tableFootprint } from './tableFootprint';
+import { tableSeatCoords } from './tableSeats';
 
 export const QA_SEED = {
   venueId: 'qatesteventvenue000001',
@@ -22,6 +23,10 @@ export const QA_SEED = {
 
 export function qaSeatId(n: number): string {
   return `TEST-SEAT-${n}`;
+}
+
+export function qaTableSeatId(n: number): string {
+  return `TEST-TABLE-SEAT-${n}`;
 }
 
 const GRID_ROWS = 10;
@@ -207,6 +212,28 @@ export async function seedQaEvent(prisma: PrismaClient): Promise<{
       cols: tableFp.cols,
     },
   });
+
+  const tableSeatIds = Array.from({ length: QA_SEED.tableChairs }, (_, i) => qaTableSeatId(i + 1));
+  await prisma.seat.deleteMany({
+    where: { tableId: QA_SEED.tableId, id: { notIn: tableSeatIds } },
+  });
+  for (let i = 0; i < QA_SEED.tableChairs; i++) {
+    const coords = tableSeatCoords({ number: 1, row: 5, col: 0 }, i);
+    await prisma.seat.upsert({
+      where: { id: tableSeatIds[i] },
+      create: {
+        id: tableSeatIds[i],
+        zoneId: QA_SEED.tableZoneId,
+        tableId: QA_SEED.tableId,
+        ...coords,
+      },
+      update: {
+        zoneId: QA_SEED.tableZoneId,
+        tableId: QA_SEED.tableId,
+        ...coords,
+      },
+    });
+  }
 
   return {
     venueId,

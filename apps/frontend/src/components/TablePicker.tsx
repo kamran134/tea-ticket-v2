@@ -3,11 +3,11 @@ import type { ZoneTable } from '../types';
 
 interface Props {
   tables: ZoneTable[];
-  cartQuantityByTable: Record<string, number>;
-  onAdd: (table: ZoneTable) => void;
+  selectedSeatIds: string[];
+  onOpen: (table: ZoneTable) => void;
 }
 
-export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
+export function TablePicker({ tables, selectedSeatIds, onOpen }: Props) {
   const { t } = useTranslation();
 
   if (tables.length === 0) {
@@ -17,16 +17,17 @@ export function TablePicker({ tables, cartQuantityByTable, onAdd }: Props) {
   return (
     <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
       {tables.map(table => {
-        const inCart = cartQuantityByTable[table.id] ?? 0;
-        const remaining = table.available - inCart;
-        const isDisabled = remaining <= 0;
+        const seats = table.seats ?? [];
+        const inCart = seats.filter(s => selectedSeatIds.includes(s.id)).length;
+        const remaining = seats.filter(s => !s.occupied && !selectedSeatIds.includes(s.id)).length;
+        const isDisabled = remaining <= 0 && inCart === 0;
 
         return (
           <button
             key={table.id}
             type="button"
             disabled={isDisabled}
-            onClick={() => onAdd(table)}
+            onClick={() => onOpen(table)}
             data-testid={`table-${table.id}`}
             data-table-id={table.id}
             data-table-status={isDisabled ? 'occupied' : inCart > 0 ? 'selected' : 'available'}

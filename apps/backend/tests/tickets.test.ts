@@ -8,6 +8,7 @@ import { createApp } from '../src/app';
 import { registerTicket, resetDatabase, seedVenueWithZone } from './helpers';
 import { expireStaleBookings } from '../src/services/booking-expiry';
 import { ErrorCodes } from '../src/errors';
+import { syncTableSeats } from '../src/services/tableSeats';
 
 const prisma = new PrismaClient();
 let app: ReturnType<typeof createApp>['app'];
@@ -54,7 +55,12 @@ async function seedTableZone(chairs = 8) {
   const table = await prisma.zoneTable.create({
     data: { zoneId, number: 1, shape: 'ROUND', chairCount: chairs, row: 0, col: 0, rows: 4, cols: 4 },
   });
-  return { venueId, zoneId, table };
+  await syncTableSeats(prisma, table);
+  const seats = await prisma.seat.findMany({
+    where: { tableId: table.id },
+    orderBy: { posInSection: 'asc' },
+  });
+  return { venueId, zoneId, table, seats };
 }
 
 describe('Ticket registration', () => {
@@ -280,6 +286,86 @@ describe('Ticket registration', () => {
         items: [{ zoneId, tableId: table.id, quantity: 3 }],
       });
     expectError(res, 409, ErrorCodes.TABLE_CAPACITY_EXCEEDED);
+  });
+
+  it('books a single table chair without taking the rest of the table', async () => {
+    const { venueId, zoneId, table, seats } = await seedTableZone(4);
+    const first = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Buyer',
+        phone: '+994501234567',
+        email: 'buyer@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[1].id] }],
+      })
+      .expect(201);
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: first.body.data.id } });
+    expect(ticket.seatId).toBe(seats[1].id);
+    expect(ticket.tableId).toBe(table.id);
+
+    const listed = await request(app).get(`/api/zones/${zoneId}/tables`).expect(200);
+    const listedTable = listed.body.data.find((t: { id: string }) => t.id === table.id);
+    expect(listedTable.available).toBe(3);
+    const occupied = listedTable.seats.filter((s: { occupied: boolean }) => s.occupied);
+    expect(occupied).toHaveLength(1);
+    expect(occupied[0].id).toBe(seats[1].id);
+
+    await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Other',
+        phone: '+994501234568',
+        email: 'other@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[2].id] }],
+      })
+      .expect(201);
+  });
+
+  it('books two chairs at the same table as separate seats', async () => {
+    const { venueId, zoneId, seats } = await seedTableZone(4);
+    const res = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Buyer',
+        phone: '+994501234567',
+        email: 'buyer@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id, seats[2].id] }],
+      })
+      .expect(201);
+
+    expect(res.body.data.groupId).toBeTruthy();
+    const members = await prisma.ticket.findMany({ where: { groupId: res.body.data.groupId } });
+    expect(members).toHaveLength(2);
+    expect(new Set(members.map(m => m.seatId))).toEqual(new Set([seats[0].id, seats[2].id]));
+  });
+
+  it('rejects a duplicate purchase of the same table chair', async () => {
+    const { venueId, zoneId, seats } = await seedTableZone(4);
+    await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'First',
+        phone: '+994501234567',
+        email: 'a@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    const res = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Second',
+        phone: '+994501234568',
+        email: 'b@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      });
+    expectError(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED);
   });
 });
 

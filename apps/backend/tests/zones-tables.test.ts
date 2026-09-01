@@ -8,6 +8,7 @@ import { createApp } from '../src/app';
 import { resetDatabase, seedVenueWithZone } from './helpers';
 import { ErrorCodes } from '../src/errors';
 import { tableFootprint } from '../src/services/tableFootprint';
+import { syncTableSeats } from '../src/services/tableSeats';
 
 const prisma = new PrismaClient();
 let app: ReturnType<typeof createApp>['app'];
@@ -58,6 +59,7 @@ describe('Zone table sync (B3)', () => {
     expect(updated.shape).toBe('RECT');
     expect(updated.rows).toBe(newFp.rows);
     expect(updated.cols).toBe(newFp.cols);
+    expect(await prisma.seat.count({ where: { tableId: table.id } })).toBe(8);
 
     void venueId;
   });
@@ -71,6 +73,7 @@ describe('Zone table sync (B3)', () => {
     const table = await prisma.zoneTable.create({
       data: { zoneId, number: 1, shape: 'ROUND', chairCount: 8, row: 0, col: 0, rows: 4, cols: 4 },
     });
+    await syncTableSeats(prisma, table);
     await request(app)
       .post('/api/tickets/register')
       .send({

@@ -6,6 +6,7 @@ import { prisma } from '../db';
 import { z } from 'zod';
 import { AppError, ErrorCodes, fail, failApp, failZod } from '../errors';
 import { tableFootprint } from '../services/tableFootprint';
+import { syncTableSeats, toSeatDto } from '../services/tableSeats';
 
 export const zonesRouter = Router();
 
@@ -160,7 +161,7 @@ zonesRouter.put('/:id', requireAuth, async (req, res) => {
         }
         const footprint = tableFootprint(nextShape, nextChairs);
         for (const table of tables) {
-          await tx.zoneTable.update({
+          const updated = await tx.zoneTable.update({
             where: { id: table.id },
             data: {
               chairCount: nextChairs,
@@ -169,6 +170,7 @@ zonesRouter.put('/:id', requireAuth, async (req, res) => {
               cols: footprint.cols,
             },
           });
+          await syncTableSeats(tx, updated);
         }
         parsed.data.capacity = tables.length * nextChairs;
       }
@@ -216,10 +218,7 @@ zonesRouter.get('/:id/seats', async (req, res) => {
         },
       },
     });
-    const data = seats.map(({ tickets, ...s }) => {
-      const ticket = tickets[0] ?? null;
-      return { ...s, ticket, occupied: ticket !== null };
-    });
+    const data = seats.map(s => toSeatDto(s));
     return res.json({ success: true, data });
   } catch {
     return res.status(500).json({ success: false, error: 'Failed to fetch seats' });
@@ -240,12 +239,31 @@ zonesRouter.get('/:id/tables', async (req, res) => {
             tickets: { where: { status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } } },
           },
         },
+        seats: {
+          orderBy: { posInSection: 'asc' },
+          include: {
+            tickets: {
+              select: { id: true },
+              where: { status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } },
+              take: 1,
+            },
+          },
+        },
       },
     });
     const data = tables.map(t => ({
-      ...t,
+      id: t.id,
+      zoneId: t.zoneId,
+      number: t.number,
+      shape: t.shape,
+      chairCount: t.chairCount,
+      row: t.row,
+      col: t.col,
+      rows: t.rows,
+      cols: t.cols,
       occupied: t._count.tickets,
       available: t.chairCount - t._count.tickets,
+      seats: t.seats.map(s => toSeatDto(s)),
     }));
     return res.json({ success: true, data });
   } catch {
