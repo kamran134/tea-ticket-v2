@@ -15,6 +15,8 @@ interface Props {
    * count (used by the admin editor).
    */
   fitCols?: number;
+  /** Pixel size of one cell before desktop fitCols shrinking. Default GRID_CELL_SIZE. */
+  cellSize?: number;
   onMouseLeave?: () => void;
   children: ReactNode;
 }
@@ -60,7 +62,7 @@ function useIsDesktop(): boolean {
 // margin: 0 auto centres the canvas while it is narrower than the container;
 // once it is wider, the auto margins collapse to zero and it simply overflows
 // into the scroll area, so the left edge always stays reachable.
-export function GridCanvas({ rows, cols, maxHeight, fitCols, onMouseLeave, children }: Props) {
+export function GridCanvas({ rows, cols, maxHeight, fitCols, cellSize = GRID_CELL_SIZE, onMouseLeave, children }: Props) {
   const isDesktop = useIsDesktop();
   // repeat(0, ...) is invalid CSS and would drop the whole declaration
   if (rows < 1 || cols < 1) return null;
@@ -76,8 +78,8 @@ export function GridCanvas({ rows, cols, maxHeight, fitCols, onMouseLeave, child
   // fill the container's width still overflows it by that border width and
   // scrolls.
   const trackSize = isDesktop && fitCols
-    ? `min(${GRID_CELL_SIZE}px, calc((100cqw - 2px) / ${Math.min(cols, fitCols)}))`
-    : `${GRID_CELL_SIZE}px`;
+    ? `min(${cellSize}px, calc((100cqw - 2px) / ${Math.min(cols, fitCols)}))`
+    : `${cellSize}px`;
 
   return (
     <div

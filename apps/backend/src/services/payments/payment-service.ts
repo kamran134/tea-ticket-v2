@@ -155,7 +155,9 @@ export class PaymentService {
 
     const tickets = await this.getCheckoutTickets(payment.checkoutId);
     const mainTicket = tickets[0];
-    const ticketsConfirmed = tickets.every(t => t.status === 'CONFIRMED');
+    // every() on an empty array is true — a checkout whose tickets were all
+    // deleted must not be reported as paid & confirmed to the poller.
+    const ticketsConfirmed = tickets.length > 0 && tickets.every(t => t.status === 'CONFIRMED');
 
     return {
       paymentId: payment.id,

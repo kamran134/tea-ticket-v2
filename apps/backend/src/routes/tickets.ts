@@ -15,6 +15,8 @@ import type { EmailJobProcessor } from '../services/email';
 import { z } from 'zod';
 import { AppError, ErrorCodes, fail, failApp, failZod, isPrismaErrorCode, registerValidationCode } from '../errors';
 import { logScope } from '../middleware/requestId';
+import { TICKET_PLACE_INCLUDE, withPlace } from '../services/ticket-dto';
+import { allocateFreeTableSeats, lockSeats } from '../services/tableSeats';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
 
@@ -30,6 +32,8 @@ function kickEmailJobs(): void {
 }
 
 export const ticketsRouter = Router();
+
+const ACTIVE_TICKET_STATUSES: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
 
 async function getTicketEmailDelivery(checkoutId: string): Promise<{
   status: EmailJobStatus;
@@ -89,6 +93,7 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
         ...(status ? { status: status as PrismaTicketStatus } : {}),
         ...(venueId ? { venueId: venueId as string } : {}),
       },
+      include: TICKET_PLACE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -114,7 +119,7 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
       const checkoutId = ticket.groupId ?? ticket.id;
       const job = jobByCheckout.get(checkoutId);
       return {
-        ...ticket,
+        ...withPlace(ticket),
         emailDelivery: job ? toEmailDeliveryDto(job) : null,
       };
     });
@@ -133,6 +138,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
   try {
     const members = await prisma.ticket.findMany({
       where: { groupId: req.params.groupId },
+      include: TICKET_PLACE_INCLUDE,
       orderBy: { createdAt: 'asc' },
     });
     if (!members.length) {
@@ -147,8 +153,8 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
     return res.json({
       success: true,
       data: {
-        ticket: withoutContactInfo(mainTicket),
-        members: members.map(withoutContactInfo),
+        ticket: withoutContactInfo(withPlace(mainTicket)),
+        members: members.map(m => withoutContactInfo(withPlace(m))),
         currency: venue?.currency ?? '₼',
         emailDelivery,
       },
@@ -166,11 +172,15 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
 // matter which member ticket gets deleted later.
 ticketsRouter.get('/:id', async (req, res) => {
   try {
-    let ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
-    let members: Ticket[] | null = null;
+    let ticket = await prisma.ticket.findUnique({
+      where: { id: req.params.id },
+      include: TICKET_PLACE_INCLUDE,
+    });
+    let members: (Ticket & { seat: { number: number; posInSection: number; tableId: string | null } | null; table: { number: number } | null })[] | null = null;
     if (!ticket) {
       const groupMembers = await prisma.ticket.findMany({
         where: { groupId: req.params.id },
+        include: TICKET_PLACE_INCLUDE,
         orderBy: { createdAt: 'asc' },
       });
       if (groupMembers.length === 0) {
@@ -181,6 +191,7 @@ ticketsRouter.get('/:id', async (req, res) => {
     } else if (ticket.groupId) {
       members = await prisma.ticket.findMany({
         where: { groupId: ticket.groupId },
+        include: TICKET_PLACE_INCLUDE,
         orderBy: { createdAt: 'asc' },
       });
     }
@@ -193,8 +204,8 @@ ticketsRouter.get('/:id', async (req, res) => {
     return res.json({
       success: true,
       data: {
-        ticket: withoutContactInfo(ticket),
-        members: members?.map(withoutContactInfo) ?? null,
+        ticket: withoutContactInfo(withPlace(ticket)),
+        members: members?.map(m => withoutContactInfo(withPlace(m))) ?? null,
         currency: venue?.currency ?? '₼',
         emailDelivery,
       },
@@ -206,10 +217,10 @@ ticketsRouter.get('/:id', async (req, res) => {
 
 // POST /api/tickets/register
 // A single checkout can span multiple zones — each cart item is either a set
-// of specific seats (SEATED), a quantity of chairs at one table (TABLE), or
-// a plain quantity (GENERAL). One ticket row is created per person/seat, all
-// sharing one groupId. The buyer's own name covers the first ticket; the
-// rest use guestNames[i] if given, otherwise an auto "Гость N" placeholder.
+// of specific seats (SEATED or TABLE chairs), a quantity of chairs at one
+// table (legacy TABLE), or a plain quantity (GENERAL). One ticket row is
+// created per person/seat, all sharing one groupId. Table chairs are real
+// Seat rows: the purchasable unit is the chair, not the table.
 const cartItemSchema = z.object({
   zoneId: z.string().min(1),
   seatIds: z.array(z.string().min(1)).max(50).optional(),
@@ -270,8 +281,8 @@ ticketsRouter.post('/register', async (req, res) => {
         const zone = zoneById.get(item.zoneId)!;
 
         if (item.seatIds && item.seatIds.length > 0) {
-          if (zone.type !== 'SEATED') {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" is not a seated zone`, 400);
+          if (zone.type !== 'SEATED' && zone.type !== 'TABLE') {
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" does not sell individual seats`, 400);
           }
           if (new Set(item.seatIds).size !== item.seatIds.length) {
             throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Duplicate seats selected', 400);
@@ -303,50 +314,76 @@ ticketsRouter.post('/register', async (req, res) => {
         throw new AppError(ErrorCodes.INVALID_QUANTITY, `Cannot register more than ${MAX_SLOTS_PER_ORDER} tickets in one order`, 400);
       }
 
-      // Seats: exist, belong to the right zone, not already taken
-      const allSeatIds = slots.map(s => s.seatId).filter((x): x is string => !!x);
-      if (new Set(allSeatIds).size !== allSeatIds.length) {
+      const claimedSeatIds = new Set<string>();
+
+      const explicitSeatIds = slots.map(s => s.seatId).filter((x): x is string => !!x);
+      if (new Set(explicitSeatIds).size !== explicitSeatIds.length) {
         throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Duplicate seats selected', 400);
       }
-      if (allSeatIds.length > 0) {
-        const seats = await tx.seat.findMany({ where: { id: { in: allSeatIds } } });
-        if (seats.length !== allSeatIds.length) {
+
+      if (explicitSeatIds.length > 0) {
+        const seats = await tx.seat.findMany({ where: { id: { in: explicitSeatIds } } });
+        if (seats.length !== explicitSeatIds.length) {
           throw new AppError(ErrorCodes.SEAT_NOT_FOUND, 'One or more seats not found', 404);
         }
         const seatById = new Map(seats.map(s => [s.id, s]));
         for (const slot of slots) {
-          if (slot.seatId && seatById.get(slot.seatId)!.zoneId !== slot.zoneId) {
+          if (!slot.seatId) continue;
+          const seat = seatById.get(slot.seatId)!;
+          if (seat.zoneId !== slot.zoneId) {
             throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Seat does not belong to the selected zone', 400);
           }
+          if (slot.zone.type === 'TABLE') {
+            if (!seat.tableId) {
+              throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Seat is not a table chair', 400);
+            }
+            slot.tableId = seat.tableId;
+          } else if (seat.tableId) {
+            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Table chairs cannot be booked in a seated zone', 400);
+          }
         }
+      }
+
+      // Lock tables before seats (sorted) so a seatIds checkout and a
+      // tableId+quantity checkout cannot deadlock on the same table.
+      const tableIds = [...new Set(slots.map(s => s.tableId).filter((x): x is string => !!x))].sort();
+      if (tableIds.length > 0) {
+        const tables = await tx.zoneTable.findMany({ where: { id: { in: tableIds } } });
+        if (tables.length !== tableIds.length) {
+          throw new AppError(ErrorCodes.TABLE_NOT_FOUND, 'One or more tables not found', 404);
+        }
+        for (const tableId of tableIds) {
+          await tx.$queryRaw`SELECT id FROM "ZoneTable" WHERE id = ${tableId} FOR UPDATE`;
+        }
+      }
+
+      const quantityTableIds = [...new Set(
+        slots.filter(s => s.tableId && !s.seatId).map(s => s.tableId!),
+      )];
+      const quantityChairs = quantityTableIds.length > 0
+        ? await tx.seat.findMany({ where: { tableId: { in: quantityTableIds } }, select: { id: true } })
+        : [];
+      const seatsToLock = [...new Set([...explicitSeatIds, ...quantityChairs.map(c => c.id)])].sort();
+      await lockSeats(tx, seatsToLock);
+
+      for (const seatId of explicitSeatIds) claimedSeatIds.add(seatId);
+
+      for (const tableId of quantityTableIds) {
+        const unassigned = slots.filter(s => s.tableId === tableId && !s.seatId);
+        const allocated = await allocateFreeTableSeats(tx, tableId, unassigned.length, claimedSeatIds);
+        for (let i = 0; i < unassigned.length; i++) {
+          unassigned[i].seatId = allocated[i];
+          claimedSeatIds.add(allocated[i]);
+        }
+      }
+
+      const allSeatIds = slots.map(s => s.seatId).filter((x): x is string => !!x);
+      if (allSeatIds.length > 0) {
         const taken = await tx.ticket.findFirst({
           where: { seatId: { in: allSeatIds }, status: { in: activeStatuses } },
         });
         if (taken) {
           throw new AppError(ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is already booked', 409);
-        }
-      }
-
-      // Tables: exist, enough free chairs for what this checkout is claiming
-      const tableIds = [...new Set(slots.map(s => s.tableId).filter((x): x is string => !!x))];
-      if (tableIds.length > 0) {
-        const tables = await tx.zoneTable.findMany({ where: { id: { in: tableIds } } });
-        const tableById = new Map(tables.map(t => [t.id, t]));
-        if (tableById.size !== tableIds.length) {
-          throw new AppError(ErrorCodes.TABLE_NOT_FOUND, 'One or more tables not found', 404);
-        }
-        for (const tableId of tableIds) {
-          const table = tableById.get(tableId)!;
-          // Lock the table row so a concurrent checkout against the same
-          // table can't read the same "occupied" count before either commits
-          // — without this, two simultaneous requests can both pass this
-          // check and both insert, overbooking the table (see S2 in the audit).
-          await tx.$queryRaw`SELECT id FROM "ZoneTable" WHERE id = ${tableId} FOR UPDATE`;
-          const requested = slots.filter(s => s.tableId === tableId).length;
-          const occupied = await tx.ticket.count({ where: { tableId, status: { in: activeStatuses } } });
-          if (occupied + requested > table.chairCount) {
-            throw new AppError(ErrorCodes.TABLE_CAPACITY_EXCEEDED, 'Not enough chairs available at the selected table', 409);
-          }
         }
       }
 
@@ -663,6 +700,23 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
         return { ticket: updated, newlyConfirmed: false, checkoutId };
       }
 
+      // An EXPIRED/REJECTED ticket keeps its seatId, and the seat may have
+      // been resold meanwhile. Reviving it would violate the partial unique
+      // index on live seatId and surface as a 500, so refuse explicitly.
+      const seatIds = [...new Set(toConfirm.map(t => t.seatId).filter((s): s is string => !!s))];
+      if (seatIds.length > 0) {
+        const conflict = await tx.ticket.findFirst({
+          where: {
+            seatId: { in: seatIds },
+            status: { in: ACTIVE_TICKET_STATUSES },
+            id: { notIn: toConfirm.map(t => t.id) },
+          },
+        });
+        if (conflict) {
+          throw new AppError(ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is no longer available', 409);
+        }
+      }
+
       const now = new Date();
       await tx.ticket.updateMany({
         where: { id: { in: toConfirm.map(t => t.id) } },
@@ -688,6 +742,12 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
     if (err instanceof AppError) {
       return failApp(res, err);
     }
+    // Last-resort guard for the seat race: the pre-check above and a
+    // concurrent checkout can interleave, and the partial unique index wins.
+    if (isPrismaErrorCode(err, 'P2002')) {
+      return fail(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is no longer available');
+    }
+    console.error('[status] error:', err);
     return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to update status');
   }
 });

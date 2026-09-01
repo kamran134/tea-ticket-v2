@@ -252,7 +252,15 @@ export function TicketView() {
           <div className="flex justify-between items-start mb-3">
             <div>
               <h1 className="text-xl font-bold text-gray-800">{ticket.name}</h1>
-              <p className="text-gray-500 text-sm">{ticket.zoneName}</p>
+              <p className="text-gray-500 text-sm">
+                {ticket.tableNumber != null && ticket.seatNumber != null
+                  ? `${ticket.zoneName} · ${t('register.placeLine', { table: ticket.tableNumber, seat: ticket.seatNumber })}`
+                  : ticket.seatNumber != null
+                    ? `${ticket.zoneName} · ${t('register.seatLine', { number: ticket.seatNumber })}`
+                    : ticket.tableNumber != null
+                      ? `${ticket.zoneName} · ${t('register.tableLine', { number: ticket.tableNumber })}`
+                      : ticket.zoneName}
+              </p>
               <span data-testid="ticket-number" className="sr-only">{ticket.groupId ?? ticket.id}</span>
             </div>
             <span
@@ -437,7 +445,13 @@ export function TicketView() {
                 <div key={m.id} className="flex justify-between items-center py-1.5 border-b last:border-0">
                   <div className="min-w-0">
                     <div className="text-sm text-gray-800">{m.name}</div>
-                    <div className="text-xs text-gray-400">{m.zoneName}</div>
+                    <div className="text-xs text-gray-400">
+                      {m.tableNumber != null && m.seatNumber != null
+                        ? `${m.zoneName} · ${t('register.placeLine', { table: m.tableNumber, seat: m.seatNumber })}`
+                        : m.seatNumber != null
+                          ? `${m.zoneName} · ${t('register.seatLine', { number: m.seatNumber })}`
+                          : m.zoneName}
+                    </div>
                   </div>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${

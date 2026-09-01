@@ -675,7 +675,11 @@ export function ManagePanel() {
                         <div>
                           <div className="font-semibold text-gray-800">{t.name}</div>
                           <div className="text-sm text-gray-500">
-                            {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                            {t.phone}{t.email && ` · ${t.email}`} · {t.zoneName}
+                            {t.tableNumber != null && t.seatNumber != null
+                              ? ` · ${t.tableNumber}/${t.seatNumber}`
+                              : t.seatNumber != null ? ` · ${t.seatNumber}` : ''}
+                            {' · '}{formatPrice(t.price, ticketCurrency)}
                           </div>
                           {t.emailDelivery && (
                             <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[t.emailDelivery.status].className}`}>
@@ -784,7 +788,11 @@ export function ManagePanel() {
                             <div>
                               <div className="text-gray-700 font-medium">{t.name}</div>
                               <div className="text-gray-400 text-xs">
-                                {t.zoneName} · {formatPrice(t.price, ticketCurrency)}
+                                {t.zoneName}
+                                {t.tableNumber != null && t.seatNumber != null
+                                  ? ` · ${t.tableNumber}/${t.seatNumber}`
+                                  : t.seatNumber != null ? ` · ${t.seatNumber}` : ''}
+                                {' · '}{formatPrice(t.price, ticketCurrency)}
                               </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">

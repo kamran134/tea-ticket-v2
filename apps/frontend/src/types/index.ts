@@ -69,6 +69,7 @@ export interface Zone {
 export interface Seat {
   id: string;
   zoneId: string;
+  tableId?: string | null;
   number: number;
   row: number;
   sectionIndex: number;
@@ -88,6 +89,7 @@ export interface ZoneTable {
   cols: number | null;
   occupied: number;
   available: number;
+  seats?: Seat[];
 }
 
 export type TicketEmailDeliveryStatus =
@@ -123,6 +125,8 @@ export interface Ticket {
   groupId: string | null;
   seatId: string | null;
   tableId: string | null;
+  seatNumber?: number | null;
+  tableNumber?: number | null;
   emailDelivery?: TicketEmailDelivery | null;
 }
 

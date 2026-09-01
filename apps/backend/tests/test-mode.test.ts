@@ -36,6 +36,8 @@ describe('TEST_MODE endpoints', () => {
     const tables = await prisma.zoneTable.findMany({ where: { zoneId: QA_SEED.tableZoneId } });
     expect(tables).toHaveLength(1);
     expect(tables[0].chairCount).toBe(8);
+    const tableSeats = await prisma.seat.count({ where: { tableId: QA_SEED.tableId } });
+    expect(tableSeats).toBe(8);
   });
 
   it('reset clears tickets and restores the QA event', async () => {

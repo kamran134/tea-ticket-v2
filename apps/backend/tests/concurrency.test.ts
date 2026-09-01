@@ -5,6 +5,7 @@ import request from 'supertest';
 import { createApp } from '../src/app';
 import { resetDatabase, seedVenueWithZone } from './helpers';
 import { ErrorCodes } from '../src/errors';
+import { syncTableSeats } from '../src/services/tableSeats';
 
 const prisma = new PrismaClient();
 let app: ReturnType<typeof createApp>['app'];
@@ -62,6 +63,7 @@ describe('Concurrent registration', () => {
     const table = await prisma.zoneTable.create({
       data: { zoneId, number: 1, shape: 'ROUND', chairCount: 8, row: 0, col: 0, rows: 4, cols: 4 },
     });
+    await syncTableSeats(prisma, table);
 
     const results = await Promise.all(
       Array.from({ length: 16 }, (_, i) =>

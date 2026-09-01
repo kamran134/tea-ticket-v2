@@ -8,6 +8,8 @@ import { isNonZoneCell, findTableBlobs } from '../services/gridCells';
 import { prisma } from '../db';
 import { z } from 'zod';
 import { AppError, ErrorCodes, failApp } from '../errors';
+import { expireStaleBookings } from '../services/booking-expiry';
+import { syncSeatsForZoneTables, toSeatDto } from '../services/tableSeats';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -366,6 +368,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
         }
 
         await tx.zone.update({ where: { id: zoneId }, data: { capacity: desiredBlobs.length * chairCount } });
+        await syncSeatsForZoneTables(tx, zoneId);
       }
 
       const venue = await tx.venue.update({
@@ -379,7 +382,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
 
     return res.json({ success: true, data: result });
   } catch (err) {
-    if (err instanceof GridConflictError) {
+    if (err instanceof AppError) {
       return failApp(res, err);
     }
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
@@ -464,6 +467,8 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
 // shape as zones.ts's per-zone /seats and /tables, just batched by venueId.
 venuesRouter.get('/:id/grid-data', async (req, res) => {
   try {
+    await expireStaleBookings(prisma);
+
     const zones = await prisma.zone.findMany({
       where: { venueId: req.params.id },
       select: { id: true, type: true },
@@ -471,7 +476,7 @@ venuesRouter.get('/:id/grid-data', async (req, res) => {
     const seatedZoneIds = zones.filter(z => z.type === 'SEATED').map(z => z.id);
     const tableZoneIds = zones.filter(z => z.type === 'TABLE').map(z => z.id);
 
-    const [seats, tables] = await Promise.all([
+    const [seats, tables, tableSeats] = await Promise.all([
       seatedZoneIds.length > 0
         ? prisma.seat.findMany({
             where: { zoneId: { in: seatedZoneIds } },
@@ -494,16 +499,47 @@ venuesRouter.get('/:id/grid-data', async (req, res) => {
             },
           })
         : Promise.resolve([]),
+      tableZoneIds.length > 0
+        ? prisma.seat.findMany({
+            where: { zoneId: { in: tableZoneIds }, tableId: { not: null } },
+            orderBy: [{ tableId: 'asc' }, { posInSection: 'asc' }],
+            include: {
+              tickets: {
+                select: { id: true },
+                where: { status: { in: ACTIVE_TICKET_STATUSES } },
+                take: 1,
+              },
+            },
+          })
+        : Promise.resolve([]),
     ]);
+
+    const seatsByTable = new Map<string, ReturnType<typeof toSeatDto>[]>();
+    for (const seat of tableSeats) {
+      if (!seat.tableId) continue;
+      const list = seatsByTable.get(seat.tableId) ?? [];
+      list.push(toSeatDto(seat));
+      seatsByTable.set(seat.tableId, list);
+    }
 
     return res.json({
       success: true,
       data: {
-        seats: seats.map(({ tickets, ...s }) => {
-          const ticket = tickets[0] ?? null;
-          return { ...s, ticket, occupied: ticket !== null };
-        }),
-        tables: tables.map(t => ({ ...t, occupied: t._count.tickets, available: t.chairCount - t._count.tickets })),
+        seats: seats.map(s => toSeatDto(s)),
+        tables: tables.map(t => ({
+          id: t.id,
+          zoneId: t.zoneId,
+          number: t.number,
+          shape: t.shape,
+          chairCount: t.chairCount,
+          row: t.row,
+          col: t.col,
+          rows: t.rows,
+          cols: t.cols,
+          occupied: t._count.tickets,
+          available: t.chairCount - t._count.tickets,
+          seats: seatsByTable.get(t.id) ?? [],
+        })),
       },
     });
   } catch {
