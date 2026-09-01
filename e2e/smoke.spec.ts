@@ -62,4 +62,21 @@ test.describe('purchase smoke', () => {
     await page.getByTestId('mock-payment-failure').click();
     await expect(page.getByTestId('ticket-status')).toHaveAttribute('data-ticket-status', 'BOOKED');
   });
+
+  test('individual table seats go to the cart separately', async ({ page, request }) => {
+    await request.post(`${backendUrl}/api/test/seed`);
+    await page.goto('/e/qa-test-event');
+    await page.getByRole('button', { name: /мест|seats|yer/i }).click();
+    await page.getByTestId('seat-TEST-TABLE-SEAT-2').click();
+    await page.getByTestId('seat-TEST-TABLE-SEAT-3').click();
+    await expect(page.getByTestId('map-selection')).toBeVisible();
+    await page.getByRole('button', { name: /Готово|Done|Hazırdır|Купить|Buy|Al/i }).first().click();
+    await expect(page.getByTestId('cart-item')).toHaveCount(2);
+    await expect(page.getByTestId('cart')).toContainText(/стол|table|masa/i);
+    await page.getByTestId('register-name').fill('Table User');
+    await page.getByTestId('register-phone').fill('+994501234567');
+    await page.getByTestId('register-email').fill('table@example.com');
+    await page.getByTestId('register-submit').click();
+    await expect(page.getByTestId('payment-button')).toBeVisible();
+  });
 });

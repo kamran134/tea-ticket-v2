@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
-import { TableIcon, type Footprint } from './TableIcon';
+import { TableIcon, type ChairVisualState, type Footprint } from './TableIcon';
+import { tableChairLayout } from './tableChairLayout';
 import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea, cellToGridArea } from './grid/gridGeometry';
 import { GridCanvas } from './grid/GridCanvas';
 import { zoneColor } from './grid/zoneColors';
@@ -21,19 +22,21 @@ interface Props {
   cartQuantityByZone: Record<string, number>;
   cartQuantityByTable: Record<string, number>;
   onZoneOpen: (zone: Zone) => void;
-  onSeatToggle: (zone: Zone, seat: Seat) => void;
+  onSeatToggle: (zone: Zone, seat: Seat, table?: ZoneTable) => void;
   onTableOpen: (zone: Zone, table: ZoneTable) => void;
   /** Proceed: keep the current selection and close (top "Buy" / bottom "Done"). */
   onClose: () => void;
   /** Cancel: confirmed via the dialog below, discards the selection made since the map was opened. */
   onCancel: () => void;
   /** True while a QuantityModal (the +/- counter for a table or a seatless zone) is open on top of this map — Escape should close that first. */
+  /** Called after inventory loads so the parent can drop stale selected seats. */
+  onOccupiedSeatIds?: (ids: string[]) => void;
   quantityModalOpen: boolean;
 }
 
 export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
-  onZoneOpen, onSeatToggle, onTableOpen, onClose, onCancel, quantityModalOpen,
+  onZoneOpen, onSeatToggle,   onTableOpen, onClose, onCancel, quantityModalOpen, onOccupiedSeatIds,
 }: Props) {
   const { t } = useTranslation();
   const layout = venue.gridLayout;
@@ -67,6 +70,9 @@ export function VenueGridMap({
   const [tablesByZone, setTablesByZone] = useState<Record<string, ZoneTable[]>>({});
   const [loadingGrid, setLoadingGrid] = useState(false);
 
+  const occupiedCb = useRef(onOccupiedSeatIds);
+  occupiedCb.current = onOccupiedSeatIds;
+
   useEffect(() => {
     let cancelled = false;
     setLoadingGrid(true);
@@ -79,6 +85,11 @@ export function VenueGridMap({
         for (const table of tables) (tablesGrouped[table.zoneId] ??= []).push(table);
         setSeatsByZone(seatsGrouped);
         setTablesByZone(tablesGrouped);
+        const occupiedIds = [
+          ...seats.filter(s => s.occupied).map(s => s.id),
+          ...tables.flatMap(t => (t.seats ?? []).filter(s => s.occupied).map(s => s.id)),
+        ];
+        occupiedCb.current?.(occupiedIds);
       })
       .finally(() => { if (!cancelled) setLoadingGrid(false); });
     return () => { cancelled = true; };
@@ -137,7 +148,7 @@ export function VenueGridMap({
   if (usedZones.length === 0) return null;
 
   const grid = (
-    <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="80vh" fitCols={DESKTOP_FIT_COLS}>
+    <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="min(55dvh, 100%)" fitCols={DESKTOP_FIT_COLS} cellSize={48}>
       {layout.cells.map((row, r) =>
         row.map((cell, c) => {
           const place = cellToGridArea(r, c);
@@ -243,31 +254,17 @@ export function VenueGridMap({
                 />
               );
             }
-            const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
-            const remaining = table.available - inCartAtTable;
-            const isFull = remaining <= 0;
+            const inCartAtTable = (table.seats ?? []).filter(s => cartSeatIds.includes(s.id)).length;
+            const remaining = (table.seats ?? []).filter(s => !s.occupied && !cartSeatIds.includes(s.id)).length;
+            const isFull = remaining <= 0 && inCartAtTable === 0;
             const sameTable = (nr: number, nc: number) => tableByCell.get(`${zone.id}|${nr}|${nc}`) === table;
-            const isAnchor = r === table.row && c === table.col;
             return (
               <div
                 key={`${r}-${c}`}
-                onClick={() => !isFull && onTableOpen(zone, table)}
-                {...(isAnchor
-                  ? {
-                      'data-testid': `table-${table.id}`,
-                    }
-                  : {})}
                 data-table-id={table.id}
                 data-table-status={isFull ? 'occupied' : inCartAtTable > 0 ? 'selected' : 'available'}
                 data-table-capacity={table.chairCount}
                 data-table-available={remaining}
-                title={t('gridMap.tableTooltip', {
-                  zone: zone.name,
-                  number: table.number,
-                  remaining,
-                  total: table.chairCount,
-                  price: formatPrice(zone.price, currency),
-                })}
                 style={{
                   ...place,
                   backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? '#d1fae5' : '#ffffff',
@@ -277,7 +274,7 @@ export function VenueGridMap({
                   borderBottomColor: sameTable(r + 1, c) ? 'transparent' : GRID_LINE,
                   borderLeftColor: sameTable(r, c - 1) ? 'transparent' : GRID_LINE,
                   borderRightColor: sameTable(r, c + 1) ? 'transparent' : GRID_LINE,
-                  cursor: isFull ? 'not-allowed' : 'pointer',
+                  pointerEvents: 'none',
                 }}
               />
             );
@@ -355,22 +352,102 @@ export function VenueGridMap({
         </div>
       ))}
 
-      {tableFootprints.map(({ table }) => {
-        const inCartAtTable = cartQuantityByTable[table.id] ?? 0;
-        const isFull = table.available - inCartAtTable <= 0;
+      {tableFootprints.map(({ zone, table }) => {
+        const seats = [...(table.seats ?? [])].sort((a, b) => a.posInSection - b.posInSection);
+        const inCartAtTable = seats.filter(s => cartSeatIds.includes(s.id)).length;
+        const remaining = seats.filter(s => !s.occupied && !cartSeatIds.includes(s.id)).length;
+        const isFull = remaining <= 0 && inCartAtTable === 0;
         const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
+        const markers = tableChairLayout(table.shape, seats.length || table.chairCount, footprint);
+        const chairStates: ChairVisualState[] = markers.map(marker => {
+          const seat = seats[marker.index];
+          if (!seat) return 'available';
+          if (seat.occupied) return 'sold';
+          if (cartSeatIds.includes(seat.id)) return 'selected';
+          return 'available';
+        });
         return (
           <div
             key={table.id}
-            className="pointer-events-none p-0.5"
-            style={{ ...footprintToGridArea(table.row!, table.col!, table.rows!, table.cols!), overflow: 'hidden' }}
+            className="relative p-0.5"
+            style={{ ...footprintToGridArea(table.row!, table.col!, table.rows!, table.cols!), overflow: 'visible' }}
           >
-            <TableIcon
-              shape={table.shape}
-              chairs={table.chairCount}
-              footprint={footprint}
-              label={String(table.number)}
-              muted={isFull}
+            <div className="pointer-events-none w-full h-full">
+              <TableIcon
+                shape={table.shape}
+                chairs={seats.length || table.chairCount}
+                footprint={footprint}
+                label={String(table.number)}
+                muted={isFull}
+                chairStates={chairStates}
+              />
+            </div>
+            {markers.map(marker => {
+              const seat = seats[marker.index];
+              if (!seat) return null;
+              const isSelected = cartSeatIds.includes(seat.id);
+              const isOccupied = seat.occupied;
+              const status = isOccupied ? 'occupied' : isSelected ? 'selected' : 'available';
+              return (
+                <button
+                  key={seat.id}
+                  type="button"
+                  disabled={isOccupied}
+                  onClick={e => {
+                    e.stopPropagation();
+                    if (!isOccupied) onSeatToggle(zone, seat, table);
+                  }}
+                  data-testid={`seat-${seat.id}`}
+                  data-seat-id={seat.id}
+                  data-seat-status={status}
+                  title={t('gridMap.tableSeatTooltip', {
+                    zone: zone.name,
+                    table: table.number,
+                    seat: seat.number,
+                    price: formatPrice(zone.price, currency),
+                    occupied: isOccupied ? ` · ${t('gridMap.occupied')}` : '',
+                  })}
+                  className="absolute z-10 rounded-full border-2 font-bold leading-none flex items-center justify-center pointer-events-auto"
+                  style={{
+                    left: `${(marker.x / footprint.cols) * 100}%`,
+                    top: `${(marker.y / footprint.rows) * 100}%`,
+                    width: `max(32px, ${(Math.max(marker.width, marker.height) / footprint.cols) * 100}%)`,
+                    height: `max(32px, ${(Math.max(marker.width, marker.height) / footprint.rows) * 100}%)`,
+                    transform: 'translate(-50%, -50%)',
+                    fontSize: 11,
+                    backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? '#059669' : '#ffffff',
+                    borderColor: isOccupied ? '#d1d5db' : isSelected ? '#047857' : '#7c5230',
+                    color: isOccupied ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
+                    cursor: isOccupied ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {seat.number}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              data-testid={`table-${table.id}`}
+              data-table-id={table.id}
+              data-table-status={isFull ? 'occupied' : inCartAtTable > 0 ? 'selected' : 'available'}
+              data-table-capacity={table.chairCount}
+              data-table-available={remaining}
+              aria-label={t('gridMap.openTableSeats', { number: table.number })}
+              title={t('gridMap.tableTooltip', {
+                zone: zone.name,
+                number: table.number,
+                remaining,
+                total: table.chairCount,
+                price: formatPrice(zone.price, currency),
+              })}
+              onClick={() => onTableOpen(zone, table)}
+              className="absolute z-[5] pointer-events-auto rounded-full bg-transparent"
+              style={{
+                left: '32%',
+                top: table.shape === 'SOFA' ? '55%' : '32%',
+                width: '36%',
+                height: '36%',
+              }}
             />
           </div>
         );
@@ -387,12 +464,16 @@ export function VenueGridMap({
           ? (seatsByZone[zone.id] ?? []).filter(s => cartSeatIds.includes(s.id)).length
           : 0;
         const tablesInCart = zone.type === 'TABLE'
-          ? (tablesByZone[zone.id] ?? []).reduce((s, tbl) => s + (cartQuantityByTable[tbl.id] ?? 0), 0)
+          ? (tablesByZone[zone.id] ?? []).reduce(
+            (s, tbl) => s + (tbl.seats ?? []).filter(seat => cartSeatIds.includes(seat.id)).length,
+            0,
+          )
           : 0;
-        const isEmpty = inCart === 0 && tablesInCart === 0 && (zone.available ?? 0) <= 0;
+        const picked = inCart + seatsInCart + tablesInCart;
+        const isEmpty = picked === 0 && (zone.available ?? 0) <= 0;
         const className = [
           'flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-xs transition-colors',
-          inCart > 0 || seatsInCart > 0 || tablesInCart > 0
+          picked > 0
             ? 'border-emerald-600 bg-emerald-50'
             : isEmpty
               ? 'border-gray-100 bg-gray-50 opacity-50'
@@ -430,10 +511,57 @@ export function VenueGridMap({
     </div>
   );
 
+  const selectedSummary: { id: string; label: string; price: number }[] = [];
+  for (const zone of zones) {
+    for (const seat of seatsByZone[zone.id] ?? []) {
+      if (!cartSeatIds.includes(seat.id)) continue;
+      selectedSummary.push({
+        id: seat.id,
+        label: t('register.seatLine', { number: seat.number }),
+        price: zone.price,
+      });
+    }
+    for (const table of tablesByZone[zone.id] ?? []) {
+      for (const seat of table.seats ?? []) {
+        if (!cartSeatIds.includes(seat.id)) continue;
+        selectedSummary.push({
+          id: seat.id,
+          label: `${t('register.tableLine', { number: table.number })} · ${t('register.seatLine', { number: seat.number })}`,
+          price: zone.price,
+        });
+      }
+    }
+  }
+  for (const zone of zones) {
+    const qty = cartQuantityByZone[zone.id] ?? 0;
+    if (qty > 0) {
+      selectedSummary.push({ id: `general:${zone.id}`, label: `${zone.name} × ${qty}`, price: zone.price * qty });
+    }
+  }
+
+  const selectedTotal = selectedSummary.reduce((s, i) => s + i.price, 0);
+
+  const stateLegend = (
+    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
+      <span className="flex items-center gap-1.5">
+        <span className="w-3.5 h-3.5 rounded-full border-2 border-[#7c5230] bg-white inline-block" />
+        {t('seatPicker.free')}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="w-3.5 h-3.5 rounded-full border-2 border-emerald-700 bg-emerald-600 inline-block" />
+        {t('seatPicker.inCart')}
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="w-3.5 h-3.5 rounded-full border-2 border-gray-200 bg-gray-200 inline-block" />
+        {t('seatPicker.occupied')}
+      </span>
+    </div>
+  );
+
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-white p-4 overflow-auto space-y-3">
-        <div className="flex justify-between items-center sticky top-0 bg-white pb-1">
+      <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        <div className="flex justify-between items-center shrink-0 bg-white px-4 pt-4 pb-2 border-b border-gray-100">
           <span className="font-semibold text-gray-800">{t('gridMap.title')}</span>
           <div className="flex items-center gap-2">
             <button
@@ -454,16 +582,32 @@ export function VenueGridMap({
             </button>
           </div>
         </div>
-        {grid}
-        {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
-        {legend}
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-        >
-          {t('common.done')}
-        </button>
+        <div className="flex-1 min-h-0 overflow-auto px-4 py-3 space-y-3">
+          {grid}
+          {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
+          {stateLegend}
+          {legend}
+        </div>
+        <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3 space-y-2">
+          {selectedSummary.length > 0 && (
+            <div data-testid="map-selection" className="flex flex-wrap gap-1.5 max-h-20 overflow-auto">
+              {selectedSummary.map(item => (
+                <span key={item.id} className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full px-2 py-0.5">
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+          >
+            {selectedSummary.length > 0
+              ? `${t('common.done')} · ${formatPrice(selectedTotal, currency)}`
+              : t('common.done')}
+          </button>
+        </div>
       </div>
 
       {confirmingCancel && (

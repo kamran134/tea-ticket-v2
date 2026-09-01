@@ -5,27 +5,24 @@ import 'react-phone-number-input/style.css';
 import { translateApiError } from '../i18n/apiErrors';
 import { formatEventDateTime } from '../i18n/format';
 import { api } from '../services/api';
-import type { Venue, Zone, Seat, ZoneTable, CartItem } from '../types';
+import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
+import {
+  cartCount as countCart,
+  cartSeatIds as idsFromCart,
+  cartTotal as sumCart,
+  pruneOccupiedSeats,
+  toCheckoutItems,
+  toggleSeatInCart,
+  type CartLine,
+} from '../lib/cart';
 import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueGridMap } from './VenueGridMap';
 import { QuantityModal } from './QuantityModal';
+import { TableSeatPicker } from './TableSeatPicker';
 import { Header } from './Header';
 import { Footer } from './Footer';
-
-interface CartLine {
-  key: string;
-  zoneId: string;
-  zoneName: string;
-  price: number;
-  quantity: number;
-  seatId?: string;
-  seatLabel?: string;
-  tableId?: string;
-  tableNumber?: number;
-  tableAvailable?: number;
-}
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -102,15 +99,15 @@ export function RegisterForm({ slug }: Props) {
     return () => { cancelled = true; };
   }, [legacyTableZoneKey]);
 
-  const cartSeatIds = cart.filter(l => l.seatId).map(l => l.seatId!);
+  const cartSeatIds = idsFromCart(cart);
   const cartQuantityByZone: Record<string, number> = {};
   const cartQuantityByTable: Record<string, number> = {};
   for (const line of cart) {
     if (line.tableId) cartQuantityByTable[line.tableId] = (cartQuantityByTable[line.tableId] ?? 0) + line.quantity;
     else if (!line.seatId) cartQuantityByZone[line.zoneId] = (cartQuantityByZone[line.zoneId] ?? 0) + line.quantity;
   }
-  const cartCount = cart.reduce((s, l) => s + l.quantity, 0);
-  const cartTotal = cart.reduce((s, l) => s + l.price * l.quantity, 0);
+  const cartCount = countCart(cart);
+  const cartTotal = sumCart(cart);
   const gridCartCount = cart.filter(l => gridZoneIds.has(l.zoneId)).reduce((s, l) => s + l.quantity, 0);
 
   useEffect(() => {
@@ -128,15 +125,8 @@ export function RegisterForm({ slug }: Props) {
     tickets: t('register.tickets', { count }),
   });
 
-  const toggleSeatInCart = (zone: Zone, seat: Seat) => {
-    const key = `seat:${seat.id}`;
-    setCart(prev => {
-      if (prev.some(l => l.key === key)) return prev.filter(l => l.key !== key);
-      return [...prev, {
-        key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        seatId: seat.id, seatLabel: String(seat.number), quantity: 1,
-      }];
-    });
+  const toggleSeat = (zone: Zone, seat: Seat, table?: ZoneTable) => {
+    setCart(prev => toggleSeatInCart(prev, zone, seat, table));
   };
 
   const setGeneralQuantity = (zone: Zone, quantity: number) => {
@@ -146,32 +136,6 @@ export function RegisterForm({ slug }: Props) {
       const existing = prev.find(l => l.key === key);
       if (existing) return prev.map(l => (l.key === key ? { ...l, quantity } : l));
       return [...prev, { key, zoneId: zone.id, zoneName: zone.name, price: zone.price, quantity }];
-    });
-  };
-
-  const addTableToCart = (zone: Zone, table: ZoneTable) => {
-    const key = `table:${table.id}`;
-    setCart(prev => {
-      const existing = prev.find(l => l.key === key);
-      if ((existing?.quantity ?? 0) >= table.available) return prev;
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity: l.quantity + 1, tableAvailable: table.available } : l));
-      return [...prev, {
-        key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        tableId: table.id, tableNumber: table.number, tableAvailable: table.available, quantity: 1,
-      }];
-    });
-  };
-
-  const setTableQuantity = (zone: Zone, table: ZoneTable, quantity: number) => {
-    const key = `table:${table.id}`;
-    setCart(prev => {
-      if (quantity <= 0) return prev.filter(l => l.key !== key);
-      const existing = prev.find(l => l.key === key);
-      if (existing) return prev.map(l => (l.key === key ? { ...l, quantity, tableAvailable: table.available } : l));
-      return [...prev, {
-        key, zoneId: zone.id, zoneName: zone.name, price: zone.price,
-        tableId: table.id, tableNumber: table.number, tableAvailable: table.available, quantity,
-      }];
     });
   };
 
@@ -218,11 +182,25 @@ export function RegisterForm({ slug }: Props) {
     setError('');
     setLoading(true);
     try {
-      const items: CartItem[] = cart.map(line => {
-        if (line.seatId) return { zoneId: line.zoneId, seatIds: [line.seatId] };
-        if (line.tableId) return { zoneId: line.zoneId, tableId: line.tableId, quantity: line.quantity };
-        return { zoneId: line.zoneId, quantity: line.quantity };
-      });
+      const items = toCheckoutItems(cart);
+      if (items.some(i => i.seatIds?.length)) {
+        try {
+          const inventory = await api.getGridData(venue.id);
+          const occupied = [
+            ...inventory.seats.filter(s => s.occupied).map(s => s.id),
+            ...inventory.tables.flatMap(tbl => (tbl.seats ?? []).filter(s => s.occupied).map(s => s.id)),
+          ];
+          const nextCart = pruneOccupiedSeats(cart, occupied);
+          if (nextCart.length !== cart.length) {
+            setCart(nextCart);
+            setError(t('errors.seatAlreadyBooked'));
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Backend still re-checks availability; continue with local cart.
+        }
+      }
       const result = await api.register({
         name: name.trim(),
         phone: (phone ?? '').trim(),
@@ -316,8 +294,9 @@ export function RegisterForm({ slug }: Props) {
                 cartQuantityByZone={cartQuantityByZone}
                 cartQuantityByTable={cartQuantityByTable}
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
-                onSeatToggle={toggleSeatInCart}
+                onSeatToggle={(zone, seat, table) => toggleSeat(zone, seat, table)}
                 onTableOpen={(zone, table) => setQuantityModalTable({ zone, table })}
+                onOccupiedSeatIds={ids => setCart(prev => pruneOccupiedSeats(prev, ids))}
                 onClose={closeGridMap}
                 onCancel={cancelGridSelection}
                 quantityModalOpen={!!quantityModalZoneId || !!quantityModalTable}
@@ -385,7 +364,7 @@ export function RegisterForm({ slug }: Props) {
                   <SeatPicker
                     seats={legacySeatsCache[legacySeatZoneId] ?? []}
                     selectedSeatIds={cartSeatIds}
-                    onToggle={seat => toggleSeatInCart(legacySeatZone, seat)}
+                    onToggle={seat => toggleSeat(legacySeatZone, seat)}
                   />
                 )}
               </div>
@@ -401,8 +380,8 @@ export function RegisterForm({ slug }: Props) {
                     )}
                     <TablePicker
                       tables={tablesByZone[zone.id] ?? []}
-                      cartQuantityByTable={cartQuantityByTable}
-                      onAdd={table => addTableToCart(zone, table)}
+                      selectedSeatIds={cartSeatIds}
+                      onOpen={table => setQuantityModalTable({ zone, table })}
                     />
                   </div>
                 ))}
@@ -421,11 +400,11 @@ export function RegisterForm({ slug }: Props) {
                       <div key={line.key} data-testid="cart-item" className="flex items-center justify-between text-sm gap-2">
                         <div className="min-w-0 truncate">
                           <span className="text-gray-800">{line.zoneName}</span>
-                          {line.seatLabel && (
-                            <span className="text-gray-400"> · {t('register.seatLine', { number: line.seatLabel })}</span>
-                          )}
                           {line.tableNumber !== undefined && (
                             <span className="text-gray-400"> · {t('register.tableLine', { number: line.tableNumber })}</span>
+                          )}
+                          {line.seatLabel && (
+                            <span className="text-gray-400"> · {t('register.seatLine', { number: line.seatLabel })}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -588,13 +567,14 @@ export function RegisterForm({ slug }: Props) {
       )}
 
       {quantityModalTable && (
-        <QuantityModal
-          title={t('register.tableTitle', { number: quantityModalTable.table.number })}
+        <TableSeatPicker
+          zoneName={quantityModalTable.zone.name}
+          table={quantityModalTable.table}
+          seats={quantityModalTable.table.seats ?? []}
+          selectedSeatIds={cartSeatIds}
           price={quantityModalTable.zone.price}
           currency={currency}
-          quantity={cartQuantityByTable[quantityModalTable.table.id] ?? 0}
-          max={quantityModalTable.table.available}
-          onChange={qty => setTableQuantity(quantityModalTable.zone, quantityModalTable.table, qty)}
+          onToggle={seat => toggleSeat(quantityModalTable.zone, seat, quantityModalTable.table)}
           onClose={() => setQuantityModalTable(null)}
         />
       )}

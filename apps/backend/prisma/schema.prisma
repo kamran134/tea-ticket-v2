@@ -85,18 +85,21 @@ model Zone {
 }
 
 model Seat {
-  id           String   @id @default(cuid())
+  id           String     @id @default(cuid())
   zoneId       String
+  tableId      String?
   number       Int
   row          Int
-  sectionIndex Int      @default(0)
+  sectionIndex Int        @default(0)
   posInSection Int
-  zone         Zone     @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  zone         Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  table        ZoneTable? @relation(fields: [tableId], references: [id], onDelete: Cascade)
   tickets      Ticket[]
 
   @@unique([zoneId, number])
   @@unique([zoneId, row, sectionIndex, posInSection])
   @@index([zoneId])
+  @@index([tableId])
 }
 
 model ZoneTable {
@@ -111,6 +114,7 @@ model ZoneTable {
   cols       Int?
   zone       Zone       @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   tickets    Ticket[]
+  seats      Seat[]
 
   @@unique([zoneId, number])
   @@index([zoneId])
