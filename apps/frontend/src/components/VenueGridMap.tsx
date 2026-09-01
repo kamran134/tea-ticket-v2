@@ -3,16 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
-import { TableIcon, type ChairVisualState, type Footprint } from './TableIcon';
+import { TableIcon, type Footprint } from './TableIcon';
 import { tableChairLayout } from './tableChairLayout';
-import { GRID_LINE, sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea, cellToGridArea } from './grid/gridGeometry';
+import { sameZoneNeighbor, connectedComponents, boxToGridArea, footprintToGridArea, cellToGridArea } from './grid/gridGeometry';
 import { GridCanvas } from './grid/GridCanvas';
 import { zoneColor } from './grid/zoneColors';
 import { ConfirmDialog } from './ConfirmDialog';
+import { SeatMarker, type SeatVisualStatus } from './seatmap/SeatMarker';
+import { StageBanner } from './seatmap/StageBanner';
+import { MapLegend } from './seatmap/MapLegend';
+import { SelectionPanel, type SelectionItem } from './seatmap/SelectionPanel';
+import { SeatTooltip } from './seatmap/SeatTooltip';
+import { useMapZoom } from './seatmap/useMapZoom';
 
-// On desktop, shrink cells so up to this many columns fit in the canvas
-// without a horizontal scrollbar; beyond it cells stay at GRID_CELL_SIZE.
 const DESKTOP_FIT_COLS = 45;
+const FLOOR_LINE = 'rgba(255,255,255,0.06)';
 
 interface Props {
   venue: Venue;
@@ -24,30 +29,39 @@ interface Props {
   onZoneOpen: (zone: Zone) => void;
   onSeatToggle: (zone: Zone, seat: Seat, table?: ZoneTable) => void;
   onTableOpen: (zone: Zone, table: ZoneTable) => void;
-  /** Proceed: keep the current selection and close (top "Buy" / bottom "Done"). */
+  onClearZone?: (zone: Zone) => void;
   onClose: () => void;
-  /** Cancel: confirmed via the dialog below, discards the selection made since the map was opened. */
   onCancel: () => void;
-  /** True while a QuantityModal (the +/- counter for a table or a seatless zone) is open on top of this map — Escape should close that first. */
-  /** Called after inventory loads so the parent can drop stale selected seats. */
   onOccupiedSeatIds?: (ids: string[]) => void;
   quantityModalOpen: boolean;
 }
 
+function neighborBorder(cells: string[][], r: number, c: number, id: string) {
+  return {
+    borderWidth: 1,
+    borderStyle: 'solid' as const,
+    borderTopColor: sameZoneNeighbor(cells, r - 1, c, id) ? 'transparent' : FLOOR_LINE,
+    borderBottomColor: sameZoneNeighbor(cells, r + 1, c, id) ? 'transparent' : FLOOR_LINE,
+    borderLeftColor: sameZoneNeighbor(cells, r, c - 1, id) ? 'transparent' : FLOOR_LINE,
+    borderRightColor: sameZoneNeighbor(cells, r, c + 1, id) ? 'transparent' : FLOOR_LINE,
+  };
+}
+
 export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
-  onZoneOpen, onSeatToggle,   onTableOpen, onClose, onCancel, quantityModalOpen, onOccupiedSeatIds,
+  onZoneOpen, onSeatToggle, onTableOpen, onClearZone, onClose, onCancel,
+  quantityModalOpen, onOccupiedSeatIds,
 }: Props) {
   const { t } = useTranslation();
   const layout = venue.gridLayout;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { zoom, zoomIn, zoomOut, resetZoom, canZoomIn, canZoomOut, canReset } = useMapZoom(scrollRef);
 
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const hasSelection = cartSeatIds.length > 0
     || Object.values(cartQuantityByZone).some(q => q > 0)
     || Object.values(cartQuantityByTable).some(q => q > 0);
 
-  // Close (X / Escape) is a cancel, not a proceed — warn before throwing away
-  // a selection; an empty selection has nothing to lose, so skip the dialog.
   const requestClose = useCallback(() => {
     if (hasSelection) setConfirmingCancel(true);
     else onCancel();
@@ -55,27 +69,52 @@ export function VenueGridMap({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // A QuantityModal layered on top handles its own Escape; let that
-      // happen first and only close this map once it's gone.
-      if (e.key !== 'Escape' || quantityModalOpen) return;
-      requestClose();
+      if (quantityModalOpen) return;
+      if (e.key === 'Escape') {
+        requestClose();
+        return;
+      }
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        zoomIn();
+      } else if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        zoomOut();
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetZoom();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [quantityModalOpen, requestClose]);
+  }, [quantityModalOpen, requestClose, zoomIn, zoomOut, resetZoom]);
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
   const [seatsByZone, setSeatsByZone] = useState<Record<string, Seat[]>>({});
   const [tablesByZone, setTablesByZone] = useState<Record<string, ZoneTable[]>>({});
   const [loadingGrid, setLoadingGrid] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [occupiedNotice, setOccupiedNotice] = useState(false);
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [mobileInspect, setMobileInspect] = useState<string | null>(null);
 
   const occupiedCb = useRef(onOccupiedSeatIds);
   occupiedCb.current = onOccupiedSeatIds;
+  const cartSeatRef = useRef(cartSeatIds);
+  cartSeatRef.current = cartSeatIds;
 
   useEffect(() => {
     let cancelled = false;
     setLoadingGrid(true);
+    setLoadError(false);
     api.getGridData(venue.id)
       .then(({ seats, tables }) => {
         if (cancelled) return;
@@ -89,11 +128,17 @@ export function VenueGridMap({
           ...seats.filter(s => s.occupied).map(s => s.id),
           ...tables.flatMap(t => (t.seats ?? []).filter(s => s.occupied).map(s => s.id)),
         ];
+        if (occupiedIds.some(id => cartSeatRef.current.includes(id))) {
+          setOccupiedNotice(true);
+        }
         occupiedCb.current?.(occupiedIds);
       })
+      .catch(() => { if (!cancelled) setLoadError(true); })
       .finally(() => { if (!cancelled) setLoadingGrid(false); });
     return () => { cancelled = true; };
-  }, [venue.id]);
+  }, [venue.id, reloadKey]);
+
+  const selectedSet = useMemo(() => new Set(cartSeatIds), [cartSeatIds]);
 
   const seatByCell = useMemo(() => {
     const map = new Map<string, Seat>();
@@ -142,13 +187,115 @@ export function VenueGridMap({
     [layout],
   );
 
-  if (!layout) return null;
+  const usedZones = useMemo(() => {
+    if (!layout) return [];
+    return zones.filter(z => layout.cells.some(row => row.includes(z.id)));
+  }, [layout, zones]);
 
-  const usedZones = zones.filter(z => layout.cells.some(row => row.includes(z.id)));
-  if (usedZones.length === 0) return null;
+  const inspect = useCallback((el: HTMLElement, open: boolean, text: string) => {
+    if (!open) {
+      setTip(null);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    setTip({ text, x: rect.left + rect.width / 2, y: rect.top });
+    setMobileInspect(text);
+  }, []);
+
+  const seatStatus = (seat: Seat): SeatVisualStatus => {
+    if (seat.occupied) return 'occupied';
+    if (selectedSet.has(seat.id)) return 'selected';
+    return 'available';
+  };
+
+  const statusLabel = (status: SeatVisualStatus | 'empty') => {
+    if (status === 'occupied') return t('gridMap.statusOccupied');
+    if (status === 'selected') return t('gridMap.statusSelected');
+    if (status === 'empty') return t('gridMap.statusEmpty');
+    return t('gridMap.statusAvailable');
+  };
+
+  const selectionItems = useMemo(() => {
+    const items: SelectionItem[] = [];
+    for (const zone of zones) {
+      for (const seat of seatsByZone[zone.id] ?? []) {
+        if (!selectedSet.has(seat.id)) continue;
+        const label = t('register.seatLine', { number: seat.number });
+        items.push({
+          id: seat.id,
+          label,
+          meta: zone.name,
+          price: zone.price,
+          removeLabel: t('gridMap.removeSeat', { label }),
+          onRemove: () => onSeatToggle(zone, seat),
+        });
+      }
+      for (const table of tablesByZone[zone.id] ?? []) {
+        for (const seat of table.seats ?? []) {
+          if (!selectedSet.has(seat.id)) continue;
+          const label = t('register.placeLine', { table: table.number, seat: seat.number });
+          items.push({
+            id: seat.id,
+            label,
+            meta: zone.name,
+            price: zone.price,
+            removeLabel: t('gridMap.removeSeat', { label }),
+            onRemove: () => onSeatToggle(zone, seat, table),
+          });
+        }
+      }
+      const qty = cartQuantityByZone[zone.id] ?? 0;
+      if (qty > 0) {
+        items.push({
+          id: `general:${zone.id}`,
+          label: `${zone.name} × ${qty}`,
+          price: zone.price * qty,
+          removeLabel: t('gridMap.removeSeat', { label: zone.name }),
+          onRemove: () => (onClearZone ? onClearZone(zone) : onZoneOpen(zone)),
+        });
+      }
+    }
+    return items;
+  }, [zones, seatsByZone, tablesByZone, selectedSet, cartQuantityByZone, onSeatToggle, onClearZone, onZoneOpen, t]);
+
+  const selectedTotal = selectionItems.reduce((s, i) => s + i.price, 0);
+  const selectedCount = cartSeatIds.length + Object.values(cartQuantityByZone).reduce((s, q) => s + q, 0);
+  const countLabel = selectedCount > 0
+    ? t('gridMap.selectedCount', { count: selectedCount })
+    : t('gridMap.yourSelection');
+  const continueLabel = selectedCount > 0
+    ? `${t('gridMap.buy')} · ${formatPrice(selectedTotal, currency)}`
+    : t('common.done');
+
+  const hasSelectable = useMemo(() => {
+    if (loadingGrid || loadError) return true;
+    for (const zone of usedZones) {
+      if (zone.type === 'GENERAL' && (zone.available ?? 0) > 0) return true;
+      for (const seat of seatsByZone[zone.id] ?? []) {
+        if (!seat.occupied) return true;
+      }
+      for (const table of tablesByZone[zone.id] ?? []) {
+        if ((table.seats ?? []).some(s => !s.occupied)) return true;
+      }
+    }
+    return usedZones.length === 0;
+  }, [loadingGrid, loadError, usedZones, seatsByZone, tablesByZone]);
+
+  if (!layout || usedZones.length === 0) return null;
 
   const grid = (
-    <GridCanvas rows={layout.rows} cols={layout.cols} maxHeight="min(55dvh, 100%)" fitCols={DESKTOP_FIT_COLS} cellSize={48}>
+    <GridCanvas
+      ref={scrollRef}
+      rows={layout.rows}
+      cols={layout.cols}
+      maxHeight="100%"
+      fitCols={DESKTOP_FIT_COLS}
+      cellSize={48}
+      zoom={zoom}
+      tone="dark"
+      onMouseLeave={() => setTip(null)}
+      onScroll={() => setTip(null)}
+    >
       {layout.cells.map((row, r) =>
         row.map((cell, c) => {
           const place = cellToGridArea(r, c);
@@ -159,32 +306,45 @@ export function VenueGridMap({
                 key={`${r}-${c}`}
                 style={{
                   ...place,
-                  backgroundColor: '#1e293b',
-                  borderWidth: 1,
-                  borderStyle: 'solid',
-                  borderTopColor: sameZoneNeighbor(layout.cells, r - 1, c, 'stage') ? 'transparent' : GRID_LINE,
-                  borderBottomColor: sameZoneNeighbor(layout.cells, r + 1, c, 'stage') ? 'transparent' : GRID_LINE,
-                  borderLeftColor: sameZoneNeighbor(layout.cells, r, c - 1, 'stage') ? 'transparent' : GRID_LINE,
-                  borderRightColor: sameZoneNeighbor(layout.cells, r, c + 1, 'stage') ? 'transparent' : GRID_LINE,
+                  backgroundColor: '#1c1812',
+                  ...neighborBorder(layout.cells, r, c, 'stage'),
                 }}
               />
             );
           }
-          const entry = cell !== 'empty' && cell !== 'blocked' ? zoneById.get(cell) : undefined;
+
+          if (cell === 'blocked') {
+            return (
+              <div
+                key={`${r}-${c}`}
+                className="seat-map-blocked"
+                title={t('gridMap.blocked')}
+                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+              />
+            );
+          }
+
+          if (cell === 'empty') {
+            return (
+              <div
+                key={`${r}-${c}`}
+                className="seat-map-floor"
+                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+              />
+            );
+          }
+
+          const entry = zoneById.get(cell);
           if (!entry) {
             return (
               <div
                 key={`${r}-${c}`}
-                style={{
-                  ...place,
-                  backgroundColor: cell === 'blocked' ? '#9ca3af' : '#ffffff',
-                  borderWidth: 1,
-                  borderStyle: 'solid',
-                  borderColor: GRID_LINE,
-                }}
+                className="seat-map-floor"
+                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
               />
             );
           }
+
           const { zone, index } = entry;
           const color = zoneColor(zone, index);
 
@@ -194,48 +354,41 @@ export function VenueGridMap({
               return (
                 <div
                   key={`${r}-${c}`}
+                  className={loadingGrid ? 'animate-pulse' : undefined}
                   style={{
                     ...place,
-                    backgroundColor: `${color}55`,
-                    borderWidth: 1, borderStyle: 'solid', borderColor: GRID_LINE,
+                    backgroundColor: `${color}22`,
+                    borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE,
                   }}
                 />
               );
             }
-            const isSelected = cartSeatIds.includes(seat.id);
-            const isOccupied = seat.occupied;
-            const seatStatus = isOccupied ? 'occupied' : isSelected ? 'selected' : 'available';
+            const status = seatStatus(seat);
+            const tooltip = t('gridMap.seatTooltip', {
+              zone: zone.name,
+              number: seat.number,
+              price: formatPrice(zone.price, currency),
+              occupied: status === 'occupied' ? ` · ${t('gridMap.occupied')}` : '',
+            });
             return (
               <div
                 key={`${r}-${c}`}
-                onClick={() => !isOccupied && onSeatToggle(zone, seat)}
-                data-testid={`seat-${seat.id}`}
-                data-seat-id={seat.id}
-                data-seat-status={seatStatus}
-                title={t('gridMap.seatTooltip', {
-                  zone: zone.name,
-                  number: seat.number,
-                  price: formatPrice(zone.price, currency),
-                  occupied: isOccupied ? ` · ${t('gridMap.occupied')}` : '',
-                })}
-                style={{
-                  ...place,
-                  backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? color : `${color}55`,
-                  borderWidth: 1,
-                  borderStyle: 'solid',
-                  borderColor: isSelected ? color : GRID_LINE,
-                  cursor: isOccupied ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden',
-                  fontSize: 12,
-                  fontWeight: 700,
-                  lineHeight: 1,
-                  color: isOccupied ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
-                }}
+                style={{ ...place, backgroundColor: `${color}18`, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
               >
-                {seat.number}
+                <SeatMarker
+                  seatId={seat.id}
+                  number={seat.number}
+                  status={status}
+                  accentColor={color}
+                  ariaLabel={t('gridMap.seatAria', {
+                    zone: zone.name,
+                    number: seat.number,
+                    price: formatPrice(zone.price, currency),
+                    status: statusLabel(status),
+                  })}
+                  onToggle={() => onSeatToggle(zone, seat)}
+                  onInspect={(el, open) => inspect(el, open, tooltip)}
+                />
               </div>
             );
           }
@@ -246,16 +399,14 @@ export function VenueGridMap({
               return (
                 <div
                   key={`${r}-${c}`}
-                  style={{
-                    ...place,
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1, borderStyle: 'solid', borderColor: GRID_LINE,
-                  }}
+                  className="seat-map-floor"
+                  style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
                 />
               );
             }
-            const inCartAtTable = (table.seats ?? []).filter(s => cartSeatIds.includes(s.id)).length;
-            const remaining = (table.seats ?? []).filter(s => !s.occupied && !cartSeatIds.includes(s.id)).length;
+            const seats = table.seats ?? [];
+            const inCartAtTable = seats.filter(s => selectedSet.has(s.id)).length;
+            const remaining = seats.filter(s => !s.occupied && !selectedSet.has(s.id)).length;
             const isFull = remaining <= 0 && inCartAtTable === 0;
             const sameTable = (nr: number, nc: number) => tableByCell.get(`${zone.id}|${nr}|${nc}`) === table;
             return (
@@ -267,13 +418,13 @@ export function VenueGridMap({
                 data-table-available={remaining}
                 style={{
                   ...place,
-                  backgroundColor: isFull ? '#e5e7eb' : inCartAtTable > 0 ? '#d1fae5' : '#ffffff',
+                  backgroundColor: 'transparent',
                   borderWidth: 1,
                   borderStyle: 'solid',
-                  borderTopColor: sameTable(r - 1, c) ? 'transparent' : GRID_LINE,
-                  borderBottomColor: sameTable(r + 1, c) ? 'transparent' : GRID_LINE,
-                  borderLeftColor: sameTable(r, c - 1) ? 'transparent' : GRID_LINE,
-                  borderRightColor: sameTable(r, c + 1) ? 'transparent' : GRID_LINE,
+                  borderTopColor: sameTable(r - 1, c) ? 'transparent' : FLOOR_LINE,
+                  borderBottomColor: sameTable(r + 1, c) ? 'transparent' : FLOOR_LINE,
+                  borderLeftColor: sameTable(r, c - 1) ? 'transparent' : FLOOR_LINE,
+                  borderRightColor: sameTable(r, c + 1) ? 'transparent' : FLOOR_LINE,
                   pointerEvents: 'none',
                 }}
               />
@@ -282,26 +433,27 @@ export function VenueGridMap({
 
           const inCart = cartQuantityByZone[zone.id] ?? 0;
           const isEmpty = inCart === 0 && (zone.available ?? 0) <= 0;
+          const tooltip = t('gridMap.zoneTooltip', {
+            zone: zone.name,
+            price: formatPrice(zone.price, currency),
+            empty: isEmpty ? ` · ${t('gridMap.noSeats')}` : '',
+          });
           return (
             <div
               key={`${r}-${c}`}
               onClick={() => !isEmpty && onZoneOpen(zone)}
-              title={t('gridMap.zoneTooltip', {
+              title={tooltip}
+              aria-label={t('gridMap.zoneAria', {
                 zone: zone.name,
                 price: formatPrice(zone.price, currency),
-                empty: isEmpty ? ` · ${t('gridMap.noSeats')}` : '',
+                status: isEmpty ? t('gridMap.statusEmpty') : t('gridMap.statusAvailable'),
               })}
               style={{
                 ...place,
-                backgroundColor: inCart > 0 ? color : `${color}99`,
-                borderWidth: 1,
-                borderStyle: 'solid',
-                borderTopColor: sameZoneNeighbor(layout.cells, r - 1, c, zone.id) ? 'transparent' : GRID_LINE,
-                borderBottomColor: sameZoneNeighbor(layout.cells, r + 1, c, zone.id) ? 'transparent' : GRID_LINE,
-                borderLeftColor: sameZoneNeighbor(layout.cells, r, c - 1, zone.id) ? 'transparent' : GRID_LINE,
-                borderRightColor: sameZoneNeighbor(layout.cells, r, c + 1, zone.id) ? 'transparent' : GRID_LINE,
+                backgroundColor: inCart > 0 ? `${color}cc` : `${color}99`,
+                ...neighborBorder(layout.cells, r, c, zone.id),
                 cursor: isEmpty ? 'not-allowed' : 'pointer',
-                opacity: isEmpty ? 0.5 : 1,
+                opacity: isEmpty ? 0.45 : 1,
               }}
             />
           );
@@ -321,7 +473,7 @@ export function VenueGridMap({
               ...boxToGridArea(box),
               overflow: 'hidden',
               color: '#ffffff',
-              textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+              textShadow: '0 1px 2px rgba(0,0,0,0.65)',
               fontSize: 14,
               lineHeight: 1.2,
             }}
@@ -337,35 +489,21 @@ export function VenueGridMap({
       })}
 
       {stageComponents.map(({ box }, i) => (
-        <div
+        <StageBanner
           key={i}
-          className="flex items-center justify-center text-center font-semibold uppercase tracking-wide pointer-events-none px-1"
-          style={{
-            ...boxToGridArea(box),
-            overflow: 'hidden',
-            color: '#ffffff',
-            fontSize: 14,
-            lineHeight: 1.2,
-          }}
-        >
-          {t('gridMap.stage')}
-        </div>
+          label={t('gridMap.stage')}
+          subtitle={venue.name}
+          style={boxToGridArea(box)}
+        />
       ))}
 
       {tableFootprints.map(({ zone, table }) => {
         const seats = [...(table.seats ?? [])].sort((a, b) => a.posInSection - b.posInSection);
-        const inCartAtTable = seats.filter(s => cartSeatIds.includes(s.id)).length;
-        const remaining = seats.filter(s => !s.occupied && !cartSeatIds.includes(s.id)).length;
+        const inCartAtTable = seats.filter(s => selectedSet.has(s.id)).length;
+        const remaining = seats.filter(s => !s.occupied && !selectedSet.has(s.id)).length;
         const isFull = remaining <= 0 && inCartAtTable === 0;
         const footprint: Footprint = { rows: table.rows!, cols: table.cols! };
         const markers = tableChairLayout(table.shape, seats.length || table.chairCount, footprint);
-        const chairStates: ChairVisualState[] = markers.map(marker => {
-          const seat = seats[marker.index];
-          if (!seat) return 'available';
-          if (seat.occupied) return 'sold';
-          if (cartSeatIds.includes(seat.id)) return 'selected';
-          return 'available';
-        });
         return (
           <div
             key={table.id}
@@ -379,50 +517,46 @@ export function VenueGridMap({
                 footprint={footprint}
                 label={String(table.number)}
                 muted={isFull}
-                chairStates={chairStates}
+                showChairs={false}
               />
             </div>
             {markers.map(marker => {
               const seat = seats[marker.index];
               if (!seat) return null;
-              const isSelected = cartSeatIds.includes(seat.id);
-              const isOccupied = seat.occupied;
-              const status = isOccupied ? 'occupied' : isSelected ? 'selected' : 'available';
+              const status = seatStatus(seat);
+              const tooltip = t('gridMap.tableSeatTooltip', {
+                zone: zone.name,
+                table: table.number,
+                seat: seat.number,
+                price: formatPrice(zone.price, currency),
+                occupied: status === 'occupied' ? ` · ${t('gridMap.occupied')}` : '',
+              });
+              const hit = Math.max(marker.width, marker.height);
               return (
-                <button
+                <SeatMarker
                   key={seat.id}
-                  type="button"
-                  disabled={isOccupied}
-                  onClick={e => {
-                    e.stopPropagation();
-                    if (!isOccupied) onSeatToggle(zone, seat, table);
+                  seatId={seat.id}
+                  number={seat.number}
+                  status={status}
+                  accentColor={zoneColor(zone, zoneById.get(zone.id)?.index ?? 0)}
+                  shape={marker.shape === 'rect' ? 'rect' : 'circle'}
+                  placement="overlay"
+                  style={{
+                    left: `${(marker.x / footprint.cols) * 100}%`,
+                    top: `${(marker.y / footprint.rows) * 100}%`,
+                    width: `max(40px, ${(hit / footprint.cols) * 130}%)`,
+                    height: `max(40px, ${(hit / footprint.rows) * 130}%)`,
                   }}
-                  data-testid={`seat-${seat.id}`}
-                  data-seat-id={seat.id}
-                  data-seat-status={status}
-                  title={t('gridMap.tableSeatTooltip', {
+                  ariaLabel={t('gridMap.tableSeatAria', {
                     zone: zone.name,
                     table: table.number,
                     seat: seat.number,
                     price: formatPrice(zone.price, currency),
-                    occupied: isOccupied ? ` · ${t('gridMap.occupied')}` : '',
+                    status: statusLabel(status),
                   })}
-                  className="absolute z-10 rounded-full border-2 font-bold leading-none flex items-center justify-center pointer-events-auto"
-                  style={{
-                    left: `${(marker.x / footprint.cols) * 100}%`,
-                    top: `${(marker.y / footprint.rows) * 100}%`,
-                    width: `max(32px, ${(Math.max(marker.width, marker.height) / footprint.cols) * 100}%)`,
-                    height: `max(32px, ${(Math.max(marker.width, marker.height) / footprint.rows) * 100}%)`,
-                    transform: 'translate(-50%, -50%)',
-                    fontSize: 11,
-                    backgroundColor: isOccupied ? '#e5e7eb' : isSelected ? '#059669' : '#ffffff',
-                    borderColor: isOccupied ? '#d1d5db' : isSelected ? '#047857' : '#7c5230',
-                    color: isOccupied ? '#9ca3af' : isSelected ? '#ffffff' : '#374151',
-                    cursor: isOccupied ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {seat.number}
-                </button>
+                  onToggle={() => onSeatToggle(zone, seat, table)}
+                  onInspect={(el, open) => inspect(el, open, tooltip)}
+                />
               );
             })}
             <button
@@ -455,170 +589,187 @@ export function VenueGridMap({
     </GridCanvas>
   );
 
-  const legend = (
-    <div className="flex flex-wrap gap-2">
-      {usedZones.map(zone => {
-        const index = zoneById.get(zone.id)!.index;
-        const inCart = cartQuantityByZone[zone.id] ?? 0;
-        const seatsInCart = zone.type === 'SEATED'
-          ? (seatsByZone[zone.id] ?? []).filter(s => cartSeatIds.includes(s.id)).length
-          : 0;
-        const tablesInCart = zone.type === 'TABLE'
-          ? (tablesByZone[zone.id] ?? []).reduce(
-            (s, tbl) => s + (tbl.seats ?? []).filter(seat => cartSeatIds.includes(seat.id)).length,
-            0,
-          )
-          : 0;
-        const picked = inCart + seatsInCart + tablesInCart;
-        const isEmpty = picked === 0 && (zone.available ?? 0) <= 0;
-        const className = [
-          'flex items-center gap-1.5 rounded-lg border-2 px-2.5 py-1.5 text-xs transition-colors',
-          picked > 0
-            ? 'border-emerald-600 bg-emerald-50'
-            : isEmpty
-              ? 'border-gray-100 bg-gray-50 opacity-50'
-              : 'border-gray-200',
-        ].join(' ');
-        const content = (
-          <>
-            <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: zoneColor(zone, index) }} />
-            <span className="font-medium text-gray-800">{zone.name}</span>
-            <span className="text-gray-400">{formatPrice(zone.price, currency)}</span>
-            {zone.available !== undefined && (
-              <span className={isEmpty ? 'text-gray-400' : zone.available <= 5 ? 'text-amber-600' : 'text-gray-400'}>
-                · {isEmpty ? t('gridMap.noSeats') : t('gridMap.seatsAvailable', { count: zone.available })}
-              </span>
-            )}
-            {(inCart > 0 || seatsInCart > 0 || tablesInCart > 0) && (
-              <span className="text-emerald-700 font-semibold">× {inCart || seatsInCart || tablesInCart}</span>
-            )}
-          </>
-        );
-        return zone.type === 'GENERAL' ? (
-          <button
-            key={zone.id}
-            type="button"
-            disabled={isEmpty}
-            onClick={() => onZoneOpen(zone)}
-            className={`${className} ${isEmpty ? 'cursor-not-allowed' : 'hover:border-emerald-300'}`}
-          >
-            {content}
-          </button>
-        ) : (
-          <div key={zone.id} className={className}>{content}</div>
-        );
-      })}
-    </div>
-  );
+  const stateLegend = [
+    { key: 'available', label: t('seatPicker.free'), swatch: 'available' as const },
+    { key: 'selected', label: t('seatPicker.inCart'), swatch: 'selected' as const },
+    { key: 'occupied', label: t('seatPicker.occupied'), swatch: 'occupied' as const },
+    { key: 'blocked', label: t('gridMap.blocked'), swatch: 'blocked' as const },
+  ];
 
-  const selectedSummary: { id: string; label: string; price: number }[] = [];
-  for (const zone of zones) {
-    for (const seat of seatsByZone[zone.id] ?? []) {
-      if (!cartSeatIds.includes(seat.id)) continue;
-      selectedSummary.push({
-        id: seat.id,
-        label: t('register.seatLine', { number: seat.number }),
-        price: zone.price,
-      });
-    }
-    for (const table of tablesByZone[zone.id] ?? []) {
-      for (const seat of table.seats ?? []) {
-        if (!cartSeatIds.includes(seat.id)) continue;
-        selectedSummary.push({
-          id: seat.id,
-          label: `${t('register.tableLine', { number: table.number })} · ${t('register.seatLine', { number: seat.number })}`,
-          price: zone.price,
-        });
-      }
-    }
-  }
-  for (const zone of zones) {
-    const qty = cartQuantityByZone[zone.id] ?? 0;
-    if (qty > 0) {
-      selectedSummary.push({ id: `general:${zone.id}`, label: `${zone.name} × ${qty}`, price: zone.price * qty });
-    }
-  }
+  const zoneLegend = usedZones.map(zone => {
+    const index = zoneById.get(zone.id)!.index;
+    const inCart = cartQuantityByZone[zone.id] ?? 0;
+    const seatsInCart = zone.type === 'SEATED'
+      ? (seatsByZone[zone.id] ?? []).filter(s => selectedSet.has(s.id)).length
+      : 0;
+    const tablesInCart = zone.type === 'TABLE'
+      ? (tablesByZone[zone.id] ?? []).reduce(
+        (s, tbl) => s + (tbl.seats ?? []).filter(seat => selectedSet.has(seat.id)).length,
+        0,
+      )
+      : 0;
+    const picked = inCart + seatsInCart + tablesInCart;
+    const isEmpty = picked === 0 && (zone.available ?? 0) <= 0;
+    return {
+      key: zone.id,
+      label: zone.name,
+      swatch: 'zone' as const,
+      color: zoneColor(zone, index),
+      hint: `${formatPrice(zone.price, currency)}${zone.available !== undefined ? ` · ${isEmpty ? t('gridMap.noSeats') : t('gridMap.seatsAvailable', { count: zone.available })}` : ''}${picked > 0 ? ` × ${picked}` : ''}`,
+      active: picked > 0,
+      disabled: isEmpty && zone.type === 'GENERAL',
+      onClick: zone.type === 'GENERAL' && !isEmpty ? () => onZoneOpen(zone) : undefined,
+    };
+  });
 
-  const selectedTotal = selectedSummary.reduce((s, i) => s + i.price, 0);
-
-  const stateLegend = (
-    <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-      <span className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 rounded-full border-2 border-[#7c5230] bg-white inline-block" />
-        {t('seatPicker.free')}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 rounded-full border-2 border-emerald-700 bg-emerald-600 inline-block" />
-        {t('seatPicker.inCart')}
-      </span>
-      <span className="flex items-center gap-1.5">
-        <span className="w-3.5 h-3.5 rounded-full border-2 border-gray-200 bg-gray-200 inline-block" />
-        {t('seatPicker.occupied')}
-      </span>
-    </div>
-  );
+  const selectionPanelProps = {
+    title: t('gridMap.yourSelection'),
+    items: selectionItems,
+    countLabel,
+    total: selectedTotal,
+    currency,
+    continueLabel,
+    emptyHint: t('gridMap.emptyHint'),
+    onContinue: onClose,
+  };
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-white flex flex-col">
-        <div className="flex justify-between items-center shrink-0 bg-white px-4 pt-4 pb-2 border-b border-gray-100">
-          <span className="font-semibold text-gray-800">{t('gridMap.title')}</span>
+      <div
+        className="seat-map-overlay fixed inset-0 z-50 flex flex-col bg-[#0a0a0a] text-white"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="seat-map-title"
+      >
+        <a
+          href="#seat-map-summary"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-20 focus:bg-black focus:px-3 focus:py-2 focus:rounded-lg"
+        >
+          {t('gridMap.skipToSelection')}
+        </a>
+
+        <header className="flex justify-between items-center shrink-0 px-4 pt-4 pb-2 border-b border-white/10 gap-3">
+          <div id="seat-map-summary" className="min-w-0">
+            <span id="seat-map-title" className="font-semibold tracking-wide">{t('gridMap.title')}</span>
+            {selectionItems.length > 0 && (
+              <div data-testid="map-selection" className="text-xs text-emerald-300/90 truncate">
+                {selectionItems.map(item => item.label).join(' · ')}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-9 px-4 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+              className="hidden sm:inline-flex h-9 px-4 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors"
             >
-              {t('gridMap.buy')}
+              {selectedCount > 0 ? t('gridMap.buy') : t('common.done')}
             </button>
             <button
               type="button"
               onClick={requestClose}
               title={t('common.closeEsc')}
               aria-label={t('common.close')}
-              className="h-9 w-9 shrink-0 flex items-center justify-center border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="h-9 w-9 shrink-0 flex items-center justify-center border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
             >
               ✕
             </button>
           </div>
+        </header>
+
+        {occupiedNotice && (
+          <div className="shrink-0 px-4 py-2 text-sm bg-amber-500/15 text-amber-100 border-b border-amber-500/20">
+            {t('gridMap.occupiedNotice')}
+          </div>
+        )}
+
+        {loadError && (
+          <div className="shrink-0 px-4 py-3 text-sm bg-red-500/10 text-red-100 border-b border-red-500/20 flex items-center justify-between gap-3">
+            <span>{t('gridMap.loadError')}</span>
+            <button
+              type="button"
+              onClick={() => setReloadKey(k => k + 1)}
+              className="shrink-0 h-9 px-3 rounded-lg bg-white/10 hover:bg-white/15 font-medium"
+            >
+              {t('gridMap.retry')}
+            </button>
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 flex">
+          <div className="relative flex-1 min-h-0 flex flex-col px-3 py-3 gap-3">
+            {!hasSelectable && !loadingGrid && (
+              <div className="shrink-0 text-center text-sm text-white/60 bg-white/5 rounded-xl py-2">
+                {t('gridMap.allOccupied')}
+              </div>
+            )}
+            <div className="relative flex-1 min-h-0">
+              {grid}
+              {loadingGrid && (
+                <div className="absolute inset-0 pointer-events-none rounded-xl bg-[#121214]/40 flex items-end justify-start p-3">
+                  <span className="text-xs text-white/50 bg-black/40 rounded-md px-2 py-1">
+                    {t('gridMap.loadingSeats')}
+                  </span>
+                </div>
+              )}
+              <div className="absolute bottom-3 right-3 z-20 flex flex-col items-end gap-2">
+                <div className="seat-map-zoom">
+                  <button type="button" onClick={zoomIn} disabled={!canZoomIn} aria-label={t('gridMap.zoomIn')}>+</button>
+                  <button type="button" onClick={zoomOut} disabled={!canZoomOut} aria-label={t('gridMap.zoomOut')}>−</button>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetZoom}
+                  disabled={!canReset}
+                  className="h-9 px-3 rounded-lg border border-white/12 bg-[#121214]/90 text-[11px] font-medium text-white/80 hover:bg-white/10 disabled:opacity-35 disabled:cursor-not-allowed"
+                >
+                  {t('gridMap.resetZoom')}
+                </button>
+              </div>
+            </div>
+            <div className="md:hidden">
+              <MapLegend states={stateLegend} zones={zoneLegend} />
+            </div>
+            {mobileInspect && (
+              <p className="md:hidden text-xs text-white/60 truncate">{mobileInspect}</p>
+            )}
+          </div>
+
+          <aside className="hidden md:flex w-80 shrink-0 flex-col border-l border-white/10 px-4 py-4 gap-4 bg-[#0e0e10]">
+            <MapLegend states={stateLegend} zones={zoneLegend} />
+            <div className="flex-1 min-h-0">
+              <SelectionPanel {...selectionPanelProps} />
+            </div>
+          </aside>
         </div>
-        <div className="flex-1 min-h-0 overflow-auto px-4 py-3 space-y-3">
-          {grid}
-          {loadingGrid && <p className="text-xs text-gray-400">{t('gridMap.loadingSeats')}</p>}
-          {stateLegend}
-          {legend}
-        </div>
-        <div className="shrink-0 border-t border-gray-200 bg-white px-4 py-3 space-y-2">
-          {selectedSummary.length > 0 && (
-            <div data-testid="map-selection" className="flex flex-wrap gap-1.5 max-h-20 overflow-auto">
-              {selectedSummary.map(item => (
-                <span key={item.id} className="text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full px-2 py-0.5">
+
+        <div className="md:hidden shrink-0 border-t border-white/10 bg-[#0e0e10] px-4 py-3 space-y-2">
+          {selectionItems.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 max-h-16 overflow-auto">
+              {selectionItems.map(item => (
+                <span key={item.id} className="text-xs bg-emerald-500/15 text-emerald-100 border border-emerald-400/30 rounded-full px-2 py-0.5">
                   {item.label}
                 </span>
               ))}
             </div>
           )}
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-          >
-            {selectedSummary.length > 0
-              ? `${t('common.done')} · ${formatPrice(selectedTotal, currency)}`
-              : t('common.done')}
-          </button>
+          <SelectionPanel compact {...selectionPanelProps} />
         </div>
       </div>
 
+      {tip && <SeatTooltip text={tip.text} x={tip.x} y={tip.y} />}
+
       {confirmingCancel && (
-        <ConfirmDialog
-          title={t('gridMap.cancelSelectionTitle')}
-          message={t('gridMap.cancelSelectionMessage')}
-          confirmLabel={t('gridMap.cancelSelectionConfirm')}
-          cancelLabel={t('gridMap.cancelSelectionKeep')}
-          onConfirm={onCancel}
-          onCancel={() => setConfirmingCancel(false)}
-        />
+        <div className="relative z-[80]">
+          <ConfirmDialog
+            title={t('gridMap.cancelSelectionTitle')}
+            message={t('gridMap.cancelSelectionMessage')}
+            confirmLabel={t('gridMap.cancelSelectionConfirm')}
+            cancelLabel={t('gridMap.cancelSelectionKeep')}
+            onConfirm={onCancel}
+            onCancel={() => setConfirmingCancel(false)}
+          />
+        </div>
       )}
     </>
   );
