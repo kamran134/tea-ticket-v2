@@ -230,7 +230,7 @@ export function TicketView() {
     const urlParams = new URLSearchParams(window.location.search);
     const hasReturnParams = urlParams.get('paymentId') && urlParams.get('returnToken');
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
+      <div className="app-bg flex items-center justify-center text-gray-400">
         {hasReturnParams && !urlParams.get('id') && !urlParams.get('checkoutId')
           ? t('ticket.ticketResolveError')
           : t('common.loading')}
@@ -244,7 +244,7 @@ export function TicketView() {
     displayStatus === 'BOOKED' || displayStatus === 'PENDING' || displayStatus === 'CONFIRMED';
 
   return (
-    <div data-testid="ticket-page" className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
+    <div data-testid="ticket-page" className="app-bg flex flex-col">
       <Header />
       <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
       <div className="max-w-md mx-auto space-y-4">
@@ -418,7 +418,7 @@ export function TicketView() {
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center gap-3">
             <div className="text-2xl">✅</div>
             <h2 className="font-semibold text-green-800">{t('ticket.confirmed')}</h2>
-            <div data-testid="ticket-qr" className="p-3 bg-gray-50 rounded-xl">
+            <div data-testid="ticket-qr" className="p-3 bg-white keep-white rounded-xl">
               <QRCodeSVG value={ticket.groupId ?? ticket.id} size={200} />
             </div>
             <p className="text-xs text-gray-500">{t('ticket.showQr')}</p>
