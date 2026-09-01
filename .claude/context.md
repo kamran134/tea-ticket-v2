@@ -1,3 +1,33 @@
+# Контекст: UX-редизайн схемы выбора мест (2026-09-01)
+
+## Что не меняем
+Backend, Prisma, API, `cart.ts`, правила `toggleSeatInCart`, цены, статусы `occupied`.
+Покупка по-прежнему: клик по месту → корзина в `RegisterForm` → `POST /api/tickets/register`.
+
+## Где живёт визуал
+- Покупатель: `VenueGridMap` (fullscreen overlay) + новые `components/seatmap/*`.
+- Админский `GridMapEditor` не редизайним — общий только `GridCanvas`/`TableIcon`.
+- Легаси `SeatPicker` / `TablePicker` (зоны вне сетки) не трогаем, кроме согласованных цветов если пересечёмся.
+
+## Визуальный язык
+Шапка/подвал сайта уже тёмные (`#0a0a0a`, акцент `#d4af37` BIR MANAT BAND).
+Схема покупателя — тёмная event-карта, не неоновая игра:
+- сцена — gold;
+- выбрано — emerald (`#059669`), как CTA/корзина;
+- категория — цвет зоны на обводке свободного места;
+- занято — muted + перечёркивание (не только цвет).
+
+## Zoom
+Не canvas-rewrite. `GridCanvas` масштабирует CSS `transform: scale(zoom)` вокруг уже существующей CSS-grid раскладки. Pan = native overflow scroll. Pinch и ctrl+wheel. Кнопка reset. `fitCols` работает и на mobile, чтобы сначала была видна вся схема (сцена как ориентир), затем zoom in для тапа.
+
+## CTA при пустом выборе
+Continue **остаётся активным** при пустом выборе: Cancel восстанавливает snapshot корзины, а Done фиксирует текущий (в т.ч. очищенный) выбор. Иначе пользователь не сможет подтвердить «убрать все места».
+
+## E2E контракт
+`data-testid="seat-*"`, `data-seat-status`, `data-testid="map-selection"`, `title` на GENERAL-клетках (`QA General`), кнопки Купить/Готово.
+
+---
+
 # Контекст: Сетка как основной инструмент продажи мест
 
 ## Задача

@@ -109,3 +109,286 @@
     color: var(--footer-accent);
   }
 }
+
+/* Buyer seat map — dark event canvas, gold stage, emerald selection */
+.seat-map-overlay {
+  --seat-available-fill: #1c1c20;
+  --seat-available-text: #e7e5e4;
+  --seat-selected-fill: #059669;
+  --seat-selected-stroke: #34d399;
+  --seat-selected-text: #ffffff;
+  --seat-occupied-fill: #2a2a2e;
+  --seat-occupied-stroke: #52525b;
+  --seat-occupied-text: #71717a;
+  --stage-accent: #d4af37;
+}
+
+.seat-map-canvas {
+  border-color: rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(212, 175, 55, 0.07), transparent 55%),
+    #121214;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  touch-action: pan-x pan-y;
+}
+
+.seat-map-floor {
+  background: #161618;
+}
+
+.seat-map-blocked {
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      #1c1c20,
+      #1c1c20 4px,
+      #232326 4px,
+      #232326 8px
+    );
+}
+
+.seat-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 3px;
+  padding: 4px 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.45);
+  background: linear-gradient(180deg, #2c2418 0%, #161310 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(245, 230, 184, 0.2),
+    0 8px 28px rgba(212, 175, 55, 0.08);
+}
+
+.seat-stage-glow {
+  position: absolute;
+  inset: auto 12% -40% 12%;
+  height: 70%;
+  background: radial-gradient(ellipse, rgba(212, 175, 55, 0.28), transparent 70%);
+  pointer-events: none;
+}
+
+.seat-stage-label {
+  position: relative;
+  color: #f5e6b8;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  font-size: clamp(10px, 1.8cqw, 15px);
+  line-height: 1.15;
+  text-align: center;
+}
+
+.seat-stage-sub {
+  position: relative;
+  margin-top: 2px;
+  color: #d4af37;
+  font-size: clamp(8px, 1.3cqw, 11px);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.seat-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.seat-marker--cell {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 2;
+}
+
+.seat-marker--overlay {
+  position: absolute;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+}
+
+.seat-marker-disc {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--seat-accent, #a8a29e);
+  background: var(--seat-available-fill);
+  color: var(--seat-available-text);
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.seat-marker--cell .seat-marker-disc {
+  width: min(72%, 36px);
+  height: min(72%, 36px);
+  font-size: clamp(8px, 38%, 12px);
+}
+
+.seat-marker--overlay .seat-marker-disc {
+  width: 72%;
+  height: 72%;
+  min-width: 22px;
+  min-height: 22px;
+  font-size: 11px;
+}
+
+.seat-marker--rect .seat-marker-disc {
+  border-radius: 28%;
+}
+
+.seat-marker:not(.seat-marker--rect) .seat-marker-disc {
+  border-radius: 9999px;
+}
+
+.seat-marker-disc[data-state='selected'] {
+  background: var(--seat-selected-fill);
+  border-color: var(--seat-selected-stroke);
+  color: var(--seat-selected-text);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.28), 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.seat-marker-disc[data-state='occupied'] {
+  background: var(--seat-occupied-fill);
+  border-color: var(--seat-occupied-stroke);
+  color: var(--seat-occupied-text);
+}
+
+.seat-marker-disc[data-state='occupied']::after {
+  content: '';
+  position: absolute;
+  width: 62%;
+  height: 2px;
+  background: #a1a1aa;
+  border-radius: 1px;
+  transform: rotate(-38deg);
+}
+
+.seat-marker[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+
+.seat-marker:not([aria-disabled='true']):hover .seat-marker-disc,
+.seat-marker:not([aria-disabled='true']):focus-visible .seat-marker-disc {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seat-accent, #d4af37) 35%, transparent), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+
+.seat-marker:focus {
+  outline: none;
+}
+
+.seat-marker:focus-visible {
+  outline: none;
+}
+
+.seat-marker-number {
+  position: relative;
+  z-index: 1;
+}
+
+.seat-legend-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  border: 2px solid;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.seat-legend-swatch--available {
+  background: var(--seat-available-fill, #1c1c20);
+  border-color: #a8a29e;
+}
+
+.seat-legend-swatch--selected {
+  background: #059669;
+  border-color: #34d399;
+}
+
+.seat-legend-swatch--occupied {
+  background: #2a2a2e;
+  border-color: #52525b;
+  background-image: linear-gradient(135deg, transparent 42%, #a1a1aa 42%, #a1a1aa 58%, transparent 58%);
+}
+
+.seat-legend-swatch--blocked {
+  border-radius: 3px;
+  border-color: #3f3f46;
+  background:
+    repeating-linear-gradient(
+      -45deg,
+      #1c1c20,
+      #1c1c20 2px,
+      #3f3f46 2px,
+      #3f3f46 4px
+    );
+}
+
+.seat-tooltip {
+  position: fixed;
+  z-index: 70;
+  transform: translate(-50%, calc(-100% - 10px));
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #0c0c0e;
+  color: #f5f5f4;
+  font-size: 12px;
+  line-height: 1.35;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  white-space: pre-line;
+}
+
+.seat-map-zoom {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.seat-map-zoom button {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(18, 18, 20, 0.88);
+  color: #f5f5f4;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.seat-map-zoom button:hover:not(:disabled) {
+  background: rgba(40, 40, 44, 0.95);
+}
+
+.seat-map-zoom button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seat-marker-disc {
+    transition: none;
+  }
+}

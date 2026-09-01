@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 import { GRID_CELL_SIZE } from './gridGeometry';
 
 interface Props {
@@ -7,97 +7,99 @@ interface Props {
   /** CSS length capping the canvas height before it starts scrolling. */
   maxHeight: string;
   /**
-   * Desktop-only: number of columns that must fit within the container's
-   * width without a horizontal scrollbar. When set, the cell shrinks below
-   * GRID_CELL_SIZE as needed to fit min(cols, fitCols) columns; past
-   * fitCols columns it stops shrinking and the canvas scrolls instead.
-   * Omit to keep the cell fixed at GRID_CELL_SIZE regardless of column
-   * count (used by the admin editor).
+   * Number of columns that must fit within the container's width without a
+   * horizontal scrollbar. When set, the cell shrinks below GRID_CELL_SIZE as
+   * needed to fit min(cols, fitCols) columns; past fitCols columns it stops
+   * shrinking and the canvas scrolls instead.
+   * Omit to keep the cell fixed at GRID_CELL_SIZE (used by the admin editor).
    */
   fitCols?: number;
-  /** Pixel size of one cell before desktop fitCols shrinking. Default GRID_CELL_SIZE. */
+  /** Pixel size of one cell before fitCols shrinking. Default GRID_CELL_SIZE. */
   cellSize?: number;
+  /** Visual scale on top of the fitted cell size. Pan remains native overflow. */
+  zoom?: number;
+  tone?: 'light' | 'dark';
+  className?: string;
   onMouseLeave?: () => void;
+  onScroll?: () => void;
   children: ReactNode;
 }
 
-// Tailwind's `md` breakpoint — the same one the rest of the app treats as
-// the desktop/mobile split (see Footer.tsx).
-const DESKTOP_QUERY = '(min-width: 768px)';
-
-// Tracks whether the desktop breakpoint currently matches, via the
-// MediaQueryList's own 'change' event rather than window 'resize' so it
-// doesn't fire on every mobile-viewport-resize-due-to-keyboard event. Reads
-// the initial value synchronously to avoid a flash of the wrong layout.
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(() => window.matchMedia(DESKTOP_QUERY).matches);
-
-  useEffect(() => {
-    const mql = window.matchMedia(DESKTOP_QUERY);
-    const onChange = () => setIsDesktop(mql.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return isDesktop;
-}
-
 // The scrollable venue canvas, shared by the admin editor and the buyer's
-// seat picker so the two cannot drift apart visually.
+// seat picker so the two cannot drift apart geometrically.
 //
-// Both tracks always use the same size, keeping cells square. On mobile — or
-// on desktop when fitCols isn't passed (the admin editor) — that size is
-// fixed at GRID_CELL_SIZE, so the canvas has one intrinsic size that never
-// stretches to fill its container and never shrinks to fit it, and anything
-// that doesn't fit is reached by scrolling (both axes). On desktop with
-// fitCols passed, the cell shrinks (via a CSS calc(), not a DOM measurement)
-// just enough that min(cols, fitCols) columns fit in the container's width
-// without a horizontal scrollbar; past fitCols columns the cell stops
-// shrinking — it stays at the size that fits exactly fitCols columns, so the
-// picture doesn't jump between a 45- and a 46-column venue — and horizontal
-// scrolling takes back over. Fixed rows additionally stop an
-// overlay's own content — a long zone name, a table icon — from growing the
-// row it sits in and shifting the whole grid.
-//
-// margin: 0 auto centres the canvas while it is narrower than the container;
-// once it is wider, the auto margins collapse to zero and it simply overflows
-// into the scroll area, so the left edge always stays reachable.
-export function GridCanvas({ rows, cols, maxHeight, fitCols, cellSize = GRID_CELL_SIZE, onMouseLeave, children }: Props) {
-  const isDesktop = useIsDesktop();
-  // repeat(0, ...) is invalid CSS and would drop the whole declaration
+// Both tracks always use the same size, keeping cells square. Without
+// fitCols the cell is fixed at GRID_CELL_SIZE (admin painting). With fitCols
+// the cell shrinks via a CSS calc() so min(cols, fitCols) columns fit in the
+// container — including on mobile, so the buyer first sees the whole plan
+// (stage as the landmark) and then zooms in. `zoom` scales that fitted grid
+// with a CSS transform; a sizer wrapper keeps scrollWidth/Height in sync so
+// pan is ordinary overflow. Fixed tracks stop overlay content from growing a
+// row and shifting the whole grid.
+export const GridCanvas = forwardRef<HTMLDivElement, Props>(function GridCanvas(
+  {
+    rows,
+    cols,
+    maxHeight,
+    fitCols,
+    cellSize = GRID_CELL_SIZE,
+    zoom = 1,
+    tone = 'light',
+    className,
+    onMouseLeave,
+    onScroll,
+    children,
+  },
+  ref,
+) {
   if (rows < 1 || cols < 1) return null;
 
-  // cqw is the scroll container's own inline-size (via containerType:
-  // 'inline-size' below), not the viewport's — unlike maxHeight, the
-  // container's width isn't a value we already have as a CSS literal (it's
-  // w-full inside a modal with padding), so container query units are what
-  // let the calc() below reference it at all.
-  //
-  // -2px accounts for the scroll container's 1px left + 1px right border,
-  // which calc() doesn't know about — without it, a grid sized to exactly
-  // fill the container's width still overflows it by that border width and
-  // scrolls.
-  const trackSize = isDesktop && fitCols
+  const trackSize = fitCols
     ? `min(${cellSize}px, calc((100cqw - 2px) / ${Math.min(cols, fitCols)}))`
     : `${cellSize}px`;
 
+  const scale = zoom > 0 && zoom !== 1 ? zoom : 1;
+
   return (
     <div
-      className="w-full rounded-xl border border-gray-200 bg-gray-100 select-none overflow-auto"
+      ref={ref}
+      className={[
+        'w-full rounded-xl border select-none overflow-auto overscroll-contain',
+        tone === 'dark' ? 'seat-map-canvas' : 'border-gray-200 bg-gray-100',
+        className ?? '',
+      ].join(' ')}
       style={{ maxHeight, containerType: 'inline-size' }}
       onMouseLeave={onMouseLeave}
+      onScroll={onScroll}
     >
       <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: `repeat(${cols}, ${trackSize})`,
-          gridTemplateRows: `repeat(${rows}, ${trackSize})`,
-          width: 'max-content',
-          margin: '0 auto',
-        }}
+        style={
+          scale === 1
+            ? { width: 'max-content', margin: '0 auto' }
+            : {
+              width: `calc((${trackSize}) * ${cols} * ${scale})`,
+              height: `calc((${trackSize}) * ${rows} * ${scale})`,
+              margin: '0 auto',
+            }
+        }
       >
-        {children}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${cols}, ${trackSize})`,
+            gridTemplateRows: `repeat(${rows}, ${trackSize})`,
+            width: 'max-content',
+            transform: scale === 1 ? undefined : `scale(${scale})`,
+            transformOrigin: '0 0',
+            willChange: scale === 1 ? undefined : 'transform',
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
-}
+});
+
+GridCanvas.displayName = 'GridCanvas';
+

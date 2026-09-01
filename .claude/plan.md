@@ -1,3 +1,39 @@
+# Часть 5: UX/UI редизайн схемы выбора мест (покупатель)
+
+Только presentation layer. Backend, цены, API, статусы мест, правила брони — не трогать.
+
+## Этап 42: Каркас и токены
+- [x] `seatmap/zoom.ts` — clamp/snap zoom + тесты
+- [x] `seatmap/useMapZoom.ts` — pinch, ctrl+wheel, кнопки, reset, компенсация scroll
+- [x] CSS-токены схемы в `main.css` (тёмная карта, gold сцена, emerald выбор)
+- [x] `GridCanvas`: `forwardRef` на скролл-контейнер, `tone`, `zoom`, `fitCols` на всех ширинах
+
+## Этап 43: Визуал мест / сцены / столов
+- [x] `SeatMarker` — состояния available/hover/selected/occupied + hit-area + aria
+- [x] `StageBanner` — заметная сцена сверху с подписью
+- [x] `TableIcon` — `showChairs`, уникальный gradient id, мебель без дубля стульев
+- [x] `VenueGridMap` — круги мест, столы как мебель, независимый клик по стулу
+
+## Этап 44: Панели, легенда, tooltip, адаптив
+- [x] Легенда состояний + зоны/цены
+- [x] Desktop sidebar «Ваш выбор» + sticky bottom bar на mobile
+- [x] Hover tooltip (desktop), tap-info (mobile)
+- [x] Удаление места из панели выбора
+- [x] Zoom-кнопки и «Сбросить масштаб»
+
+## Этап 45: Состояния и a11y
+- [x] Skeleton загрузки, ошибка + retry, «все места заняты»
+- [x] Keyboard/focus/aria-label, skip-link к панели выбора
+- [x] i18n ru/en/az
+- [x] Сохранить testid / title для e2e (`seat-*`, `map-selection`, `title*="QA General"`)
+
+## Этап 46: Проверка
+- [x] `tsc --noEmit` frontend + vitest релевантных тестов
+- [x] Не ломать админский `GridMapEditor` (светлый GridCanvas без zoom)
+- [ ] Ручная проверка в браузере — пользователь проверяет UI сам
+
+---
+
 # План: Сетка = реальные зоны/места + зона без мест
 
 ## Концепция

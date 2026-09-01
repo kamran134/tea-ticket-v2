@@ -295,6 +295,7 @@ export function RegisterForm({ slug }: Props) {
                 cartQuantityByTable={cartQuantityByTable}
                 onZoneOpen={zone => setQuantityModalZoneId(zone.id)}
                 onSeatToggle={(zone, seat, table) => toggleSeat(zone, seat, table)}
+                onClearZone={zone => setGeneralQuantity(zone, 0)}
                 onTableOpen={(zone, table) => setQuantityModalTable({ zone, table })}
                 onOccupiedSeatIds={ids => setCart(prev => pruneOccupiedSeats(prev, ids))}
                 onClose={closeGridMap}
