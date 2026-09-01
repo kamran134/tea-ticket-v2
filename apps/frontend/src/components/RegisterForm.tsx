@@ -220,7 +220,7 @@ export function RegisterForm({ slug }: Props) {
 
   if (venueNotFound) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
+      <div className="app-bg flex flex-col">
         {/* <Header /> */}
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
@@ -237,7 +237,7 @@ export function RegisterForm({ slug }: Props) {
 
   if (!venue) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-gray-400">
+      <div className="app-bg flex items-center justify-center text-gray-400">
         {t('common.loading')}
       </div>
     );
@@ -250,7 +250,7 @@ export function RegisterForm({ slug }: Props) {
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
+    <div className="app-bg flex flex-col">
       {/* <Header /> */}
       <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">

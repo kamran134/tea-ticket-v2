@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../services/api';
 import type { PublicTicket } from '../types';
+import { ThemeToggle } from './ThemeToggle';
 
 function isTokenValid(): boolean {
   const token = localStorage.getItem('admin_token');
@@ -158,9 +159,12 @@ export function AdminScanner() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+      <div className="app-bg flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
-          <h1 className="text-xl font-bold text-gray-800 mb-4">Вход для администратора</h1>
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-xl font-bold text-gray-800">Вход для администратора</h1>
+            <ThemeToggle />
+          </div>
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
           )}
@@ -193,9 +197,12 @@ export function AdminScanner() {
       <div className="max-w-md mx-auto space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">QR Сканер</h1>
-          <button onClick={logout} className="text-sm text-gray-400 hover:text-white transition-colors">
-            Выйти
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle variant="header" />
+            <button onClick={logout} className="text-sm text-gray-400 hover:text-white transition-colors">
+              Выйти
+            </button>
+          </div>
         </div>
 
         {message && (

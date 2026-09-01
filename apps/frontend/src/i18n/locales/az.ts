@@ -25,6 +25,9 @@ const az = {
     contacts: 'Əlaqə',
     whatsapp: 'WhatsApp',
     switchLanguage: 'Dili {{lang}} dilinə keçir',
+    toggleTheme: '{{theme}} keç',
+    themeLight: 'açıq tema',
+    themeDark: 'tünd tema',
   },
   footer: {
     tagline: 'Korporativ tədbirlər, toy və festivallar üçün Bakının premium kover qrupu.',

@@ -4,6 +4,7 @@ import brandLogo from '../assets/brand-logo.svg';
 import { changeLanguage } from '../i18n';
 import { LANGS, type Lang } from '../i18n/types';
 import { SITE_URL, siteSectionUrl } from '../lib/site';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
   const { t, i18n } = useTranslation();
@@ -79,6 +80,9 @@ export function Header() {
               </button>
             ))}
           </div>
+          <div className="hidden lg:block">
+            <ThemeToggle variant="header" />
+          </div>
 
           <button
             type="button"
@@ -122,6 +126,7 @@ export function Header() {
                   {l}
                 </button>
               ))}
+              <ThemeToggle variant="header" />
             </div>
           </div>
         </div>
