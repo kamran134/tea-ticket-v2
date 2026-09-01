@@ -7,6 +7,7 @@ import { generateVenueSlug, slugify } from '../utils/slug';
 import { StatsTab } from './StatsTab';
 import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
+import { ThemeToggle } from './ThemeToggle';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
@@ -346,9 +347,12 @@ export function ManagePanel() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex items-center justify-center p-4">
+      <div className="app-bg flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
-          <h1 className="text-xl font-bold text-gray-800 mb-4">Управление</h1>
+          <div className="flex justify-between items-start mb-4">
+            <h1 className="text-xl font-bold text-gray-800">Управление</h1>
+            <ThemeToggle />
+          </div>
           {authError && (
             <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
           )}
@@ -377,11 +381,12 @@ export function ManagePanel() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50">
+    <div className="app-bg">
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold text-gray-800">Управление</h1>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
               Сканер
             </a>

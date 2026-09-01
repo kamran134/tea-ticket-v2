@@ -25,6 +25,9 @@ const ru = {
     contacts: 'Контакты',
     whatsapp: 'WhatsApp',
     switchLanguage: 'Переключить язык на {{lang}}',
+    toggleTheme: 'Переключить на {{theme}}',
+    themeLight: 'светлую тему',
+    themeDark: 'тёмную тему',
   },
   footer: {
     tagline: 'Премиальная кавер-группа Баку для корпоративов, свадеб и фестивалей.',

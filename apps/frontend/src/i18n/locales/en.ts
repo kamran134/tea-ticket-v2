@@ -25,6 +25,9 @@ const en = {
     contacts: 'Contacts',
     whatsapp: 'WhatsApp',
     switchLanguage: 'Switch language to {{lang}}',
+    toggleTheme: 'Switch to {{theme}}',
+    themeLight: 'light theme',
+    themeDark: 'dark theme',
   },
   footer: {
     tagline: 'Premium Baku cover band for corporate events, weddings and festivals.',

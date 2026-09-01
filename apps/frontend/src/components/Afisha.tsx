@@ -19,7 +19,7 @@ export function Afisha() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-amber-50 flex flex-col">
+    <div className="app-bg flex flex-col">
       <Header />
       <div className="flex-1 p-4 pt-[calc(72px+1rem)] sm:pt-[calc(86px+1rem)]">
         <div className="max-w-4xl mx-auto">
