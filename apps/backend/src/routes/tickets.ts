@@ -31,6 +31,8 @@ function kickEmailJobs(): void {
 
 export const ticketsRouter = Router();
 
+const ACTIVE_TICKET_STATUSES: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
+
 async function getTicketEmailDelivery(checkoutId: string): Promise<{
   status: EmailJobStatus;
   acceptedAt: string | null;
@@ -663,6 +665,23 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
         return { ticket: updated, newlyConfirmed: false, checkoutId };
       }
 
+      // An EXPIRED/REJECTED ticket keeps its seatId, and the seat may have
+      // been resold meanwhile. Reviving it would violate the partial unique
+      // index on live seatId and surface as a 500, so refuse explicitly.
+      const seatIds = [...new Set(toConfirm.map(t => t.seatId).filter((s): s is string => !!s))];
+      if (seatIds.length > 0) {
+        const conflict = await tx.ticket.findFirst({
+          where: {
+            seatId: { in: seatIds },
+            status: { in: ACTIVE_TICKET_STATUSES },
+            id: { notIn: toConfirm.map(t => t.id) },
+          },
+        });
+        if (conflict) {
+          throw new AppError(ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is no longer available', 409);
+        }
+      }
+
       const now = new Date();
       await tx.ticket.updateMany({
         where: { id: { in: toConfirm.map(t => t.id) } },
@@ -688,6 +707,12 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
     if (err instanceof AppError) {
       return failApp(res, err);
     }
+    // Last-resort guard for the seat race: the pre-check above and a
+    // concurrent checkout can interleave, and the partial unique index wins.
+    if (isPrismaErrorCode(err, 'P2002')) {
+      return fail(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED, 'Seat is no longer available');
+    }
+    console.error('[status] error:', err);
     return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to update status');
   }
 });

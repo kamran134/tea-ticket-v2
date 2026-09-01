@@ -218,6 +218,21 @@ describe('Payment API', () => {
     expect(res.body.data.status).toBe('CREATED');
   });
 
+  it('does not report a deleted checkout as confirmed', async () => {
+    const { venueId, zoneId } = await seedVenueWithZone(prisma);
+    const { ticketId } = await registerTicket(app, venueId, zoneId);
+    const payment = await createPayment(app, ticketId);
+    await prisma.ticket.delete({ where: { id: ticketId } });
+
+    const res = await request(app)
+      .get(`/api/payments/${payment.paymentId}/status`)
+      .query({ token: payment.returnToken })
+      .expect(200);
+
+    expect(res.body.data.ticketsConfirmed).toBe(false);
+    expect(res.body.data.ticketStatus).toBeNull();
+  });
+
   it('does not confirm tickets on failed or cancelled payment', async () => {
     const { venueId, zoneId } = await seedVenueWithZone(prisma);
     const { ticketId } = await registerTicket(app, venueId, zoneId);

@@ -283,6 +283,82 @@ describe('Ticket registration', () => {
   });
 });
 
+describe('PATCH /api/tickets/:id/status', () => {
+  it('rejects confirming an expired ticket whose seat was resold', async () => {
+    const { venueId, zoneId, seats } = await seedSeatedZone(2);
+    const first = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'First',
+        phone: '+994501234567',
+        email: 'a@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    await prisma.ticket.update({
+      where: { id: first.body.data.id },
+      data: { expiresAt: new Date('2020-01-01T00:00:00Z') },
+    });
+    await expireStaleBookings(prisma);
+
+    await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'Second',
+        phone: '+994501234568',
+        email: 'b@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    const res = await request(app)
+      .patch(`/api/tickets/${first.body.data.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'CONFIRMED' });
+
+    expectError(res, 409, ErrorCodes.SEAT_ALREADY_BOOKED);
+
+    const stale = await prisma.ticket.findUniqueOrThrow({ where: { id: first.body.data.id } });
+    expect(stale.status).toBe('EXPIRED');
+    const live = await prisma.ticket.findMany({
+      where: { seatId: seats[0].id, status: { in: ['BOOKED', 'PENDING', 'CONFIRMED'] } },
+    });
+    expect(live).toHaveLength(1);
+  });
+
+  it('confirms an expired ticket when its seat is still free', async () => {
+    const { venueId, zoneId, seats } = await seedSeatedZone(2);
+    const created = await request(app)
+      .post('/api/tickets/register')
+      .send({
+        name: 'First',
+        phone: '+994501234567',
+        email: 'a@example.com',
+        venueId,
+        items: [{ zoneId, seatIds: [seats[0].id] }],
+      })
+      .expect(201);
+
+    await prisma.ticket.update({
+      where: { id: created.body.data.id },
+      data: { expiresAt: new Date('2020-01-01T00:00:00Z') },
+    });
+    await expireStaleBookings(prisma);
+
+    await request(app)
+      .patch(`/api/tickets/${created.body.data.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'CONFIRMED' })
+      .expect(200);
+
+    const confirmed = await prisma.ticket.findUniqueOrThrow({ where: { id: created.body.data.id } });
+    expect(confirmed.status).toBe('CONFIRMED');
+  });
+});
+
 describe('Check-in', () => {
   it('checks in a confirmed ticket and rejects a double check-in', async () => {
     const { venueId, zoneId } = await seedVenueWithZone(prisma);
