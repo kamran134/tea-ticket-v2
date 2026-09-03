@@ -1,12 +1,17 @@
 import type { PaymentProvider } from './payment-provider';
 import { assertAmountFormat, assertCurrency, formatAmount } from './decimal';
 import type { CreatePaymentInput, CreatePaymentResult, ProviderPaymentState, ProviderPaymentStatus } from './types';
+import { describePmoResultCode, isPmoApproval } from './pmo-decline-codes';
 
 /**
  * Adapter for Kapital Bank's TXPG e-commerce gateway (Birbank retail brand).
- * Docs: https://pg.kapitalbank.az/docs (Basic Auth, no webhooks — status is
- * always confirmed by polling GET /order/{id}, never trusted from the HPP
- * browser redirect).
+ * Docs:
+ *   - https://pg.kapitalbank.az/docs (the original SPA)
+ *   - https://brawny-airport-7ca.notion.site/Kapital-bank-E-commerce-API-Documentation-6dd6a228c40644e3bef034bca7845e3c
+ *     (fuller English copy; the order-status, error-code and PmoDecline tables
+ *     are filled in here where the SPA shipped them empty)
+ * Basic Auth, no webhooks — status is always confirmed by polling
+ * GET /order/{id}, never trusted from the HPP browser redirect.
  */
 
 export type KapitalOrderType = 'Order_SMS' | 'Order_DMS';
@@ -142,23 +147,42 @@ export class KapitalProvider implements PaymentProvider {
     return trimmed.endsWith('/flex') ? trimmed : `${trimmed}/flex`;
   }
 
+  /**
+   * The order-status table is now published (see the Notion docs link on the class
+   * docblock); the values below are transcribed from it. An unknown status still
+   * throws rather than guessing FAILED: silently mapping a paid order to FAILED
+   * would cancel a real booking, and the cost of the two mistakes is not symmetric.
+   *
+   * Caveat: the docs table prints human-readable descriptions ("Fully paid",
+   * "Being prepared"), not the literal enum values. The literals below come from
+   * live API responses where we have them and are inferred as PascalCase otherwise.
+   */
   private mapStatus(status: string): ProviderPaymentStatus {
     switch (status) {
       case 'Preparing':
         return 'CREATED';
       case 'FullyPaid':
-      case 'Refunded':
+      case 'Refunded': // refunds are out of scope, see TZ-KAPITAL-TXPG.md A9
+      case 'Closed': // order closed after payment
         return 'SUCCEEDED';
       case 'Declined':
+      case 'Rejected':
         return 'FAILED';
+      // Accept both spellings: the API example uses one, the docs table prints
+      // the other, and we have never seen the literal live.
       case 'Canceled':
+      case 'Cancelled':
+      case 'Refused': // consumer declined to pay on the hosted page (the Cancel order button)
+      case 'Voided': // authorised amount reduced to zero by a full reversal
         return 'CANCELLED';
       case 'Expired':
         return 'EXPIRED';
+      // 'Authorized', 'PartiallyPaid' and 'Funded' are documented, but only
+      // reachable on order types we do not use (Order_DMS preauthorisation and
+      // DualStep transfers). If KAPITAL_ORDER_TYPE is ever switched to Order_DMS
+      // these need real handling together with the Clearing call — see
+      // TZ-KAPITAL-TXPG.md A9. Until then, failing loudly is the intended behaviour.
       default:
-        // No public status table exists (pg.kapitalbank.az/docs ships the section empty).
-        // Fail loudly instead of silently mapping to FAILED — a wrong guess here would
-        // cancel a booking that was actually paid.
         throw new Error(`Unknown Kapital order status: ${status}`);
     }
   }
@@ -175,15 +199,27 @@ export class KapitalProvider implements PaymentProvider {
   }
 
   /**
-   * No documented failure-code field on the order itself. Best-effort extraction from the
-   * last non-approved transaction's pmoResultCode ("1" = approved). Unconfirmed — see A10.
+   * There is still no documented failure-code field on the order itself, so we read the
+   * last transaction's pmoResultCode. The PmoDecline code table is now published (see
+   * pmo-decline-codes.ts), so the meaning of each code is known — including that '2'
+   * ("Approved Partial") and '3' ("Approved Purchase Only") are approvals too, which the
+   * old `=== '1'` check misreported as failures.
+   *
+   * Returns the machine-readable `pmo:<code>` shape; it is persisted in
+   * Payment.failureCode and existing rows already use it, so the format is fixed. An
+   * unknown code is still surfaced as `pmo:<code>` rather than swallowed.
    */
   private extractFailureCode(order: KapitalOrderDetailResponse['order']): string | null {
     const trans = order.trans;
     if (!trans || trans.length === 0) return null;
     const last = trans[trans.length - 1];
-    if (!last.pmoResultCode || last.pmoResultCode === '1') return null;
-    return `pmo:${last.pmoResultCode}`;
+    const code = last.pmoResultCode;
+    if (!code || isPmoApproval(code)) return null;
+    if (describePmoResultCode(code) === null) {
+      // Not in the published PmoDecline table — still surface it, never swallow it.
+      console.warn(`[kapital] undocumented pmoResultCode on order ${order.id}: ${code}`);
+    }
+    return `pmo:${code}`;
   }
 
   private async request<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {

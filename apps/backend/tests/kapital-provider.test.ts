@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { KapitalApiError, KapitalProvider, loadKapitalConfig } from '../src/services/payments/kapital-provider';
+import { describePmoResultCode, isPmoApproval } from '../src/services/payments/pmo-decline-codes';
 import type { PaymentProvider } from '../src/services/payments/payment-provider';
 import type { CreatePaymentInput } from '../src/services/payments/types';
 
@@ -158,6 +159,62 @@ describe('KapitalProvider', () => {
     await expect(provider.getPaymentStatus('1')).rejects.toThrow(/Unknown Kapital order status/);
   });
 
+  it.each([
+    ['Closed', 'SUCCEEDED'],
+    ['Rejected', 'FAILED'],
+    ['Refused', 'CANCELLED'],
+    ['Voided', 'CANCELLED'],
+    ['Canceled', 'CANCELLED'],
+    ['Cancelled', 'CANCELLED'],
+  ])('maps the newly documented status %s to %s', async (txpgStatus, expected) => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse(200, { order: { id: 1, status: txpgStatus, amount: 1, currency: 'AZN' } }),
+    );
+
+    const provider = newProvider();
+    const state = await provider.getPaymentStatus('1');
+    expect(state.status).toBe(expected);
+  });
+
+  // Deliberate regression guard: the preauthorisation / dual-step statuses stay unmapped
+  // on purpose and must keep throwing until Order_DMS + Clearing is implemented (TZ A9).
+  it.each(['Authorized', 'PartiallyPaid', 'Funded'])(
+    'still throws on the intentionally unmapped preauth status %s',
+    async (txpgStatus) => {
+      fetchMock.mockResolvedValueOnce(
+        fakeResponse(200, { order: { id: 1, status: txpgStatus, amount: 1, currency: 'AZN' } }),
+      );
+
+      const provider = newProvider();
+      await expect(provider.getPaymentStatus('1')).rejects.toThrow(/Unknown Kapital order status/);
+    },
+  );
+
+  it.each([
+    ['1', null],
+    // Regression on the old `=== '1'` check: 2 and 3 are approvals too.
+    ['2', null],
+    ['3', null],
+    ['81', 'pmo:81'],
+    ['999', 'pmo:999'], // undocumented code is surfaced, not swallowed
+  ])('extractFailureCode: last pmoResultCode %s -> failureCode %s', async (pmoResultCode, expected) => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse(200, {
+        order: {
+          id: 1,
+          status: 'Declined',
+          amount: 1,
+          currency: 'AZN',
+          trans: [{ pmoResultCode }],
+        },
+      }),
+    );
+
+    const provider = newProvider();
+    const state = await provider.getPaymentStatus('1');
+    expect(state.failureCode).toBe(expected);
+  });
+
   it('never has verifyAndParseWebhook — supportsWebhooks is false', () => {
     const provider: PaymentProvider = newProvider();
     expect(provider.supportsWebhooks).toBe(false);
@@ -195,5 +252,25 @@ describe('loadKapitalConfig', () => {
     expect(cfg.orderType).toBe('Order_SMS');
     expect(cfg.language).toBe('az');
     expect(cfg.timeoutMs).toBe(15000);
+  });
+});
+
+describe('pmo-decline-codes', () => {
+  it('describePmoResultCode returns the published title', () => {
+    expect(describePmoResultCode('51')).toBe('Expired card');
+    expect(describePmoResultCode('81')).toBe('Bad CVV2');
+    expect(describePmoResultCode('7')).toBe("Need Checker's confirmation");
+  });
+
+  it('describePmoResultCode returns null for a code not in the table', () => {
+    expect(describePmoResultCode('999')).toBeNull();
+  });
+
+  it('isPmoApproval covers 0/1/2/3 and nothing else', () => {
+    expect(isPmoApproval('0')).toBe(true);
+    expect(isPmoApproval('1')).toBe(true);
+    expect(isPmoApproval('2')).toBe(true);
+    expect(isPmoApproval('3')).toBe(true);
+    expect(isPmoApproval('51')).toBe(false);
   });
 });
