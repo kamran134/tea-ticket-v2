@@ -15,6 +15,7 @@ import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { createResendInboundWebhookHandler } from './routes/resend-inbound';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { testRouter } from './routes/test';
+import { isTestMode } from './errors';
 import { requestIdMiddleware } from './middleware/requestId';
 import { createPaymentProvider, loadPaymentProviderConfig } from './services/payments/factory';
 import {
@@ -106,7 +107,13 @@ export function createApp(options?: {
   app.use('/api/zones', zonesRouter);
   app.use('/api/grid-templates', gridTemplatesRouter);
   app.use('/api/payments', paymentsRouter(paymentService));
-  app.use('/api/test', testRouter(paymentService));
+
+  // /api/test seeds and wipes data, so it is gated twice: the router itself 404s unless
+  // TEST_MODE is on, and outside TEST_MODE it is never mounted in the first place. The
+  // second gate is what survives someone later refactoring the guard out of the router.
+  if (isTestMode()) {
+    app.use('/api/test', testRouter(paymentService));
+  }
 
   // Mock hosted page — только для PAYMENT_PROVIDER=mock
   if (providerConfig.provider === 'mock') {

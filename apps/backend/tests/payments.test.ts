@@ -314,7 +314,9 @@ describe('Webhook-less provider (Kapital-style)', () => {
       .send(Buffer.from('{}'))
       .expect(404);
 
-    expect(res.body.error).toMatch(/does not support webhooks/i);
+    // The error envelope is { code, message } since the QA error-code work; the
+    // frontend's readError still accepts the older plain-string shape too.
+    expect(res.body.error.message).toMatch(/does not support webhooks/i);
   });
 
   it('reconcilePendingPayments picks up CREATED, not just PROCESSING', async () => {
