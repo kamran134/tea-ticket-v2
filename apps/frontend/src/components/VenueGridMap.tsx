@@ -657,24 +657,17 @@ export function VenueGridMap({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="hidden sm:inline-flex h-9 px-4 text-sm font-semibold bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors"
-            >
-              {selectedCount > 0 ? t('gridMap.buy') : t('common.done')}
-            </button>
-            <button
-              type="button"
-              onClick={requestClose}
-              title={t('common.closeEsc')}
-              aria-label={t('common.close')}
-              className="h-9 w-9 shrink-0 flex items-center justify-center border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
-            >
-              ✕
-            </button>
-          </div>
+          {/* The confirm action lives only in SelectionPanel — the sidebar from md up, the
+              sticky bar below it — so it is never duplicated and always carries the total. */}
+          <button
+            type="button"
+            onClick={requestClose}
+            title={t('common.closeEsc')}
+            aria-label={t('common.close')}
+            className="h-9 w-9 shrink-0 flex items-center justify-center border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
+          >
+            ✕
+          </button>
         </header>
 
         {occupiedNotice && (

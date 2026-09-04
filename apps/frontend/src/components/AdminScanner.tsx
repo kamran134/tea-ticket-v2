@@ -198,6 +198,10 @@ export function AdminScanner() {
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">QR Сканер</h1>
           <div className="flex items-center gap-2">
+            {/* Mirrors the Сканер link in ManagePanel — the scanner was a dead end. */}
+            <a href="/manage.html" className="text-sm text-gray-400 hover:text-white transition-colors">
+              Управление
+            </a>
             <ThemeToggle variant="header" />
             <button onClick={logout} className="text-sm text-gray-400 hover:text-white transition-colors">
               Выйти

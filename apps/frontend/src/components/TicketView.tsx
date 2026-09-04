@@ -12,6 +12,7 @@ import type {
   TicketEmailDeliveryStatus,
 } from '../types';
 import { formatPrice } from '../types';
+import { BackLink } from './BackLink';
 // import { Header } from './Header';
 // import { Footer } from './Footer';
 
@@ -249,6 +250,7 @@ export function TicketView() {
       {/* <Header /> */}
       <div className="flex-1 p-4">
       <div className="max-w-md mx-auto space-y-4">
+        <BackLink href="/" label={t('common.toAfisha')} />
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-start mb-3">
             <div>

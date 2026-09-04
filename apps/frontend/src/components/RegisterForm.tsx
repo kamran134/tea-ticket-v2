@@ -20,6 +20,7 @@ import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueGridMap } from './VenueGridMap';
 import { QuantityModal } from './QuantityModal';
+import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
 // Header/Footer stay out of public pages — they carry the other instance's branding.
 // import { Header } from './Header';
@@ -254,6 +255,7 @@ export function RegisterForm({ slug }: Props) {
       {/* <Header /> */}
       <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
           <p className="text-gray-600 mt-2">{formatEventDateTime(venue.date)}</p>
