@@ -5,8 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Tea Ticket — Управление</title>
     <script>
+      // Runs before React so a dark viewer never sees a flash of the light theme.
+      // Mirrors readStoredTheme(): an explicit choice wins, otherwise follow the OS.
       try {
-        if (localStorage.getItem('tea-ticket-theme') === 'dark') {
+        var stored = localStorage.getItem('tea-ticket-theme');
+        var dark = stored === 'dark'
+          || (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) {
           document.documentElement.classList.add('dark');
           document.documentElement.style.colorScheme = 'dark';
         }
