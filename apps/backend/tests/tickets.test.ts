@@ -75,6 +75,32 @@ describe('Ticket registration', () => {
     expect(res.body.data.ticket).not.toHaveProperty('email');
   });
 
+  // The public ticket page showed the buyer, zone and seat but never named the event,
+  // and so had nothing to link back to. Both public routes now carry it.
+  it('returns the event a ticket belongs to, on the ticket and the group route', async () => {
+    const { venueId, zoneId } = await seedVenueWithZone(prisma);
+    const venue = await prisma.venue.findUniqueOrThrow({ where: { id: venueId } });
+    const { ticketId } = await registerTicket(app, venueId, zoneId);
+
+    const byId = await request(app).get(`/api/tickets/${ticketId}`).expect(200);
+    expect(byId.body.data.event).toEqual({
+      name: venue.name,
+      slug: venue.slug,
+      date: venue.date.toISOString(),
+    });
+
+    const group = await request(app).post('/api/tickets/register').send({
+      name: 'Buyer',
+      phone: '+994501234567',
+      email: 'buyer@example.com',
+      venueId,
+      items: [{ zoneId, quantity: 2 }],
+    }).expect(201);
+    const groupId = group.body.data.groupId ?? group.body.data.id;
+    const byGroup = await request(app).get(`/api/tickets/group/${groupId}`).expect(200);
+    expect(byGroup.body.data.event.slug).toBe(venue.slug);
+  });
+
   it('creates a group of 4 with a standalone groupId', async () => {
     const { venueId, zoneId } = await seedVenueWithZone(prisma);
     const res = await request(app)

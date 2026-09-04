@@ -130,6 +130,13 @@ export interface Ticket {
   emailDelivery?: TicketEmailDelivery | null;
 }
 
+/** The event a ticket belongs to, returned alongside the public ticket. */
+export interface TicketEvent {
+  name: string;
+  slug: string;
+  date: string;
+}
+
 export interface CreatePaymentResult {
   paymentId: string;
   redirectUrl: string;

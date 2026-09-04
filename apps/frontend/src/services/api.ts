@@ -17,6 +17,7 @@ import type {
   CreatePaymentResult,
   PaymentStatusResult,
   TicketEmailDelivery,
+  TicketEvent,
 } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
@@ -171,6 +172,7 @@ export const api = {
     members: PublicTicket[] | null;
     currency: Currency;
     emailDelivery: TicketEmailDelivery | null;
+    event: TicketEvent | null;
   }> {
     return request(`/api/tickets/${encodeURIComponent(id)}`);
   },
@@ -180,6 +182,7 @@ export const api = {
     members: PublicTicket[];
     currency: Currency;
     emailDelivery: TicketEmailDelivery | null;
+    event: TicketEvent | null;
   }> {
     return request(`/api/tickets/group/${encodeURIComponent(groupId)}`);
   },

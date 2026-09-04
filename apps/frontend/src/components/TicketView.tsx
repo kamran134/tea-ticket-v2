@@ -4,12 +4,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import { api } from '../services/api';
 import { toast } from '../services/toast';
 import { translateApiError } from '../i18n/apiErrors';
+import { formatEventDateTime } from '../i18n/format';
 import type {
   PublicTicket,
   TicketStatus,
   Currency,
   TicketEmailDelivery,
   TicketEmailDeliveryStatus,
+  TicketEvent,
 } from '../types';
 import { formatPrice } from '../types';
 import { BackLink } from './BackLink';
@@ -36,6 +38,7 @@ async function reloadTicket(id: string): Promise<{
   members: PublicTicket[] | null;
   currency: Currency;
   emailDelivery: TicketEmailDelivery | null;
+  event: TicketEvent | null;
 }> {
   return api.getTicket(id);
 }
@@ -64,6 +67,7 @@ export function TicketView() {
   const [members, setMembers] = useState<PublicTicket[]>([]);
   const [currency, setCurrency] = useState<Currency>('₼');
   const [emailDelivery, setEmailDelivery] = useState<TicketEmailDelivery | null>(null);
+  const [event, setEvent] = useState<TicketEvent | null>(null);
   const [copied, setCopied] = useState(false);
   const [paying, setPaying] = useState(false);
   const [pollingPayment, setPollingPayment] = useState(false);
@@ -105,11 +109,13 @@ export function TicketView() {
     members: PublicTicket[] | null;
     currency: Currency;
     emailDelivery?: TicketEmailDelivery | null;
+    event?: TicketEvent | null;
   }) => {
     setTicket(data.ticket);
     setCurrency(data.currency);
     if (data.members) setMembers(data.members);
     setEmailDelivery(data.emailDelivery ?? null);
+    setEvent(data.event ?? null);
   }, []);
 
   const stopPolling = useCallback(() => {
@@ -251,6 +257,17 @@ export function TicketView() {
       <div className="flex-1 p-4">
       <div className="max-w-md mx-auto space-y-4">
         <BackLink href="/" label={t('common.toAfisha')} />
+        {event && (
+          <div>
+            <a
+              href={`/e/${encodeURIComponent(event.slug)}`}
+              className="text-lg font-bold text-emerald-800 hover:underline"
+            >
+              🍵 {event.name}
+            </a>
+            <p className="text-sm text-gray-500">{formatEventDateTime(event.date)}</p>
+          </div>
+        )}
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-start mb-3">
             <div>

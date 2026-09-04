@@ -15,7 +15,7 @@ import type { EmailJobProcessor } from '../services/email';
 import { z } from 'zod';
 import { AppError, ErrorCodes, fail, failApp, failZod, isPrismaErrorCode, registerValidationCode } from '../errors';
 import { logScope } from '../middleware/requestId';
-import { TICKET_PLACE_INCLUDE, withPlace } from '../services/ticket-dto';
+import { TICKET_PLACE_INCLUDE, eventSummary, withPlace } from '../services/ticket-dto';
 import { allocateFreeTableSeats, lockSeats } from '../services/tableSeats';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
@@ -147,7 +147,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
     const mainTicket = members[0];
     const venue = await prisma.venue.findUnique({
       where: { id: mainTicket.venueId },
-      select: { currency: true },
+      select: { currency: true, name: true, slug: true, date: true },
     });
     const emailDelivery = await getTicketEmailDelivery(req.params.groupId);
     return res.json({
@@ -156,6 +156,7 @@ ticketsRouter.get('/group/:groupId', async (req, res) => {
         ticket: withoutContactInfo(withPlace(mainTicket)),
         members: members.map(m => withoutContactInfo(withPlace(m))),
         currency: venue?.currency ?? '₼',
+        event: eventSummary(venue),
         emailDelivery,
       },
     });
@@ -197,7 +198,7 @@ ticketsRouter.get('/:id', async (req, res) => {
     }
     const venue = await prisma.venue.findUnique({
       where: { id: ticket.venueId },
-      select: { currency: true },
+      select: { currency: true, name: true, slug: true, date: true },
     });
     const checkoutId = ticket.groupId ?? ticket.id;
     const emailDelivery = await getTicketEmailDelivery(checkoutId);
@@ -207,6 +208,7 @@ ticketsRouter.get('/:id', async (req, res) => {
         ticket: withoutContactInfo(withPlace(ticket)),
         members: members?.map(m => withoutContactInfo(withPlace(m))) ?? null,
         currency: venue?.currency ?? '₼',
+        event: eventSummary(venue),
         emailDelivery,
       },
     });
