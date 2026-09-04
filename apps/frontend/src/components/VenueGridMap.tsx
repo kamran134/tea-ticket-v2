@@ -319,7 +319,7 @@ export function VenueGridMap({
                 key={`${r}-${c}`}
                 className="seat-map-blocked"
                 title={t('gridMap.blocked')}
-                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+                style={{ ...place }}
               />
             );
           }
@@ -329,7 +329,7 @@ export function VenueGridMap({
               <div
                 key={`${r}-${c}`}
                 className="seat-map-floor"
-                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+                style={{ ...place }}
               />
             );
           }
@@ -340,7 +340,7 @@ export function VenueGridMap({
               <div
                 key={`${r}-${c}`}
                 className="seat-map-floor"
-                style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+                style={{ ...place }}
               />
             );
           }
@@ -358,7 +358,6 @@ export function VenueGridMap({
                   style={{
                     ...place,
                     backgroundColor: `${color}22`,
-                    borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE,
                   }}
                 />
               );
@@ -373,7 +372,7 @@ export function VenueGridMap({
             return (
               <div
                 key={`${r}-${c}`}
-                style={{ ...place, backgroundColor: `${color}18`, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+                style={{ ...place, backgroundColor: `${color}18` }}
               >
                 <SeatMarker
                   seatId={seat.id}
@@ -400,7 +399,7 @@ export function VenueGridMap({
                 <div
                   key={`${r}-${c}`}
                   className="seat-map-floor"
-                  style={{ ...place, borderWidth: 1, borderStyle: 'solid', borderColor: FLOOR_LINE }}
+                  style={{ ...place }}
                 />
               );
             }
