@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
-import { clampZoom, MAX_ZOOM, MIN_ZOOM, zoomIn as stepIn, zoomOut as stepOut } from './zoom';
+import { clampZoom, INITIAL_ZOOM, MAX_ZOOM, MIN_ZOOM, zoomIn as stepIn, zoomOut as stepOut } from './zoom';
 
 interface PinchOrigin {
   x: number;
@@ -17,7 +17,7 @@ function touchMidpoint(a: Touch, b: Touch): PinchOrigin {
 }
 
 export function useMapZoom(scrollRef: RefObject<HTMLElement | null>) {
-  const [zoom, setZoom] = useState(MIN_ZOOM);
+  const [zoom, setZoom] = useState(INITIAL_ZOOM);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
 
@@ -56,7 +56,7 @@ export function useMapZoom(scrollRef: RefObject<HTMLElement | null>) {
   const zoomOut = useCallback(() => applyZoom(stepOut(zoomRef.current)), [applyZoom]);
   const resetZoom = useCallback(() => {
     pendingScroll.current = { left: 0, top: 0 };
-    setZoom(MIN_ZOOM);
+    setZoom(INITIAL_ZOOM);
   }, []);
 
   useEffect(() => {
@@ -114,6 +114,6 @@ export function useMapZoom(scrollRef: RefObject<HTMLElement | null>) {
     resetZoom,
     canZoomIn: zoom < MAX_ZOOM - 0.001,
     canZoomOut: zoom > MIN_ZOOM + 0.001,
-    canReset: zoom !== MIN_ZOOM,
+    canReset: zoom !== INITIAL_ZOOM,
   };
 }

@@ -140,6 +140,7 @@ const ru = {
     yourSelection: 'Ваш выбор',
     continue: 'Продолжить',
     emptyHint: 'Нажмите на свободное место на схеме',
+    legend: 'Обозначения',
     resetZoom: 'Сбросить масштаб',
     zoomIn: 'Приблизить',
     zoomOut: 'Отдалить',

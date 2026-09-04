@@ -721,7 +721,7 @@ export function VenueGridMap({
               </div>
             </div>
             <div className="md:hidden">
-              <MapLegend states={stateLegend} zones={zoneLegend} />
+              <MapLegend collapsible states={stateLegend} zones={zoneLegend} />
             </div>
             {mobileInspect && (
               <p className="md:hidden text-xs text-white/60 truncate">{mobileInspect}</p>

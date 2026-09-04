@@ -138,6 +138,7 @@ const en = {
     yourSelection: 'Your selection',
     continue: 'Continue',
     emptyHint: 'Tap an available seat on the map',
+    legend: 'Legend',
     resetZoom: 'Reset zoom',
     zoomIn: 'Zoom in',
     zoomOut: 'Zoom out',

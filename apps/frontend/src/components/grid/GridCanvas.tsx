@@ -54,8 +54,11 @@ export const GridCanvas = forwardRef<HTMLDivElement, Props>(function GridCanvas(
 ) {
   if (rows < 1 || cols < 1) return null;
 
+  // --grid-cell-min is the floor under the fitted size, set per surface in CSS rather
+  // than inline so a media query can raise it for touch: fitting 45 columns into a phone
+  // produced ~8px cells, well under a tappable target. Defaults to 0, i.e. fit as before.
   const trackSize = fitCols
-    ? `min(${cellSize}px, calc((100cqw - 2px) / ${Math.min(cols, fitCols)}))`
+    ? `max(var(--grid-cell-min, 0px), min(${cellSize}px, calc((100cqw - 2px) / ${Math.min(cols, fitCols)})))`
     : `${cellSize}px`;
 
   const scale = zoom > 0 && zoom !== 1 ? zoom : 1;

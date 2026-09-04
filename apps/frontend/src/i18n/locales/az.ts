@@ -140,6 +140,7 @@ const az = {
     yourSelection: 'Seçiminiz',
     continue: 'Davam et',
     emptyHint: 'Sxemdə boş yerə toxunun',
+    legend: 'İşarələr',
     resetZoom: 'Miqyası sıfırla',
     zoomIn: 'Yaxınlaşdır',
     zoomOut: 'Uzaqlaşdır',

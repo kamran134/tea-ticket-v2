@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
 interface LegendItem {
   key: string;
   label: string;
@@ -12,6 +15,11 @@ interface LegendItem {
 interface Props {
   states: LegendItem[];
   zones: LegendItem[];
+  /**
+   * Render behind a toggle, closed by default. Used on phones, where the legend and the
+   * zone list together took 185px of an 812px screen away from the map itself.
+   */
+  collapsible?: boolean;
 }
 
 function Swatch({ item }: { item: LegendItem }) {
@@ -26,9 +34,37 @@ function Swatch({ item }: { item: LegendItem }) {
   return <span className={`seat-legend-swatch seat-legend-swatch--${item.swatch}`} />;
 }
 
-export function MapLegend({ states, zones }: Props) {
+export function MapLegend({ states, zones, collapsible = false }: Props) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  if (collapsible && !open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        className="inline-flex items-center gap-1.5 text-[11px] text-white/55 hover:text-white/80 transition-colors"
+      >
+        <span aria-hidden="true">▸</span>
+        {t('gridMap.legend')}
+      </button>
+    );
+  }
+
   return (
     <div className="space-y-3">
+      {collapsible && (
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-expanded
+          className="inline-flex items-center gap-1.5 text-[11px] text-white/55 hover:text-white/80 transition-colors"
+        >
+          <span aria-hidden="true">▾</span>
+          {t('gridMap.legend')}
+        </button>
+      )}
       <div className="flex flex-wrap gap-x-3 gap-y-1.5">
         {states.map(item => (
           <span key={item.key} className="inline-flex items-center gap-1.5 text-[11px] text-white/55">
