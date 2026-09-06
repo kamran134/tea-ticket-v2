@@ -1,8 +1,4 @@
-// TODO: fill in TeaTicket's real contact channels before Header/Footer are rendered
-// again anywhere — both are currently commented out on every public page (see commit
-// b404664 "Скрыть header и footer с брендингом BirManatBand"), so these are unused.
-// Left empty rather than fabricated: a fake phone/Instagram/TikTok handle would be
-// actively wrong if someone re-enables these components later.
+// Contact channels for Header/Footer. Empty social/phone values are not rendered.
 export const WHATSAPP_URL = '';
 export const PHONE_DISPLAY = '';
 export const PHONE_HREF = '';

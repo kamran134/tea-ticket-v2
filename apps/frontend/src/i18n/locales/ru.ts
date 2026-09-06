@@ -17,6 +17,9 @@ const ru = {
     afisha: 'Tea Ticket — Афиша',
     register: 'Tea Ticket — Регистрация',
     ticket: 'Tea Ticket — Мой билет',
+    privacyPolicy: 'Tea Ticket — Политика конфиденциальности',
+    terms: 'Tea Ticket — Пользовательское соглашение',
+    refundPolicy: 'Tea Ticket — Условия возврата билетов',
   },
   header: {
     videos: 'Видео',
@@ -35,6 +38,13 @@ const ru = {
     riders: 'Райдеры',
     rights: 'BIR MANAT BAND',
     legal: 'Все права защищены.',
+    documents: 'Документы',
+  },
+  legal: {
+    privacyPolicy: 'Политика конфиденциальности',
+    terms: 'Пользовательское соглашение',
+    refundPolicy: 'Условия возврата билетов',
+    unavailable: 'Перевод этого документа на выбранный язык недоступен. Показана версия на другом языке.',
   },
   afisha: {
     title: 'Tea Ticket',

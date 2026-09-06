@@ -15,8 +15,7 @@ import type {
 } from '../types';
 import { formatPrice } from '../types';
 import { BackLink } from './BackLink';
-// import { Header } from './Header';
-// import { Footer } from './Footer';
+import { PublicLayout } from './PublicLayout';
 
 const TERMINAL_PAYMENT_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'REQUIRES_REVIEW']);
 
@@ -237,11 +236,13 @@ export function TicketView() {
     const urlParams = new URLSearchParams(window.location.search);
     const hasReturnParams = urlParams.get('paymentId') && urlParams.get('returnToken');
     return (
-      <div className="app-bg flex items-center justify-center text-gray-400">
-        {hasReturnParams && !urlParams.get('id') && !urlParams.get('checkoutId')
-          ? t('ticket.ticketResolveError')
-          : t('common.loading')}
-      </div>
+      <PublicLayout>
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          {hasReturnParams && !urlParams.get('id') && !urlParams.get('checkoutId')
+            ? t('ticket.ticketResolveError')
+            : t('common.loading')}
+        </div>
+      </PublicLayout>
     );
   }
 
@@ -251,10 +252,8 @@ export function TicketView() {
     displayStatus === 'BOOKED' || displayStatus === 'PENDING' || displayStatus === 'CONFIRMED';
 
   return (
-    <div data-testid="ticket-page" className="app-bg flex flex-col">
-      {/* Header stays hidden on public pages — it carries the other instance's branding. */}
-      {/* <Header /> */}
-      <div className="flex-1 p-4">
+    <PublicLayout>
+      <div data-testid="ticket-page" className="flex-1 p-4">
       <div className="max-w-md mx-auto space-y-4">
         <BackLink href="/" label={t('common.toAfisha')} />
         {event && (
@@ -487,7 +486,6 @@ export function TicketView() {
         )}
       </div>
       </div>
-      {/* <Footer /> */}
-    </div>
+    </PublicLayout>
   );
 }

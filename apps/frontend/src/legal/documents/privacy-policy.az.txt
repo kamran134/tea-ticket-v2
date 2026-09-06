@@ -1,0 +1,176 @@
+MƏXFİLİK SİYASƏTİ
+
+Son yenilənmə tarixi: [DOLDURULMALIDIR: TARİX]
+
+Bu Məxfilik Siyasəti stolits.art istifadəçilərinin şəxsi məlumatlarının Stolitsa Art tərəfindən toplanması, istifadəsi, saxlanılması və qorunması qaydasını müəyyən edir.
+
+1. ŞƏXSİ MƏLUMATLARIN OPERATORU
+
+Şəxsi məlumatların operatoru:
+
+[DOLDURULMALIDIR: TAM HÜQUQİ AD]
+[DOLDURULMALIDIR: HÜQUQİ TƏŞKİLAT FORMASI]
+VÖEN: [DOLDURULMALIDIR: VÖEN]
+Ünvan: [DOLDURULMALIDIR: HÜQUQİ ÜNVAN]
+Email: [DOLDURULMALIDIR: EMAIL]
+Telefon: [DOLDURULMALIDIR: TELEFON]
+
+2. TOPLADIĞIMIZ MƏLUMATLAR
+
+Bron və ya bilet alışı zamanı Stolitsa Art aşağıdakı məlumatları əldə edir:
+alıcının adı və soyadı;
+alıcının telefon nömrəsi;
+alıcının elektron poçt ünvanı;
+alıcının könüllü şəkildə təqdim etdiyi qonaqların adları;
+sifariş məlumatları;
+alınmış biletlər haqqında məlumat;
+biletlərin statusu və giriş məlumatları;
+qaytarılma haqqında məlumat;
+saytdan istifadə ilə bağlı texniki məlumatlar.
+
+Alışın tamamlanması üçün alıcının adı, soyadı, telefon nömrəsi və elektron poçt ünvanı məcburidir. Qonaqların adları isteğe bağlıdır.
+
+Sifariş üçün qeydiyyat və şəxsi kabinetin yaradılması tələb olunmur.
+
+3. TEXNİKİ MƏLUMATLAR
+
+Sayta daxil olduqda server iş və təhlükəsizlik üçün zəruri texniki məlumatları, o cümlədən aşağıdakıları avtomatik qeydə ala bilər:
+IP ünvanı;
+müraciətin tarixi və vaxtı;
+brauzer haqqında məlumat;
+cihaz haqqında məlumat;
+server sorğuları və xətaları haqqında texniki məlumatlar.
+
+Bu məlumatlar saytın işləməsi, texniki problemlərin diaqnostikası, informasiya təhlükəsizliyi və sui-istifadənin qarşısının alınması üçün istifadə olunur.
+
+4. MƏLUMATLARIN EMALININ MƏQSƏDLƏRİ
+
+Stolitsa Art şəxsi məlumatları aşağıdakı məqsədlərlə emal edir:
+bronların rəsmiləşdirilməsi;
+elektron biletlərin satışı və təqdim edilməsi;
+biletlərin elektron poçtla göndərilməsi;
+sifarişlə bağlı alıcı ilə əlaqə;
+tədbirin tarixində, vaxtında və ya keçirildiyi məkanda dəyişikliklər barədə məlumatlandırma;
+tədbirin ləğvi və ya təxirə salınması barədə məlumatlandırma;
+qaytarılma tələblərinin emalı;
+biletlərin yoxlanılması və tədbirə girişin təşkili;
+fırıldaqçılıq və sui-istifadənin qarşısının alınması;
+saytın təhlükəsizliyinin təmin edilməsi;
+qanunvericiliyin tələblərinin yerinə yetirilməsi;
+sifarişlər və ödənişlər üzrə zəruri uçotun aparılması.
+
+5. XİDMƏT BİLDİRİŞLƏRİ
+
+Alıcı tərəfindən təqdim edilmiş elektron poçt və digər əlaqə məlumatları mövcud sifarişlə bağlı mesajların göndərilməsi üçün istifadə oluna bilər.
+
+Belə mesajlara aşağıdakılar daxil ola bilər:
+elektron bilet;
+alışın təsdiqi;
+tədbirdə dəyişiklik barədə bildiriş;
+ləğv və ya təxirə salınma barədə bildiriş;
+sifarişin və ya qaytarılmanın emalı üçün zəruri mesajlar.
+
+Bu mesajlar xidmət xarakterlidir və reklam mesajları hesab edilmir.
+
+6. ÖDƏNİŞLƏR
+
+Ödənişlər qoşulmuş ödəniş xidməti vasitəsilə həyata keçirilir.
+
+[DOLDURULMALIDIR: ÖDƏNİŞ OPERATORUNUN DƏQİQ HÜQUQİ ADI]
+
+Bank kartı məlumatları ödəniş xidməti tərəfindən emal olunur.
+
+Stolitsa Art istifadə olunan ödəniş infrastrukturu başqa cür nəzərdə tutmadığı halda bank kartının tam rekvizitlərini saxlamır.
+
+Stolitsa Art ödəniş və sifariş uçotu üçün zəruri məlumatları, məsələn:
+məbləğ;
+ödənişin tarixi və vaxtı;
+ödəniş statusu;
+tranzaksiya identifikatoru;
+qaytarılma haqqında məlumatı saxlaya bilər.
+
+7. ELEKTRON POÇTUN GÖNDƏRİLMƏSİ
+
+Elektron biletlərin və xidmət mesajlarının göndərilməsi üçün Resend xidmətindən istifadə olunur.
+
+Stolitsa Art müvafiq mesajın göndərilməsi üçün zəruri məlumatları, ilk növbədə elektron poçt ünvanını və mesajın məzmununu Resend-ə təqdim edə bilər.
+
+[DOLDURULMALIDIR: YAYIMDAN ƏVVƏL RESEND-İN AKTUAL ŞƏRTLƏRİNİ VƏ MƏLUMATLARIN EMAL OLUNDUĞU YERİ YOXLA]
+
+8. MƏLUMATLARIN SAXLANILMASI
+
+Şəxsi məlumatlar Stolitsa Art-ın informasiya sistemində saytın işləməsi üçün istifadə olunan server infrastrukturunda saxlanılır.
+
+[DOLDURULMALIDIR: VPS PROVAYDERİ VƏ SERVERİN YERLƏŞDİYİ ÖLKƏ, ƏGƏR SİYASƏTDƏ GÖSTƏRİLƏCƏKSƏ]
+
+Məlumatlar sistemin işləməsi, sifarişlərin uçotu, öhdəliklərin yerinə yetirilməsi və ya qanunvericiliyin tələblərinə riayət edilməsi üçün saxlanılması zəruri olduğu müddətdə əvvəlcədən müəyyən edilmiş son tarix olmadan saxlanıla bilər.
+
+9. ŞƏXSİ MƏLUMATLARIN SİLİNMƏSİ
+
+İstifadəçi öz şəxsi məlumatlarının silinməsini tələb edə bilər.
+
+Sorğu saytın əlaqə forması vasitəsilə göndərilir.
+
+Stolitsa Art artıq saxlanılması tələb olunmayan şəxsi məlumatları sorğunu nəzərdən keçirdikdən sonra silir.
+
+Qanunvericilik, məcburi mühasibat və ya digər məcburi uçot tələblərinə əsasən saxlanılması zəruri olan məlumatlar tələb olunan müddət ərzində saxlanıla bilər.
+
+Zəruri hallarda məlumatlar anonimləşdirilə bilər ki, sifariş tarixçəsi konkret şəxslə əlaqələndirilmədən saxlanılsın.
+
+10. MƏLUMATLARIN ÜÇÜNCÜ ŞƏXSLƏRƏ ÖTÜRÜLMƏSİ
+
+Stolitsa Art istifadəçilərin şəxsi məlumatlarını üçüncü şəxslərə onların öz reklam məqsədləri üçün satmır və təqdim etmir.
+
+Məlumatlar saytın işləməsi və sifarişlərin yerinə yetirilməsi üçün zəruri həcmdə xarici xidmətlərə təqdim edilə bilər, o cümlədən:
+ödənişlərin emalı üçün ödəniş xidmətinə;
+elektron poçtun göndərilməsi üçün Resend-ə.
+
+Məlumatlar Azərbaycan Respublikasının qanunvericiliyində nəzərdə tutulmuş hallarda dövlət orqanlarına və digər şəxslərə təqdim edilə bilər.
+
+11. ƏMƏKDAŞLARIN GİRİŞİ
+
+Şəxsi məlumatlara giriş yalnız xidməti vəzifələrinin yerinə yetirilməsi üçün buna ehtiyacı olan Stolitsa Art əməkdaşlarına verilir.
+
+Administrator sifarişlərə, şəxsi məlumatlara, ödənişlərə və qaytarılmalara giriş əldə edə bilər.
+
+Biletləri yoxlayan əməkdaşlara yalnız sifarişlərin yoxlanılması və ziyarətçilərin tədbirə buraxılması üçün zəruri məlumatlar təqdim edilir.
+
+12. MƏLUMATLARIN QORUNMASI
+
+Stolitsa Art şəxsi məlumatları icazəsiz girişdən, dəyişdirilmədən, açıqlanmadan, itirilmədən və məhv edilmədən qorumaq üçün texniki və təşkilati tədbirlər görür.
+
+13. COOKIES VƏ ANALİTİKA
+
+Saytın işləməsi üçün zəruri olan texniki cookies və oxşar texnologiyalardan istifadə edilə bilər.
+
+Bu Siyasətin dərc edildiyi tarixdə Stolitsa Art istifadəçilərin davranışlarını izləmək üçün üçüncü tərəf analitika sistemlərindən və ya reklam pikselindən istifadə etmir.
+
+Belə xidmətlər əlavə edildikdə bu Siyasət müvafiq qaydada yenilənə bilər.
+
+14. QONAQLARIN MƏLUMATLARI
+
+Alıcı sifariş zamanı bir və ya bir neçə qonağın adını könüllü şəkildə göstərə bilər.
+
+Alıcı təqdim etdiyi məlumatların düzgünlüyünə görə məsuliyyət daşıyır.
+
+Qonağın adının göstərilməsi, konkret tədbirin şərtlərində başqa cür nəzərdə tutulmadığı halda, biletin qüvvədə olması üçün məcburi şərt deyil.
+
+15. İSTİFADƏÇİNİN HÜQUQLARI
+
+Azərbaycan Respublikasının qanunvericiliyinə əsasən istifadəçilər şəxsi məlumatları ilə bağlı hüquqlara, o cümlədən qanunla nəzərdə tutulmuş hallarda məlumatların emalı barədə məlumat almaq, məlumatları düzəltmək, silinməsini tələb etmək və ya emalın dayandırılmasını tələb etmək hüquqlarına malikdirlər.
+
+Hüquqlarını həyata keçirmək üçün istifadəçi Stolitsa Art-a saytın əlaqə forması vasitəsilə müraciət edə bilər.
+
+16. SİYASƏTƏ DƏYİŞİKLİKLƏR
+
+Stolitsa Art qanunvericilik, saytın funksionallığı və ya məlumatların emalı qaydaları dəyişdikdə bu Məxfilik Siyasətinə dəyişikliklər edə bilər.
+
+Siyasətin aktual versiyası stolits.art saytında dərc olunur.
+
+17. ƏLAQƏ MƏLUMATLARI
+
+[DOLDURULMALIDIR: TAM HÜQUQİ AD]
+[DOLDURULMALIDIR: VÖEN]
+[DOLDURULMALIDIR: HÜQUQİ ÜNVAN]
+[DOLDURULMALIDIR: EMAIL]
+[DOLDURULMALIDIR: TELEFON]

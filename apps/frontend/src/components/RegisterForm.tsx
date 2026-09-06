@@ -22,9 +22,7 @@ import { VenueGridMap } from './VenueGridMap';
 import { QuantityModal } from './QuantityModal';
 import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
-// Header/Footer stay out of public pages — they carry the other instance's branding.
-// import { Header } from './Header';
-// import { Footer } from './Footer';
+import { PublicLayout } from './PublicLayout';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -221,8 +219,7 @@ export function RegisterForm({ slug }: Props) {
 
   if (venueNotFound) {
     return (
-      <div className="app-bg flex flex-col">
-        {/* <Header /> */}
+      <PublicLayout>
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center">
             <div className="text-4xl mb-2">🔍</div>
@@ -231,16 +228,17 @@ export function RegisterForm({ slug }: Props) {
             <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
           </div>
         </div>
-        {/* <Footer /> */}
-      </div>
+      </PublicLayout>
     );
   }
 
   if (!venue) {
     return (
-      <div className="app-bg flex items-center justify-center text-gray-400">
-        {t('common.loading')}
-      </div>
+      <PublicLayout>
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          {t('common.loading')}
+        </div>
+      </PublicLayout>
     );
   }
 
@@ -251,8 +249,7 @@ export function RegisterForm({ slug }: Props) {
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
 
   return (
-    <div className="app-bg flex flex-col">
-      {/* <Header /> */}
+    <PublicLayout>
       <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
@@ -582,7 +579,6 @@ export function RegisterForm({ slug }: Props) {
           onClose={() => setQuantityModalTable(null)}
         />
       )}
-      {/* <Footer /> */}
-    </div>
+    </PublicLayout>
   );
 }

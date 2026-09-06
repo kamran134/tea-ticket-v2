@@ -1,0 +1,176 @@
+PRIVACY POLICY
+
+Last updated: [TO FILL IN: DATE]
+
+This Privacy Policy describes how Stolitsa Art collects, uses, stores and protects personal data of users of stolits.art.
+
+1. DATA CONTROLLER
+
+The data controller is:
+
+[TO FILL IN: FULL LEGAL NAME]
+[TO FILL IN: LEGAL FORM]
+VÖEN: [TO FILL IN: VÖEN]
+Address: [TO FILL IN: LEGAL ADDRESS]
+Email: [TO FILL IN: EMAIL]
+Phone: [TO FILL IN: PHONE]
+
+2. DATA WE COLLECT
+
+When making a reservation or purchasing a ticket, Stolitsa Art collects:
+the buyer's first and last name;
+the buyer's phone number;
+the buyer's email address;
+guest names, if voluntarily provided by the buyer;
+order information;
+purchased ticket information;
+ticket status and admission information;
+refund information;
+technical information related to use of the website.
+
+The buyer's first name, last name, phone number and email address are required to complete a purchase. Guest names are optional.
+
+Registration and creation of a personal account are not required.
+
+3. TECHNICAL DATA
+
+When the website is visited, the server may automatically record technical information required for operation and security, including:
+IP address;
+date and time of access;
+browser information;
+device information;
+server request and error data.
+
+This information is used to operate the website, diagnose technical problems, maintain information security and prevent abuse.
+
+4. PURPOSES OF PROCESSING
+
+Stolitsa Art processes personal data for:
+processing reservations;
+selling and providing electronic tickets;
+sending tickets by email;
+communicating with the buyer about an order;
+notifying buyers about changes to the date, time or venue;
+notifying buyers about cancellation or postponement;
+processing refund requests;
+checking tickets and organizing event admission;
+preventing fraud and abuse;
+maintaining website security;
+complying with legal requirements;
+maintaining necessary records of orders and payments.
+
+5. SERVICE COMMUNICATIONS
+
+Email and other contact details provided by the buyer may be used to send messages related to an existing order.
+
+Such messages may include:
+electronic tickets;
+purchase confirmations;
+event change notifications;
+cancellation or postponement notifications;
+messages necessary to process an order or refund.
+
+These are service communications and are not marketing communications.
+
+6. PAYMENTS
+
+Payments are processed through the connected payment service.
+
+[TO FILL IN: EXACT LEGAL NAME OF PAYMENT OPERATOR]
+
+Bank card details are processed by the payment service.
+
+Stolitsa Art does not store full bank card details unless otherwise provided by the payment infrastructure used.
+
+Stolitsa Art may store information necessary to record a payment and order, such as:
+amount;
+date and time of payment;
+payment status;
+transaction identifier;
+refund information.
+
+7. EMAIL DELIVERY
+
+Resend is used to send electronic tickets and service emails.
+
+Stolitsa Art may provide Resend with the information necessary to send the relevant message, primarily the email address and message content.
+
+[TO FILL IN: VERIFY CURRENT RESEND TERMS AND DATA PROCESSING LOCATION BEFORE PUBLICATION]
+
+8. DATA STORAGE
+
+Personal data are stored in Stolitsa Art's information system on the server infrastructure used to operate the website.
+
+[TO FILL IN: VPS PROVIDER AND SERVER LOCATION, IF THIS WILL BE STATED IN THE POLICY]
+
+Data may be retained without a predetermined end date while retention is necessary for operation of the system, order records, performance of obligations or compliance with legal requirements.
+
+9. DELETION OF PERSONAL DATA
+
+A user may request deletion of their personal data.
+
+Requests are submitted through the website contact form.
+
+Stolitsa Art reviews the request and deletes personal data that no longer needs to be retained.
+
+Information that must be retained under applicable law or mandatory accounting or other record-keeping requirements may be retained for the required period.
+
+Where appropriate, information may be anonymized so that order history can be retained without being linked to an identifiable person.
+
+10. SHARING OF DATA WITH THIRD PARTIES
+
+Stolitsa Art does not sell or provide users' personal data to third parties for their own advertising purposes.
+
+Data may be provided to external services to the extent necessary to operate the website and fulfil orders, including:
+the payment service for processing payments;
+Resend for email delivery.
+
+Data may also be disclosed to government authorities and other persons where required or permitted by the laws of the Republic of Azerbaijan.
+
+11. EMPLOYEE ACCESS
+
+Access to personal data is provided only to Stolitsa Art employees who need it to perform their duties.
+
+The administrator may have access to orders, personal data, payments and refunds.
+
+Staff responsible for ticket checking receive only the information necessary to verify orders and admit visitors.
+
+12. DATA SECURITY
+
+Stolitsa Art takes technical and organizational measures to protect personal data against unauthorized access, alteration, disclosure, loss and destruction.
+
+13. COOKIES AND ANALYTICS
+
+The website may use technical cookies and similar technologies necessary for website operation.
+
+At the time of publication of this Policy, Stolitsa Art does not use third-party analytics systems or advertising pixels to track user behavior.
+
+If such services are added, this Policy may be updated accordingly.
+
+14. GUEST DATA
+
+The buyer may voluntarily provide the name of one or more guests when placing an order.
+
+The buyer is responsible for the accuracy of the information provided.
+
+Providing a guest name is not a mandatory condition for ticket validity unless otherwise stated in the conditions of a specific event.
+
+15. USER RIGHTS
+
+Under the laws of the Republic of Azerbaijan, users have rights regarding their personal data, including rights provided by law to obtain information about processing, correct data, request deletion or request cessation of processing where applicable.
+
+To exercise their rights, users may contact Stolitsa Art through the website contact form.
+
+16. CHANGES TO THIS POLICY
+
+Stolitsa Art may amend this Privacy Policy when legislation, website functionality or data processing practices change.
+
+The current version of the Policy is published on stolits.art.
+
+17. CONTACT DETAILS
+
+[TO FILL IN: FULL LEGAL NAME]
+[TO FILL IN: VÖEN]
+[TO FILL IN: LEGAL ADDRESS]
+[TO FILL IN: EMAIL]
+[TO FILL IN: PHONE]
