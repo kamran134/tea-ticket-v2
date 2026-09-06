@@ -40,9 +40,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  // Keep following the OS while the user has not picked a theme themselves. This is the
-  // only way the public pages can reach dark mode: their toggle lives in the header,
-  // which is hidden here.
+  // Keep following the OS while the user has not picked a theme themselves.
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
     const query = window.matchMedia('(prefers-color-scheme: dark)');

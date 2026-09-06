@@ -17,6 +17,9 @@ const az = {
     afisha: 'Tea Ticket — Afisha',
     register: 'Tea Ticket — Qeydiyyat',
     ticket: 'Tea Ticket — Biletim',
+    privacyPolicy: 'Tea Ticket — Məxfilik Siyasəti',
+    terms: 'Tea Ticket — İstifadəçi Sazişi',
+    refundPolicy: 'Tea Ticket — Biletlərin Qaytarılması Şərtləri',
   },
   header: {
     videos: 'Videolar',
@@ -35,6 +38,13 @@ const az = {
     riders: 'Riderlər',
     rights: 'BIR MANAT BAND',
     legal: 'Bütün hüquqlar qorunur.',
+    documents: 'Sənədlər',
+  },
+  legal: {
+    privacyPolicy: 'Məxfilik Siyasəti',
+    terms: 'İstifadəçi Sazişi',
+    refundPolicy: 'Biletlərin Qaytarılması Şərtləri',
+    unavailable: 'Bu sənədin seçilmiş dildə tərcüməsi yoxdur. Başqa dildəki versiya göstərilir.',
   },
   afisha: {
     title: 'Tea Ticket',

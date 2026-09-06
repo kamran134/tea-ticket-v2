@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import brandLogo from '../assets/brand-logo.svg';
+import { LEGAL_PAGES } from '../legal/pages';
 import {
   WHATSAPP_URL,
   PHONE_DISPLAY,
@@ -28,51 +29,74 @@ export function Footer() {
             />
           </a>
           <div className="mt-6 flex flex-col items-start gap-3">
-            <a
-              href={INSTAGRAM}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2.5 footer-eyebrow hover:text-[var(--footer-accent-hover)]"
-            >
-              <InstagramIcon className="size-4 shrink-0" />
-              Instagram →
-            </a>
-            <a
-              href={TIKTOK}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2.5 footer-eyebrow hover:text-[var(--footer-accent-hover)]"
-            >
-              <TikTokIcon className="size-4 shrink-0" />
-              TikTok →
-            </a>
+            {INSTAGRAM && (
+              <a
+                href={INSTAGRAM}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2.5 footer-eyebrow hover:text-[var(--footer-accent-hover)]"
+              >
+                <InstagramIcon className="size-4 shrink-0" />
+                Instagram →
+              </a>
+            )}
+            {TIKTOK && (
+              <a
+                href={TIKTOK}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2.5 footer-eyebrow hover:text-[var(--footer-accent-hover)]"
+              >
+                <TikTokIcon className="size-4 shrink-0" />
+                TikTok →
+              </a>
+            )}
           </div>
         </div>
 
         <div>
           <p className="footer-eyebrow mb-4">{t('footer.contactTitle')}</p>
           <ul className="space-y-2 text-[15px] text-[var(--footer-fg)]">
-            <li>
-              <a
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:text-[var(--footer-accent)]"
-              >
-                WhatsApp
-              </a>
-            </li>
-            <li>
-              <a href={PHONE_HREF} className="hover:text-[var(--footer-accent)]">
-                {PHONE_DISPLAY}
-              </a>
-            </li>
-            <li>
-              <a href={`mailto:${EMAIL}`} className="hover:text-[var(--footer-accent)]">
-                {EMAIL}
-              </a>
-            </li>
+            {WHATSAPP_URL && (
+              <li>
+                <a
+                  href={WHATSAPP_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-[var(--footer-accent)]"
+                >
+                  WhatsApp
+                </a>
+              </li>
+            )}
+            {PHONE_HREF && PHONE_DISPLAY && (
+              <li>
+                <a href={PHONE_HREF} className="hover:text-[var(--footer-accent)]">
+                  {PHONE_DISPLAY}
+                </a>
+              </li>
+            )}
+            {EMAIL && (
+              <li>
+                <a href={`mailto:${EMAIL}`} className="hover:text-[var(--footer-accent)]">
+                  {EMAIL}
+                </a>
+              </li>
+            )}
             <li className="text-[var(--footer-muted)]">Baku, Azerbaijan</li>
+          </ul>
+        </div>
+
+        <div>
+          <p className="footer-eyebrow mb-4">{t('footer.documents')}</p>
+          <ul className="space-y-2 text-[15px] text-[var(--footer-fg)]">
+            {LEGAL_PAGES.map(page => (
+              <li key={page.id}>
+                <a href={page.path} className="hover:text-[var(--footer-accent)]">
+                  {t(page.titleKey)}
+                </a>
+              </li>
+            ))}
           </ul>
         </div>
       </div>

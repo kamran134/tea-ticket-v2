@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { formatEventDate } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue } from '../types';
-// import { Header } from './Header';
-// import { Footer } from './Footer';
+import { PublicLayout } from './PublicLayout';
 
 export function Afisha() {
   const { t } = useTranslation();
@@ -19,8 +18,7 @@ export function Afisha() {
   }, []);
 
   return (
-    <div className="app-bg flex flex-col">
-      {/* <Header /> */}
+    <PublicLayout>
       <div className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
@@ -68,7 +66,6 @@ export function Afisha() {
           )}
         </div>
       </div>
-      {/* <Footer /> */}
-    </div>
+    </PublicLayout>
   );
 }

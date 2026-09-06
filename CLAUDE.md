@@ -35,12 +35,13 @@
 |---|---|---|---|
 | `/` | `index.html` | `Afisha` | все |
 | `/e/:slug` | `index.html` (роутинг regex в `main.tsx`) | `RegisterForm` | покупатель |
+| `/privacy-policy`, `/terms`, `/refund-policy` | `index.html` | `LegalPage` | все |
 | `/ticket?id=...` | `ticket.html` | `TicketView` | покупатель |
 | `/manage` | `manage.html` | `ManagePanel` | админ |
 | `/admin` | `admin.html` | `AdminScanner` | админ на входе |
 
-`main.tsx` разводит `/` и `/e/:slug` по `window.location.pathname`. Nginx фронта отдаёт
-`index.html` для `/e/`.
+`main.tsx` разводит `/`, `/e/:slug` и юридические URL по `window.location.pathname`. Nginx фронта отдаёт
+`index.html` для `/e/` и `/privacy-policy` `/terms` `/refund-policy`.
 
 ## Модель данных (`apps/backend/prisma/schema.prisma`)
 

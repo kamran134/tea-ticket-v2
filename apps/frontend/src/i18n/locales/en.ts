@@ -17,6 +17,9 @@ const en = {
     afisha: 'Tea Ticket — Events',
     register: 'Tea Ticket — Registration',
     ticket: 'Tea Ticket — My ticket',
+    privacyPolicy: 'Tea Ticket — Privacy Policy',
+    terms: 'Tea Ticket — User Agreement',
+    refundPolicy: 'Tea Ticket — Ticket Refund Policy',
   },
   header: {
     videos: 'Videos',
@@ -35,6 +38,13 @@ const en = {
     riders: 'Riders',
     rights: 'BIR MANAT BAND',
     legal: 'All rights reserved.',
+    documents: 'Documents',
+  },
+  legal: {
+    privacyPolicy: 'Privacy Policy',
+    terms: 'User Agreement',
+    refundPolicy: 'Ticket Refund Policy',
+    unavailable: 'This document is not available in the selected language. Showing another language version.',
   },
   afisha: {
     title: 'Tea Ticket',

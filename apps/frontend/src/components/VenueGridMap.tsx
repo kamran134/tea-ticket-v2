@@ -635,7 +635,7 @@ export function VenueGridMap({
   return (
     <>
       <div
-        className="seat-map-overlay fixed inset-0 z-50 flex flex-col bg-[#0a0a0a] text-white"
+        className="seat-map-overlay fixed inset-0 z-[60] flex flex-col bg-[#0a0a0a] text-white"
         role="dialog"
         aria-modal="true"
         aria-labelledby="seat-map-title"
