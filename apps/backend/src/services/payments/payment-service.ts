@@ -384,6 +384,13 @@ export class PaymentService {
       const payment = await tx.payment.findUnique({ where: { id: paymentId } });
       if (!payment) return;
 
+      // Late success after we already expired the session: money may have moved, but
+      // the hold is over — never confirm seats. Flag for a human refund.
+      if (payment.status === 'EXPIRED' && event.status === 'SUCCEEDED') {
+        await this.confirmCheckoutOnSuccess(tx, payment.checkoutId, payment.id, event.paidAt);
+        return;
+      }
+
       if ((TERMINAL_PAYMENT_STATUSES as readonly string[]).includes(payment.status)) {
         return;
       }
@@ -459,14 +466,38 @@ export class PaymentService {
       },
     });
     const now = paidAt ? new Date(paidAt) : new Date();
+    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
 
+    const holdLapsed = tickets.some(t => t.expiresAt !== null && t.expiresAt.getTime() <= now.getTime())
+      || Boolean(payment?.expiresAt && payment.expiresAt.getTime() <= now.getTime());
     const allBooked = tickets.every(t => t.status === 'BOOKED');
     const hasExpired = tickets.some(t => t.status === 'EXPIRED');
     const hasConfirmedByOther = tickets.some(
       t => t.status === 'CONFIRMED' && t.confirmationSource !== 'PAYMENT',
     );
 
-    if (!allBooked || hasExpired) {
+    if (hasExpired || holdLapsed) {
+      if (holdLapsed) {
+        await tx.ticket.updateMany({
+          where: {
+            OR: [{ id: checkoutId }, { groupId: checkoutId }],
+            status: 'BOOKED',
+          },
+          data: { status: 'EXPIRED' },
+        });
+      }
+      await tx.payment.update({
+        where: { id: paymentId },
+        data: {
+          status: 'REQUIRES_REVIEW',
+          paidAt: now,
+          failureCode: 'HOLD_EXPIRED',
+        },
+      });
+      return;
+    }
+
+    if (!allBooked) {
       await tx.payment.update({
         where: { id: paymentId },
         data: {

@@ -437,7 +437,7 @@ export function RegisterForm({ slug }: Props) {
                               <button
                                 type="button"
                                 onClick={() => adjustQuantity(line.key, -1, max)}
-                                className="w-5 h-5 rounded bg-gray-200 hover:bg-gray-300 text-xs leading-none"
+                                className="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-xs leading-none"
                               >
                                 –
                               </button>
@@ -446,7 +446,7 @@ export function RegisterForm({ slug }: Props) {
                                 type="button"
                                 onClick={() => adjustQuantity(line.key, 1, max)}
                                 disabled={line.quantity >= max}
-                                className="w-5 h-5 rounded bg-gray-200 hover:bg-gray-300 text-xs leading-none disabled:opacity-40"
+                                className="w-5 h-5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 text-xs leading-none disabled:opacity-40"
                               >
                                 +
                               </button>
