@@ -8,6 +8,8 @@ import { StatsTab } from './StatsTab';
 import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ThemeToggle } from './ThemeToggle';
+import { RichTextEditor } from './RichTextEditor';
+import { descriptionForApi } from '../lib/descriptionHtml';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
@@ -225,7 +227,7 @@ export function ManagePanel() {
         name: newVenueName.trim(),
         date: toIsoFromDateAndTime(newVenueDate, newVenueTime),
         slug: newVenueSlug || undefined,
-        description: newVenueDescription,
+        description: descriptionForApi(newVenueDescription),
       });
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
@@ -256,7 +258,7 @@ export function ManagePanel() {
       const updated = await api.updateVenue(id, {
         name: editVenueName.trim(),
         date: toIsoFromDateAndTime(editVenueDate, editVenueTime),
-        description: editVenueDescription.trim() || null,
+        description: descriptionForApi(editVenueDescription),
       });
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
       setEditingVenueId(null);
@@ -512,13 +514,10 @@ export function ManagePanel() {
                 className={DATE_TIME_INPUT_CLASS}
                 required
               />
-              <textarea
-                placeholder="Описание"
-                rows={3}
-                maxLength={2000}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 resize-y focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              <RichTextEditor
                 value={newVenueDescription}
-                onChange={e => setNewVenueDescription(e.target.value)}
+                onChange={setNewVenueDescription}
+                placeholder="Описание"
               />
               <div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
@@ -586,13 +585,11 @@ export function ManagePanel() {
                               className={DATE_TIME_INPUT_CLASS_COMPACT}
                               required
                             />
-                            <textarea
-                              placeholder="Описание"
-                              rows={3}
-                              maxLength={2000}
-                              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                            <RichTextEditor
                               value={editVenueDescription}
-                              onChange={e => setEditVenueDescription(e.target.value)}
+                              onChange={setEditVenueDescription}
+                              placeholder="Описание"
+                              compact
                             />
                             <div className="flex gap-3">
                               <button

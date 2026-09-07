@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { AppError, ErrorCodes, failApp } from '../errors';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { syncSeatsForZoneTables, toSeatDto } from '../services/tableSeats';
+import { normalizeDescription } from '../lib/sanitizeDescription';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -78,14 +79,7 @@ venuesRouter.get('/by-slug/:slug', async (req, res) => {
 });
 
 const CURRENCY = '₼';
-const DESCRIPTION_MAX = 2000;
-
-function normalizeDescription(value: string | null | undefined): string | null | undefined {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? null : trimmed;
-}
+const DESCRIPTION_MAX = 4000;
 
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),

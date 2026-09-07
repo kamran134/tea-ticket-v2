@@ -16,6 +16,14 @@ import type {
 import { formatPrice } from '../types';
 import { BackLink } from './BackLink';
 import { PublicLayout } from './PublicLayout';
+import { SaveLinkLeaveDialog } from './SaveLinkLeaveDialog';
+import {
+  attachTicketLeaveGuard,
+  forgetUnsavedTicketLink,
+  hasUnsavedTicketLink,
+  isFreshTicketUrl,
+  rememberUnsavedTicketLink,
+} from '../lib/ticketLinkGuard';
 
 const TERMINAL_PAYMENT_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED', 'EXPIRED', 'REQUIRES_REVIEW']);
 
@@ -73,9 +81,17 @@ export function TicketView() {
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
   const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const allowLeaveRef = useRef(false);
+  const linkUnsavedRef = useRef(false);
 
   const params = new URLSearchParams(window.location.search);
   const ticketId = params.get('id') ?? params.get('checkoutId');
+
+  const [linkUnsaved, setLinkUnsaved] = useState(() =>
+    Boolean(ticketId && (isFreshTicketUrl() || hasUnsavedTicketLink(ticketId))),
+  );
+  const [leavePrompt, setLeavePrompt] = useState(false);
+  const pendingLeaveUrl = useRef<string | null>(null);
 
   const ticketUrl = `${window.location.origin}/ticket?id=${ticketId ?? ''}`;
 
@@ -175,10 +191,10 @@ export function TicketView() {
     }
 
     if (urlParams.get('new') === '1') {
+      rememberUnsavedTicketLink(ticketId);
+      setLinkUnsaved(true);
       window.history.replaceState(null, '', `/ticket?id=${ticketId}`);
-      navigator.clipboard.writeText(`${window.location.origin}/ticket?id=${ticketId}`)
-        .then(() => toast.success(t('ticket.linkCopied')))
-        .catch(() => {});
+      toast.success(t('ticket.saveLink'));
     }
 
     return () => stopPolling();
@@ -212,6 +228,7 @@ export function TicketView() {
     setPaymentMessage(null);
     try {
       const payment = await api.createPayment(ticket.id);
+      allowLeaveRef.current = true;
       window.location.href = payment.redirectUrl;
     } catch (err) {
       const msg = translateApiError(err, 'ticket.paymentStartError');
@@ -221,16 +238,98 @@ export function TicketView() {
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(ticketUrl).then(() => {
+  const markLinkSaved = useCallback(() => {
+    if (ticketId) forgetUnsavedTicketLink(ticketId);
+    setLinkUnsaved(false);
+  }, [ticketId]);
+
+  const copyTicketLink = useCallback((): Promise<boolean> => {
+    return navigator.clipboard.writeText(ticketUrl).then(() => {
       setCopied(true);
+      markLinkSaved();
+      toast.success(t('ticket.linkCopied'));
       setTimeout(() => setCopied(false), 2000);
-    }).catch(() => {});
+      return true;
+    }).catch(() => false);
+  }, [ticketUrl, markLinkSaved, t]);
+
+  const handleCopy = () => {
+    void copyTicketLink().then(ok => {
+      if (!ok) return;
+      pendingLeaveUrl.current = null;
+      setLeavePrompt(false);
+    });
   };
 
   const handleShare = () => {
-    navigator.share({ url: ticketUrl }).catch(() => {});
+    navigator.share({ url: ticketUrl }).then(() => {
+      markLinkSaved();
+    }).catch(() => {});
   };
+
+  const stayOnTicket = useCallback(() => {
+    pendingLeaveUrl.current = null;
+    setLeavePrompt(false);
+  }, []);
+
+  const leaveWithoutCopy = useCallback(() => {
+    const next = pendingLeaveUrl.current;
+    pendingLeaveUrl.current = null;
+    setLeavePrompt(false);
+    if (!next) return;
+    allowLeaveRef.current = true;
+    window.location.href = next;
+  }, []);
+
+  const copyAndLeave = useCallback(() => {
+    const next = pendingLeaveUrl.current;
+    void copyTicketLink().then(ok => {
+      if (!ok) return;
+      pendingLeaveUrl.current = null;
+      setLeavePrompt(false);
+      if (next) {
+        allowLeaveRef.current = true;
+        window.location.href = next;
+      }
+    });
+  }, [copyTicketLink]);
+
+  linkUnsavedRef.current = linkUnsaved;
+
+  useEffect(() => {
+    if (!ticketId || !linkUnsaved) return;
+    return attachTicketLeaveGuard({
+      ticketId,
+      isEnabled: () => linkUnsavedRef.current,
+      allowLeave: allowLeaveRef,
+      onPrompt: nextUrl => {
+        if (nextUrl) pendingLeaveUrl.current = nextUrl;
+        setLeavePrompt(true);
+      },
+    });
+  }, [ticketId, linkUnsaved]);
+
+  useEffect(() => {
+    if (!leavePrompt) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') stayOnTicket();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [leavePrompt, stayOnTicket]);
+
+  const leaveDialog = leavePrompt ? (
+    <SaveLinkLeaveDialog
+      title={t('ticket.saveLinkLeaveTitle')}
+      message={t('ticket.saveLinkLeaveMessage')}
+      copyLabel={t('ticket.copyLink')}
+      stayLabel={t('ticket.saveLinkStay')}
+      leaveLabel={t('ticket.saveLinkLeaveAnyway')}
+      onCopy={copyAndLeave}
+      onStay={stayOnTicket}
+      onLeave={leaveWithoutCopy}
+    />
+  ) : null;
 
   if (!ticket) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -242,6 +341,7 @@ export function TicketView() {
             ? t('ticket.ticketResolveError')
             : t('common.loading')}
         </div>
+        {leaveDialog}
       </PublicLayout>
     );
   }
@@ -486,6 +586,7 @@ export function TicketView() {
         )}
       </div>
       </div>
+      {leaveDialog}
     </PublicLayout>
   );
 }

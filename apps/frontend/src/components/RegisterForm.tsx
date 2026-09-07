@@ -23,6 +23,7 @@ import { QuantityModal } from './QuantityModal';
 import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
 import { PublicLayout } from './PublicLayout';
+import { FormattedDescription } from './FormattedDescription';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -256,9 +257,7 @@ export function RegisterForm({ slug }: Props) {
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
           <p className="text-gray-600 mt-2">{formatEventDateTime(venue.date)}</p>
-          {venue.description?.trim() && (
-            <p className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{venue.description.trim()}</p>
-          )}
+          <FormattedDescription html={venue.description ?? ''} className="text-sm text-gray-600 mt-3 text-left" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -275,7 +274,7 @@ export function RegisterForm({ slug }: Props) {
                   onClick={openGridMap}
                   className={[
                     'w-full flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
-                    gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 hover:border-emerald-300',
+                    gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 bg-gray-50 hover:border-emerald-300',
                   ].join(' ')}
                 >
                   <span className="font-medium text-gray-800">
@@ -477,6 +476,7 @@ export function RegisterForm({ slug }: Props) {
                 placeholder="XX XXX XX XX"
                 value={phone}
                 onChange={setPhone}
+                limitMaxLength
                 numberInputProps={{ id: 'register-phone', 'data-testid': 'register-phone' }}
                 required
               />

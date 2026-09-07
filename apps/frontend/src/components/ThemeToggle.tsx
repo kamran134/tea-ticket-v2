@@ -2,14 +2,21 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../theme/ThemeProvider';
 
 interface Props {
-  variant?: 'header' | 'page';
+  variant?: 'header' | 'page' | 'map';
 }
+
+const VARIANT_CLASS: Record<NonNullable<Props['variant']>, string> = {
+  header:
+    'size-10 grid place-items-center rounded-sm border border-[var(--header-border)] text-[var(--header-muted)] hover:text-[var(--header-accent)] transition-colors',
+  page:
+    'size-10 grid place-items-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors',
+  map: 'seat-map-ghost-btn h-9 w-9 shrink-0 grid place-items-center rounded-lg transition-colors',
+};
 
 export function ThemeToggle({ variant = 'page' }: Props) {
   const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
   const next = theme === 'dark' ? 'light' : 'dark';
-  const header = variant === 'header';
 
   return (
     <button
@@ -18,11 +25,7 @@ export function ThemeToggle({ variant = 'page' }: Props) {
       aria-label={t('header.toggleTheme', { theme: t(next === 'dark' ? 'header.themeDark' : 'header.themeLight') })}
       aria-pressed={theme === 'dark'}
       title={t(next === 'dark' ? 'header.themeDark' : 'header.themeLight')}
-      className={
-        header
-          ? 'size-10 grid place-items-center rounded-sm border border-[var(--header-border)] text-[var(--header-muted)] hover:text-[var(--header-accent)] transition-colors'
-          : 'size-10 grid place-items-center rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 dark:border-zinc-600 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors'
-      }
+      className={VARIANT_CLASS[variant]}
     >
       {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>

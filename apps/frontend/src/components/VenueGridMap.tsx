@@ -15,6 +15,7 @@ import { MapLegend } from './seatmap/MapLegend';
 import { SelectionPanel, type SelectionItem } from './seatmap/SelectionPanel';
 import { SeatTooltip } from './seatmap/SeatTooltip';
 import { useMapZoom } from './seatmap/useMapZoom';
+import { ThemeToggle } from './ThemeToggle';
 
 const DESKTOP_FIT_COLS = 45;
 const FLOOR_LINE = 'rgba(255,255,255,0.06)';
@@ -306,7 +307,7 @@ export function VenueGridMap({
                 key={`${r}-${c}`}
                 style={{
                   ...place,
-                  backgroundColor: '#1c1812',
+                  backgroundColor: 'var(--seat-stage-cell)',
                   ...neighborBorder(layout.cells, r, c, 'stage'),
                 }}
               />
@@ -635,7 +636,7 @@ export function VenueGridMap({
   return (
     <>
       <div
-        className="seat-map-overlay fixed inset-0 z-[60] flex flex-col bg-[#0a0a0a] text-white"
+        className="seat-map-overlay fixed inset-0 z-[60] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-labelledby="seat-map-title"
@@ -647,41 +648,39 @@ export function VenueGridMap({
           {t('gridMap.skipToSelection')}
         </a>
 
-        <header className="flex justify-between items-center shrink-0 px-4 pt-4 pb-2 border-b border-white/10 gap-3">
+        <header className="flex justify-between items-center shrink-0 px-4 pt-4 pb-2 border-b seat-map-hairline gap-3">
           <div id="seat-map-summary" className="min-w-0">
             <span id="seat-map-title" className="font-semibold tracking-wide">{t('gridMap.title')}</span>
-            {selectionItems.length > 0 && (
-              <div data-testid="map-selection" className="text-xs text-emerald-300/90 truncate">
-                {selectionItems.map(item => item.label).join(' · ')}
-              </div>
-            )}
           </div>
           {/* The confirm action lives only in SelectionPanel — the sidebar from md up, the
               sticky bar below it — so it is never duplicated and always carries the total. */}
-          <button
-            type="button"
-            onClick={requestClose}
-            title={t('common.closeEsc')}
-            aria-label={t('common.close')}
-            className="h-9 w-9 shrink-0 flex items-center justify-center border border-white/15 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <ThemeToggle variant="map" />
+            <button
+              type="button"
+              onClick={requestClose}
+              title={t('common.closeEsc')}
+              aria-label={t('common.close')}
+              className="seat-map-ghost-btn h-9 w-9 shrink-0 flex items-center justify-center rounded-lg transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </header>
 
         {occupiedNotice && (
-          <div className="shrink-0 px-4 py-2 text-sm bg-amber-500/15 text-amber-100 border-b border-amber-500/20">
+          <div className="shrink-0 px-4 py-2 text-sm bg-amber-500/15 text-amber-900 dark:text-amber-100 border-b border-amber-500/20">
             {t('gridMap.occupiedNotice')}
           </div>
         )}
 
         {loadError && (
-          <div className="shrink-0 px-4 py-3 text-sm bg-red-500/10 text-red-100 border-b border-red-500/20 flex items-center justify-between gap-3">
+          <div className="shrink-0 px-4 py-3 text-sm bg-red-500/10 text-red-800 dark:text-red-100 border-b border-red-500/20 flex items-center justify-between gap-3">
             <span>{t('gridMap.loadError')}</span>
             <button
               type="button"
               onClick={() => setReloadKey(k => k + 1)}
-              className="shrink-0 h-9 px-3 rounded-lg bg-white/10 hover:bg-white/15 font-medium"
+              className="seat-map-ghost-btn shrink-0 h-9 px-3 rounded-lg font-medium"
             >
               {t('gridMap.retry')}
             </button>
@@ -691,15 +690,15 @@ export function VenueGridMap({
         <div className="flex-1 min-h-0 flex">
           <div className="relative flex-1 min-h-0 flex flex-col px-3 py-3 gap-3">
             {!hasSelectable && !loadingGrid && (
-              <div className="shrink-0 text-center text-sm text-white/60 bg-white/5 rounded-xl py-2">
+              <div className="shrink-0 text-center text-sm seat-map-muted bg-black/[0.04] dark:bg-white/5 rounded-xl py-2">
                 {t('gridMap.allOccupied')}
               </div>
             )}
             <div className="relative flex-1 min-h-0">
               {grid}
               {loadingGrid && (
-                <div className="absolute inset-0 pointer-events-none rounded-xl bg-[#121214]/40 flex items-end justify-start p-3">
-                  <span className="text-xs text-white/50 bg-black/40 rounded-md px-2 py-1">
+                <div className="absolute inset-0 pointer-events-none rounded-xl bg-black/5 dark:bg-[#121214]/40 flex items-end justify-start p-3">
+                  <span className="text-xs seat-map-muted bg-white/80 dark:bg-black/40 rounded-md px-2 py-1">
                     {t('gridMap.loadingSeats')}
                   </span>
                 </div>
@@ -713,7 +712,7 @@ export function VenueGridMap({
                   type="button"
                   onClick={resetZoom}
                   disabled={!canReset}
-                  className="h-9 px-3 rounded-lg border border-white/12 bg-[#121214]/90 text-[11px] font-medium text-white/80 hover:bg-white/10 disabled:opacity-35 disabled:cursor-not-allowed"
+                  className="seat-map-ghost-btn h-9 px-3 rounded-lg text-[11px] font-medium disabled:opacity-35 disabled:cursor-not-allowed"
                 >
                   {t('gridMap.resetZoom')}
                 </button>
@@ -723,11 +722,11 @@ export function VenueGridMap({
               <MapLegend collapsible states={stateLegend} zones={zoneLegend} />
             </div>
             {mobileInspect && (
-              <p className="md:hidden text-xs text-white/60 truncate">{mobileInspect}</p>
+              <p className="md:hidden text-xs seat-map-muted truncate">{mobileInspect}</p>
             )}
           </div>
 
-          <aside className="hidden md:flex w-80 shrink-0 flex-col border-l border-white/10 px-4 py-4 gap-4 bg-[#0e0e10]">
+          <aside className="seat-map-aside hidden md:flex w-80 shrink-0 flex-col border-l px-4 py-4 gap-4">
             <MapLegend states={stateLegend} zones={zoneLegend} />
             <div className="flex-1 min-h-0">
               <SelectionPanel {...selectionPanelProps} />
@@ -735,11 +734,15 @@ export function VenueGridMap({
           </aside>
         </div>
 
-        <div className="md:hidden shrink-0 border-t border-white/10 bg-[#0e0e10] px-4 py-3 space-y-2">
+        <div className="seat-map-aside md:hidden shrink-0 border-t px-4 py-3 space-y-2">
           {selectionItems.length > 0 && (
             <div className="flex flex-wrap gap-1.5 max-h-16 overflow-auto">
               {selectionItems.map(item => (
-                <span key={item.id} className="text-xs bg-emerald-500/15 text-emerald-100 border border-emerald-400/30 rounded-full px-2 py-0.5">
+                <span key={item.id} className="text-xs rounded-full px-2 py-0.5" style={{
+                  background: 'var(--map-chip-bg)',
+                  color: 'var(--map-chip-fg)',
+                  border: '1px solid var(--map-chip-border)',
+                }}>
                   {item.label}
                 </span>
               ))}
