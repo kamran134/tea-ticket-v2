@@ -204,6 +204,36 @@ describe('Payment API', () => {
     expect(ticket.status).toBe('EXPIRED');
   });
 
+  it('does not confirm a still-BOOKED ticket whose hold already elapsed', async () => {
+    const { venueId, zoneId } = await seedVenueWithZone(prisma);
+    const { ticketId } = await registerTicket(app, venueId, zoneId);
+    const payment = await createPayment(app, ticketId);
+    const dbPayment = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+
+    await prisma.ticket.update({
+      where: { id: ticketId },
+      data: { expiresAt: new Date(Date.now() - 60_000) },
+    });
+
+    await postMockWebhook(app, 'mock', {
+      eventId: 'evt_success_after_hold',
+      event: 'payment.succeeded',
+      paymentId: dbPayment.providerPaymentId,
+      orderId: payment.paymentId,
+      amount: payment.amount,
+      currency: 'AZN',
+      status: 'SUCCEEDED',
+      paidAt: new Date().toISOString(),
+    }).expect(200);
+
+    const updatedPayment = await prisma.payment.findUniqueOrThrow({ where: { id: payment.paymentId } });
+    expect(updatedPayment.status).toBe('REQUIRES_REVIEW');
+    expect(updatedPayment.failureCode).toBe('HOLD_EXPIRED');
+
+    const ticket = await prisma.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+    expect(ticket.status).toBe('EXPIRED');
+  });
+
   it('polls payment status by id and return token', async () => {
     const { venueId, zoneId } = await seedVenueWithZone(prisma);
     const { ticketId } = await registerTicket(app, venueId, zoneId);
