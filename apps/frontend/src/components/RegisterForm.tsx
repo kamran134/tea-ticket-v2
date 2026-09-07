@@ -250,12 +250,15 @@ export function RegisterForm({ slug }: Props) {
 
   return (
     <PublicLayout>
-      <div className="flex-1 flex items-center justify-center p-4">
+      <div className="flex-1 flex items-start justify-center p-4">
       <div className="w-full max-w-md">
         <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
         <div className="text-center mb-6">
           <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
           <p className="text-gray-600 mt-2">{formatEventDateTime(venue.date)}</p>
+          {venue.description?.trim() && (
+            <p className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{venue.description.trim()}</p>
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">

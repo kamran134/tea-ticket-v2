@@ -16,7 +16,11 @@ describe('slugify', () => {
 });
 
 describe('generateVenueSlug', () => {
-  it('combines slugified name with the date part of the datetime-local value', () => {
+  it('combines slugified name with YYYY-MM-DD', () => {
+    expect(generateVenueSlug('Летняя вечеринка', '2026-08-15')).toBe('letnyaya-vecherinka-2026-08-15');
+  });
+
+  it('uses only the date part when a datetime value is passed', () => {
     expect(generateVenueSlug('Летняя вечеринка', '2026-08-15T18:00')).toBe('letnyaya-vecherinka-2026-08-15');
   });
 

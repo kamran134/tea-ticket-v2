@@ -113,7 +113,7 @@ export const api = {
     });
   },
 
-  async updateVenue(id: string, data: { name?: string; date?: string }): Promise<Venue> {
+  async updateVenue(id: string, data: { name?: string; date?: string; description?: string | null }): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: authHeaders(),
@@ -267,11 +267,22 @@ export const api = {
     });
   },
 
-  async createVenue(name: string, date: string, slug?: string): Promise<Venue> {
+  async createVenue(data: {
+    name: string;
+    date: string;
+    slug?: string;
+    description?: string | null;
+  }): Promise<Venue> {
+    const description = data.description?.trim();
     return request('/api/venues', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ name, date, ...(slug && { slug }) }),
+      body: JSON.stringify({
+        name: data.name,
+        date: data.date,
+        ...(data.slug && { slug: data.slug }),
+        ...(description ? { description } : {}),
+      }),
     });
   },
 

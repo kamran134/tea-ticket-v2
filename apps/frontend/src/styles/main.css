@@ -178,7 +178,8 @@
   border-color: #52525b;
 }
 
-.dark .app-bg .bg-emerald-50 {
+.dark .app-bg .bg-emerald-50,
+.dark .app-bg .bg-emerald-100 {
   background-color: rgb(6 78 59 / 0.45);
 }
 

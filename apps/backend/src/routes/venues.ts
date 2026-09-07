@@ -78,11 +78,20 @@ venuesRouter.get('/by-slug/:slug', async (req, res) => {
 });
 
 const CURRENCY = '₼';
+const DESCRIPTION_MAX = 2000;
+
+function normalizeDescription(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? null : trimmed;
+}
 
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
   slug: z.string().min(1).max(100).optional(),
+  description: z.string().max(DESCRIPTION_MAX).nullish(),
 });
 
 venuesRouter.post('/', requireAuth, async (req, res) => {
@@ -102,6 +111,7 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
         date,
         currency: CURRENCY,
         slug,
+        description: normalizeDescription(parsed.data.description) ?? null,
       },
     });
     return res.status(201).json({ success: true, data: venue });
@@ -120,8 +130,9 @@ const patchVenueSchema = z.object({
   floorPlanImage: z.string().nullable().optional(),
   posterImage: z.string().nullable().optional(),
   slug: z.string().min(1).max(100).optional(),
+  description: z.string().max(DESCRIPTION_MAX).nullish(),
 }).refine(d => Object.values(d).some(v => v !== undefined), {
-  message: 'Provide name, date, active, floorPlanImage, posterImage, or slug',
+  message: 'Provide name, date, active, floorPlanImage, posterImage, slug, or description',
 });
 
 venuesRouter.patch('/:id', requireAuth, async (req, res) => {
@@ -129,11 +140,12 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { slug, date, ...rest } = parsed.data;
+  const { slug, date, description, ...rest } = parsed.data;
   const normalizedSlug = slug !== undefined ? slugify(slug) : undefined;
   if (slug !== undefined && !normalizedSlug) {
     return res.status(400).json({ success: false, error: 'Invalid slug' });
   }
+  const normalizedDescription = normalizeDescription(description);
   try {
     const venue = await prisma.venue.update({
       where: { id: req.params.id },
@@ -141,6 +153,7 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
         ...rest,
         ...(date !== undefined && { date: new Date(date) }),
         ...(normalizedSlug !== undefined && { slug: normalizedSlug }),
+        ...(normalizedDescription !== undefined && { description: normalizedDescription }),
       },
     });
     return res.json({ success: true, data: venue });
@@ -148,7 +161,11 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
       return res.status(409).json({ success: false, error: `Slug "${normalizedSlug}" is already taken` });
     }
-    return res.status(404).json({ success: false, error: 'Venue not found' });
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    console.error('[venues.patch]', err);
+    return res.status(500).json({ success: false, error: 'Failed to update venue' });
   }
 });
 

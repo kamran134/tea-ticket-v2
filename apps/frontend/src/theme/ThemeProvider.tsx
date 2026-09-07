@@ -1,10 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import {
   applyTheme,
   persistTheme,
-  readExplicitTheme,
   readStoredTheme,
-  systemTheme,
   toggleTheme as nextTheme,
   type Theme,
 } from './theme';
@@ -20,7 +18,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     const initial = readStoredTheme();
-    // Paint only. Persisting here would turn "following the OS" into a one-time snapshot.
+    // Paint only. Persisting here would turn the default into an explicit choice.
     applyTheme(initial);
     return initial;
   });
@@ -38,20 +36,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       persistTheme(next);
       return next;
     });
-  }, []);
-
-  // Keep following the OS while the user has not picked a theme themselves.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const query = window.matchMedia('(prefers-color-scheme: dark)');
-    const onChange = () => {
-      if (readExplicitTheme() !== null) return;
-      const next = systemTheme();
-      applyTheme(next);
-      setThemeState(next);
-    };
-    query.addEventListener('change', onChange);
-    return () => query.removeEventListener('change', onChange);
   }, []);
 
   const value = useMemo(

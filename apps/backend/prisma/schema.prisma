@@ -51,6 +51,7 @@ model Venue {
   currency       String   @default("₼")
   floorPlanImage String?
   posterImage    String?
+  description    String?
   gridLayout     Json?
   createdAt      DateTime @default(now())
   zones          Zone[]

@@ -45,6 +45,7 @@ export interface Venue {
   currency: Currency;
   floorPlanImage: string | null;
   posterImage: string | null;
+  description: string | null;
   gridLayout: GridLayout | null;
 }
 

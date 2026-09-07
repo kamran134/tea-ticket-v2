@@ -52,10 +52,73 @@ function isTokenValid(): boolean {
   }
 }
 
-function toDatetimeLocal(iso: string): string {
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+function toDateInputValue(iso: string): string {
   const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function toTimeInputValue(iso: string): string {
+  const d = new Date(iso);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function combineDateAndTime(date: string, time: string): string {
+  return `${date}T${time}`;
+}
+
+function toIsoFromDateAndTime(date: string, time: string): string {
+  return new Date(combineDateAndTime(date, time)).toISOString();
+}
+
+const DATE_TIME_INPUT_CLASS =
+  'w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+const DATE_TIME_INPUT_CLASS_COMPACT =
+  'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-300';
+
+function VenueDateTimeFields({
+  date,
+  time,
+  onDateChange,
+  onTimeChange,
+  className,
+  required,
+}: {
+  date: string;
+  time: string;
+  onDateChange: (value: string) => void;
+  onTimeChange: (value: string) => void;
+  className: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <label className="block min-w-0">
+        <span className="text-xs text-gray-500 mb-1 block">Дата</span>
+        <input
+          type="date"
+          className={className}
+          value={date}
+          onChange={e => onDateChange(e.target.value)}
+          required={required}
+        />
+      </label>
+      <label className="block min-w-0">
+        <span className="text-xs text-gray-500 mb-1 block">Время</span>
+        <input
+          type="time"
+          step="60"
+          className={className}
+          value={time}
+          onChange={e => onTimeChange(e.target.value)}
+          required={required}
+        />
+      </label>
+    </div>
+  );
 }
 
 export function ManagePanel() {
@@ -68,6 +131,8 @@ export function ManagePanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueDate, setNewVenueDate] = useState('');
+  const [newVenueTime, setNewVenueTime] = useState('');
+  const [newVenueDescription, setNewVenueDescription] = useState('');
   const [newVenueSlug, setNewVenueSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -77,6 +142,8 @@ export function ManagePanel() {
   const [editingVenueId, setEditingVenueId] = useState<string | null>(null);
   const [editVenueName, setEditVenueName] = useState('');
   const [editVenueDate, setEditVenueDate] = useState('');
+  const [editVenueTime, setEditVenueTime] = useState('');
+  const [editVenueDescription, setEditVenueDescription] = useState('');
   const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
   // Schema (grid map) — which venue is selected for editing
@@ -154,14 +221,17 @@ export function ManagePanel() {
   const createVenue = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const venue = await api.createVenue(
-        newVenueName.trim(),
-        new Date(newVenueDate).toISOString(),
-        newVenueSlug || undefined,
-      );
+      const venue = await api.createVenue({
+        name: newVenueName.trim(),
+        date: toIsoFromDateAndTime(newVenueDate, newVenueTime),
+        slug: newVenueSlug || undefined,
+        description: newVenueDescription,
+      });
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
+      setNewVenueTime('');
+      setNewVenueDescription('');
       setNewVenueSlug('');
       setSlugManuallyEdited(false);
       setSlugStatus('idle');
@@ -174,16 +244,19 @@ export function ManagePanel() {
   const startEditVenue = (v: Venue) => {
     setEditingVenueId(v.id);
     setEditVenueName(v.name);
-    setEditVenueDate(toDatetimeLocal(v.date));
+    setEditVenueDate(toDateInputValue(v.date));
+    setEditVenueTime(toTimeInputValue(v.date));
+    setEditVenueDescription(v.description ?? '');
   };
 
   const saveVenueEdit = async (id: string) => {
-    if (!editVenueName.trim() || !editVenueDate) return;
+    if (!editVenueName.trim() || !editVenueDate || !editVenueTime) return;
     setSavingVenueEdit(true);
     try {
       const updated = await api.updateVenue(id, {
         name: editVenueName.trim(),
-        date: new Date(editVenueDate).toISOString(),
+        date: toIsoFromDateAndTime(editVenueDate, editVenueTime),
+        description: editVenueDescription.trim() || null,
       });
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
       setEditingVenueId(null);
@@ -431,12 +504,21 @@ export function ManagePanel() {
                 onChange={e => setNewVenueName(e.target.value)}
                 required
               />
-              <input
-                type="datetime-local"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-                value={newVenueDate}
-                onChange={e => setNewVenueDate(e.target.value)}
+              <VenueDateTimeFields
+                date={newVenueDate}
+                time={newVenueTime}
+                onDateChange={setNewVenueDate}
+                onTimeChange={setNewVenueTime}
+                className={DATE_TIME_INPUT_CLASS}
                 required
+              />
+              <textarea
+                placeholder="Описание"
+                rows={3}
+                maxLength={2000}
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 resize-y focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                value={newVenueDescription}
+                onChange={e => setNewVenueDescription(e.target.value)}
               />
               <div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
@@ -496,11 +578,21 @@ export function ManagePanel() {
                               value={editVenueName}
                               onChange={e => setEditVenueName(e.target.value)}
                             />
-                            <input
-                              type="datetime-local"
-                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300"
-                              value={editVenueDate}
-                              onChange={e => setEditVenueDate(e.target.value)}
+                            <VenueDateTimeFields
+                              date={editVenueDate}
+                              time={editVenueTime}
+                              onDateChange={setEditVenueDate}
+                              onTimeChange={setEditVenueTime}
+                              className={DATE_TIME_INPUT_CLASS_COMPACT}
+                              required
+                            />
+                            <textarea
+                              placeholder="Описание"
+                              rows={3}
+                              maxLength={2000}
+                              className="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              value={editVenueDescription}
+                              onChange={e => setEditVenueDescription(e.target.value)}
                             />
                             <div className="flex gap-3">
                               <button

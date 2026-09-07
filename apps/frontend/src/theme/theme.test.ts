@@ -65,17 +65,14 @@ describe('theme', () => {
     expect(readExplicitTheme()).toBe('dark');
   });
 
-  it('follows the OS preference when the user has not chosen', () => {
-    stubMatchMedia(true);
-    expect(systemTheme()).toBe('dark');
-    expect(readStoredTheme()).toBe('dark');
-
+  it('defaults to dark when the user has not chosen', () => {
     stubMatchMedia(false);
-    expect(readStoredTheme()).toBe('light');
+    expect(readExplicitTheme()).toBeNull();
+    expect(readStoredTheme()).toBe('dark');
+    expect(DEFAULT_THEME).toBe('dark');
   });
 
-  // Regression: an explicit light choice must not be overridden by a dark OS.
-  it('prefers an explicit choice over the OS preference', () => {
+  it('prefers an explicit light choice over the dark default', () => {
     stubMatchMedia(true);
     persistTheme('light');
     expect(readStoredTheme()).toBe('light');
@@ -84,11 +81,17 @@ describe('theme', () => {
   it('falls back to the default when matchMedia is unavailable', () => {
     stubMatchMedia(null);
     expect(systemTheme()).toBe(DEFAULT_THEME);
-    expect(DEFAULT_THEME).toBe('light');
   });
 
-  // Regression: applyTheme used to persist. That froze the OS-derived theme into storage
-  // on first paint, after which the public pages stopped following the OS entirely.
+  it('systemTheme reports the OS preference when matchMedia is available', () => {
+    stubMatchMedia(true);
+    expect(systemTheme()).toBe('dark');
+    stubMatchMedia(false);
+    expect(systemTheme()).toBe('light');
+  });
+
+  // Regression: applyTheme used to persist. That froze the default into storage
+  // on first paint and made it look like an explicit user choice.
   it('applyTheme paints without persisting', () => {
     applyTheme('dark');
     expect(documentElement.classList.contains('dark')).toBe(true);
