@@ -149,6 +149,10 @@
   background-color: #3f3f46;
 }
 
+.dark .app-bg .bg-gray-200 {
+  background-color: #3f3f46;
+}
+
 .dark .app-bg .border-gray-100,
 .dark .app-bg .border-gray-200 {
   border-color: #3f3f46;
@@ -164,6 +168,10 @@
 }
 
 .dark .app-bg .hover\:bg-gray-200:hover {
+  background-color: #52525b;
+}
+
+.dark .app-bg .hover\:bg-gray-300:hover {
   background-color: #52525b;
 }
 

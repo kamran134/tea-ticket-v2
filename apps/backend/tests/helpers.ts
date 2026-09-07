@@ -1,7 +1,10 @@
 import { createHmac } from 'crypto';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 import request from 'supertest';
 import type { Express } from 'express';
+import { signAdminToken } from '../src/middleware/auth';
+import { SYSTEM_ROLES } from '../src/services/permissions';
 import type { PaymentProvider } from '../src/services/payments/payment-provider';
 import type {
   CreatePaymentInput,
@@ -47,6 +50,9 @@ export class FakeSyncProvider implements PaymentProvider {
 }
 
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
+  await prisma.adminAuditLog.deleteMany();
+  await prisma.adminUser.deleteMany();
+  await prisma.adminRole.deleteMany();
   await prisma.emailWebhookEvent.deleteMany();
   await prisma.emailJob.deleteMany();
   await prisma.paymentWebhookEvent.deleteMany();
@@ -57,6 +63,55 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.zone.deleteMany();
   await prisma.venue.deleteMany();
   await prisma.gridTemplate.deleteMany();
+}
+
+export const TEST_ADMIN_EMAIL = 'owner@test.local';
+export const TEST_ADMIN_PASSWORD = 'test-admin-password';
+
+/** Fast hash — tests do not need production cost. */
+const TEST_BCRYPT_COST = 4;
+
+export async function seedSystemRoles(prisma: PrismaClient): Promise<void> {
+  for (const role of SYSTEM_ROLES) {
+    await prisma.adminRole.upsert({
+      where: { slug: role.slug },
+      create: {
+        slug: role.slug,
+        name: role.name,
+        description: role.description,
+        permissions: [...role.permissions],
+        isSystem: true,
+        isSuperAdmin: role.isSuperAdmin,
+      },
+      update: {},
+    });
+  }
+}
+
+export async function seedAdminUser(
+  prisma: PrismaClient,
+  opts: { email: string; password: string; roleSlug: string; name?: string },
+): Promise<{ id: string; token: string; roleId: string }> {
+  const role = await prisma.adminRole.findUniqueOrThrow({ where: { slug: opts.roleSlug } });
+  const user = await prisma.adminUser.create({
+    data: {
+      email: opts.email.toLowerCase(),
+      name: opts.name ?? opts.email,
+      passwordHash: await bcrypt.hash(opts.password, TEST_BCRYPT_COST),
+      roleId: role.id,
+    },
+  });
+  return { id: user.id, roleId: role.id, token: signAdminToken(user.id, user.tokenVersion) };
+}
+
+export async function seedSuperAdmin(prisma: PrismaClient): Promise<{ id: string; token: string }> {
+  await seedSystemRoles(prisma);
+  return seedAdminUser(prisma, {
+    email: TEST_ADMIN_EMAIL,
+    password: TEST_ADMIN_PASSWORD,
+    roleSlug: 'super-admin',
+    name: 'Owner',
+  });
 }
 
 export async function seedVenueWithZone(prisma: PrismaClient): Promise<{

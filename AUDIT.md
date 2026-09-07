@@ -304,10 +304,10 @@ Express декодирует `%2F`. `POST /api/venues/..%2F..%2F..%2Fetc/upload-
 **Фикс:** `type Tool = { kind: 'block' } | { kind: 'erase' } | { kind: 'stage' } | { kind: 'zone'; id: string }`
 и хелпер `isZoneCell(cell)`.
 
-### A8. Один зашитый админ и никакой аудитории действий
-Один bcrypt-хеш в env; кто подтвердил или удалил билет — нигде не фиксируется. Для одного
-организатора нормально, но при первом же помощнике станет проблемой. Зафиксировать как
-осознанное решение или завести таблицу `AdminUser` + `AuditLog`.
+### A8. Один зашитый админ и никакой аудитории действий — закрыто
+Было: один bcrypt-хеш в env, без идентификации и без журнала. Стало: `AdminUser` +
+динамические `AdminRole` с granular permissions, JWT `{ sub, ver }`, `AdminAuditLog`
+на критичные действия. См. `apps/backend/src/services/permissions.ts`.
 
 ---
 

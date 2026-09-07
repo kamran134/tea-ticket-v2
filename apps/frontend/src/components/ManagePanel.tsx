@@ -1,19 +1,35 @@
 import { useState, useEffect, useMemo } from 'react';
 import { api } from '../services/api';
-import type { Venue, Ticket, TicketStatus, TicketEmailDeliveryStatus } from '../types';
+import type { Venue, Ticket, TicketStatus, TicketEmailDeliveryStatus, PermissionCode } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { generateVenueSlug, slugify } from '../utils/slug';
+import { useAdminAuth } from '../lib/adminAuth';
+import { descriptionForApi } from '../lib/descriptionHtml';
 import { StatsTab } from './StatsTab';
 import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ThemeToggle } from './ThemeToggle';
 import { RichTextEditor } from './RichTextEditor';
-import { descriptionForApi } from '../lib/descriptionHtml';
+import { AdminLoginGate, NoAccess } from './AdminLoginGate';
+import { UsersTab } from './admin/UsersTab';
+import { RolesTab } from './admin/RolesTab';
+import { AuditTab } from './admin/AuditTab';
+import { ChangePasswordDialog } from './admin/ChangePasswordDialog';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
-type Tab = 'venues' | 'gridmap' | 'tickets' | 'stats';
+type Tab = 'venues' | 'gridmap' | 'tickets' | 'stats' | 'users' | 'roles' | 'audit';
+
+const TABS: { id: Tab; label: string; permission: PermissionCode }[] = [
+  { id: 'venues', label: 'Мероприятия', permission: 'events.view' },
+  { id: 'gridmap', label: 'Схема', permission: 'events.edit' },
+  { id: 'tickets', label: 'Билеты', permission: 'tickets.view' },
+  { id: 'stats', label: 'Статистика', permission: 'stats.view' },
+  { id: 'users', label: 'Пользователи', permission: 'users.view' },
+  { id: 'roles', label: 'Роли', permission: 'roles.view' },
+  { id: 'audit', label: 'Журнал', permission: 'audit.view' },
+];
 type TicketFilter = TicketStatus | 'ALL';
 
 const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
@@ -42,17 +58,6 @@ const EMAIL_STATUS_STYLE: Record<TicketEmailDeliveryStatus, { label: string; cla
   COMPLAINED: { label: 'Email — жалоба',      className: 'text-red-700' },
   FAILED:     { label: 'Ошибка email',        className: 'text-red-700' },
 };
-
-function isTokenValid(): boolean {
-  const token = localStorage.getItem('admin_token');
-  if (!token) return false;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1])) as { exp: number };
-    return payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-}
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
@@ -124,10 +129,10 @@ function VenueDateTimeFields({
 }
 
 export function ManagePanel() {
-  const [authenticated, setAuthenticated] = useState(isTokenValid);
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  const auth = useAdminAuth();
+  const authenticated = auth.state === 'authenticated';
   const [tab, setTab] = useState<Tab>('venues');
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
   // Venues
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -163,23 +168,6 @@ export function ManagePanel() {
 
   const requestConfirm = (title: string, message: string, onConfirm: () => void) =>
     setPendingConfirm({ title, message, onConfirm });
-
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    try {
-      const { token } = await api.login(password);
-      localStorage.setItem('admin_token', token);
-      setAuthenticated(true);
-    } catch {
-      setAuthError('Неверный пароль');
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('admin_token');
-    setAuthenticated(false);
-  };
 
   useEffect(() => {
     if (!authenticated) return;
@@ -413,78 +401,75 @@ export function ManagePanel() {
     return order.map(key => ({ key, tickets: byKey.get(key)! }));
   }, [displayedTickets]);
 
-  const TAB_LABELS: Record<Tab, string> = {
-    venues: 'Мероприятия',
-    gridmap: 'Схема',
-    tickets: 'Билеты',
-    stats: 'Статистика',
-  };
+  const visibleTabs = TABS.filter(t => auth.can(t.permission));
+  const visibleTabIds = visibleTabs.map(t => t.id).join(',');
 
-  if (!authenticated) {
-    return (
-      <div className="app-bg flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
-          <div className="flex justify-between items-start mb-4">
-            <h1 className="text-xl font-bold text-gray-800">Управление</h1>
-            <ThemeToggle />
-          </div>
-          {authError && (
-            <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
-          )}
-          <form data-testid="admin-login" onSubmit={login} className="space-y-3">
-            <input
-              type="password"
-              data-testid="admin-password"
-              aria-label="Пароль"
-              placeholder="Пароль"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoFocus
-            />
-            <button
-              type="submit"
-              data-testid="admin-login-submit"
-              className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-            >
-              Войти
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!authenticated) return;
+    const ids = visibleTabIds ? (visibleTabIds.split(',') as Tab[]) : [];
+    if (ids.length === 0) return;
+    if (!ids.includes(tab)) setTab(ids[0]);
+  }, [authenticated, tab, visibleTabIds]);
+
+  const canCreateEvents = auth.can('events.create');
+  const canEditEvents = auth.can('events.edit');
+  const canEditTickets = auth.can('tickets.edit');
+  const canDeleteTickets = auth.can('tickets.delete');
+  const canCheckin = auth.can('tickets.checkin');
 
   return (
+    <AdminLoginGate auth={auth} title="Управление">
     <div className="app-bg">
       <div className="max-w-2xl mx-auto p-4 space-y-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-800">Управление</h1>
+          <div>
+            <h1 className="text-xl font-bold text-gray-800">Управление</h1>
+            {auth.admin && (
+              <div className="text-xs text-gray-400 mt-0.5">
+                {auth.admin.name} · {auth.admin.role.name}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
-              Сканер
-            </a>
-            <button onClick={logout} className="text-sm text-gray-500 hover:text-gray-800 transition-colors">
+            {canCheckin && (
+              <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
+                Сканер
+              </a>
+            )}
+            <button
+              onClick={() => setShowPasswordDialog(true)}
+              className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              Пароль
+            </button>
+            <button
+              onClick={() => void auth.logout()}
+              className="text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            >
               Выйти
             </button>
           </div>
         </div>
 
+        {visibleTabs.length === 0 ? (
+          <NoAccess message="У вашей роли нет доступа ни к одному разделу. Обратитесь к администратору." />
+        ) : (
+          <>
         {/* Tabs */}
         <div className="flex border-b border-gray-200 overflow-x-auto">
-          {(['venues', 'gridmap', 'tickets', 'stats'] as Tab[]).map(t => (
+          {visibleTabs.map(t => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
+              key={t.id}
+              onClick={() => setTab(t.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                tab === t
+                tab === t.id
                   ? 'border-emerald-600 text-emerald-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              {TAB_LABELS[t]}
-              {t === 'tickets' && ticketCounts.BOOKED > 0 && (
+              {t.label}
+              {t.id === 'tickets' && ticketCounts.BOOKED > 0 && (
                 <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5">
                   {ticketCounts.BOOKED}
                 </span>
@@ -496,6 +481,7 @@ export function ManagePanel() {
         {/* VENUES TAB */}
         {tab === 'venues' && (
           <div className="space-y-4">
+            {canCreateEvents && (
             <form onSubmit={createVenue} className="bg-white rounded-2xl shadow-sm p-4 space-y-3">
               <h2 className="font-semibold text-gray-800">Новое мероприятие</h2>
               <input
@@ -550,6 +536,7 @@ export function ManagePanel() {
                 Создать
               </button>
             </form>
+            )}
 
             <div className="space-y-2">
               {venues.map(v => (
@@ -648,6 +635,7 @@ export function ManagePanel() {
                             </button>
                           </div>
                         ) : (
+                          canEditEvents ? (
                           <button
                             onClick={() => { setEditingSlugId(v.id); setEditingSlugValue(v.slug); }}
                             className="text-xs text-gray-400 hover:text-emerald-700 font-mono mt-1.5 truncate block"
@@ -655,6 +643,11 @@ export function ManagePanel() {
                           >
                             /e/{v.slug}
                           </button>
+                          ) : (
+                            <span className="text-xs text-gray-400 font-mono mt-1.5 truncate block">
+                              /e/{v.slug}
+                            </span>
+                          )
                         )}
                       </div>
                     </div>
@@ -667,6 +660,8 @@ export function ManagePanel() {
                           Скопировать ссылку
                         </button>
                       )}
+                      {canEditEvents && (
+                        <>
                       <button
                         onClick={() => startEditVenue(v)}
                         className="text-xs text-gray-400 hover:text-emerald-700"
@@ -695,6 +690,8 @@ export function ManagePanel() {
                       >
                         {v.active ? 'Скрыть' : 'Активировать'}
                       </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -807,7 +804,7 @@ export function ManagePanel() {
                       </button>
 
                       <div className="flex gap-2">
-                        {(t.status === 'PENDING' || t.status === 'BOOKED') && (
+                        {canEditTickets && (t.status === 'PENDING' || t.status === 'BOOKED') && (
                           <>
                             <button
                               onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
@@ -823,6 +820,7 @@ export function ManagePanel() {
                             </button>
                           </>
                         )}
+                        {canDeleteTickets && (
                         <button
                           onClick={() => deleteTicket(t)}
                           className="px-3 py-2 text-gray-400 hover:text-red-600 transition-colors text-sm rounded-xl hover:bg-red-50"
@@ -830,6 +828,7 @@ export function ManagePanel() {
                         >
                           🗑
                         </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -899,6 +898,7 @@ export function ManagePanel() {
                                   Чек
                                 </button>
                               )}
+                              {canDeleteTickets && (
                               <button
                                 onClick={() => deleteTicket(t)}
                                 className="px-2 py-1 text-gray-400 hover:text-red-600 transition-colors text-xs rounded-lg hover:bg-red-50"
@@ -906,6 +906,7 @@ export function ManagePanel() {
                               >
                                 🗑
                               </button>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -919,7 +920,7 @@ export function ManagePanel() {
                       Скопировать ссылку на билет
                     </button>
 
-                    {(primary.status === 'PENDING' || primary.status === 'BOOKED') && (
+                    {canEditTickets && (primary.status === 'PENDING' || primary.status === 'BOOKED') && (
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleTicketStatus(primary.id, 'CONFIRMED')}
@@ -972,7 +973,17 @@ export function ManagePanel() {
 
         {/* STATS TAB */}
         {tab === 'stats' && <StatsTab venues={venues} />}
+
+        {tab === 'users' && auth.can('users.view') && <UsersTab auth={auth} />}
+        {tab === 'roles' && auth.can('roles.view') && <RolesTab auth={auth} />}
+        {tab === 'audit' && auth.can('audit.view') && <AuditTab auth={auth} />}
+          </>
+        )}
       </div>
+
+      {showPasswordDialog && (
+        <ChangePasswordDialog onClose={() => setShowPasswordDialog(false)} />
+      )}
 
       {pendingConfirm && (
         <ConfirmDialog
@@ -983,5 +994,6 @@ export function ManagePanel() {
         />
       )}
     </div>
+    </AdminLoginGate>
   );
 }

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/auth';
+import { requireAuth, requirePermission } from '../middleware/auth';
 import { isNonZoneCell } from '../services/gridCells';
 import { prisma } from '../db';
 import { z } from 'zod';
@@ -31,7 +31,7 @@ const createTemplateSchema = z.object({
 });
 
 // GET /api/grid-templates
-gridTemplatesRouter.get('/', requireAuth, async (_req, res) => {
+gridTemplatesRouter.get('/', requireAuth, requirePermission('events.view'), async (_req, res) => {
   try {
     const templates = await prisma.gridTemplate.findMany({
       orderBy: { createdAt: 'desc' },
@@ -52,7 +52,7 @@ gridTemplatesRouter.get('/', requireAuth, async (_req, res) => {
 });
 
 // GET /api/grid-templates/:id
-gridTemplatesRouter.get('/:id', requireAuth, async (req, res) => {
+gridTemplatesRouter.get('/:id', requireAuth, requirePermission('events.view'), async (req, res) => {
   try {
     const template = await prisma.gridTemplate.findUnique({ where: { id: req.params.id } });
     if (!template) {
@@ -65,7 +65,7 @@ gridTemplatesRouter.get('/:id', requireAuth, async (req, res) => {
 });
 
 // POST /api/grid-templates
-gridTemplatesRouter.post('/', requireAuth, async (req, res) => {
+gridTemplatesRouter.post('/', requireAuth, requirePermission('events.create'), async (req, res) => {
   const parsed = createTemplateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -95,7 +95,7 @@ gridTemplatesRouter.post('/', requireAuth, async (req, res) => {
 });
 
 // DELETE /api/grid-templates/:id
-gridTemplatesRouter.delete('/:id', requireAuth, async (req, res) => {
+gridTemplatesRouter.delete('/:id', requireAuth, requirePermission('events.delete'), async (req, res) => {
   try {
     await prisma.gridTemplate.delete({ where: { id: req.params.id } });
     return res.json({ success: true, data: { deleted: true } });

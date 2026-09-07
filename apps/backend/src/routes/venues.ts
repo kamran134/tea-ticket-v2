@@ -1,13 +1,16 @@
 import { Router } from 'express';
 import { Prisma, TicketStatus } from '@prisma/client';
 import multer from 'multer';
-import { requireAuth } from '../middleware/auth';
+import { actorOf, requireAuth, requirePermission } from '../middleware/auth';
+import { AuditActions, recordAudit } from '../services/audit';
+import { can } from '../services/permissions';
+import { loadOwnedVenue, venueOwnerWhere, assertVenueAccess } from '../services/venue-access';
 import { uploadFile } from '../services/storage';
 import { generateVenueSlug, slugify } from '../services/slug';
 import { isNonZoneCell, findTableBlobs } from '../services/gridCells';
 import { prisma } from '../db';
 import { z } from 'zod';
-import { AppError, ErrorCodes, failApp } from '../errors';
+import { AppError, ErrorCodes, fail, failApp } from '../errors';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { syncSeatsForZoneTables, toSeatDto } from '../services/tableSeats';
 import { normalizeDescription } from '../lib/sanitizeDescription';
@@ -28,10 +31,11 @@ venuesRouter.get('/', async (req, res) => {
 
   const respond = async () => {
     try {
+      const ownerFilter = all ? venueOwnerWhere(actorOf(req)) : {};
       const venues = await prisma.venue.findMany({
         where: upcoming
           ? { active: true, date: { gte: new Date() } }
-          : (all ? undefined : { active: true }),
+          : (all ? ownerFilter : { active: true }),
         orderBy: { date: upcoming ? 'asc' : 'desc' },
       });
       res.json({ success: true, data: venues });
@@ -40,17 +44,22 @@ venuesRouter.get('/', async (req, res) => {
     }
   };
 
-  // all=true also surfaces hidden/past venues — admin only. The default and
-  // upcoming=true modes (Afisha, event pages) stay public.
+  // all=true also surfaces hidden/past venues — needs events.view. The default
+  // and upcoming=true modes (Afisha, event pages) stay public.
   if (all) {
-    requireAuth(req, res, respond);
+    await requireAuth(req, res, () => {
+      if (!can(actorOf(req), 'events.view')) {
+        return fail(res, 403, ErrorCodes.FORBIDDEN, 'Missing permission: events.view');
+      }
+      return respond();
+    });
   } else {
     await respond();
   }
 });
 
 // GET /api/venues/slug-available?slug=&excludeId=  (admin: live availability check)
-venuesRouter.get('/slug-available', requireAuth, async (req, res) => {
+venuesRouter.get('/slug-available', requireAuth, requirePermission('events.create'), async (req, res) => {
   const { slug, excludeId } = req.query;
   if (!slug || typeof slug !== 'string') {
     return res.status(400).json({ success: false, error: 'slug is required' });
@@ -88,7 +97,7 @@ const createVenueSchema = z.object({
   description: z.string().max(DESCRIPTION_MAX).nullish(),
 });
 
-venuesRouter.post('/', requireAuth, async (req, res) => {
+venuesRouter.post('/', requireAuth, requirePermission('events.create'), async (req, res) => {
   const parsed = createVenueSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -106,7 +115,16 @@ venuesRouter.post('/', requireAuth, async (req, res) => {
         currency: CURRENCY,
         slug,
         description: normalizeDescription(parsed.data.description) ?? null,
+        createdById: actorOf(req).id,
       },
+    });
+    await recordAudit({
+      action: AuditActions.VENUE_CREATE,
+      actor: actorOf(req),
+      req,
+      resource: 'venue',
+      resourceId: venue.id,
+      metadata: { name: venue.name, slug: venue.slug },
     });
     return res.status(201).json({ success: true, data: venue });
   } catch (err) {
@@ -129,7 +147,7 @@ const patchVenueSchema = z.object({
   message: 'Provide name, date, active, floorPlanImage, posterImage, slug, or description',
 });
 
-venuesRouter.patch('/:id', requireAuth, async (req, res) => {
+venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async (req, res) => {
   const parsed = patchVenueSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -141,6 +159,7 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
   }
   const normalizedDescription = normalizeDescription(description);
   try {
+    await loadOwnedVenue(req.params.id, actorOf(req));
     const venue = await prisma.venue.update({
       where: { id: req.params.id },
       data: {
@@ -158,6 +177,7 @@ venuesRouter.patch('/:id', requireAuth, async (req, res) => {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
       return res.status(404).json({ success: false, error: 'Venue not found' });
     }
+    if (err instanceof AppError) return failApp(res, err);
     console.error('[venues.patch]', err);
     return res.status(500).json({ success: false, error: 'Failed to update venue' });
   }
@@ -179,7 +199,7 @@ class GridConflictError extends AppError {
   }
 }
 
-venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
+venuesRouter.put('/:id/grid-layout', requireAuth, requirePermission('events.edit'), async (req, res) => {
   const parsed = gridLayoutSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -192,11 +212,17 @@ venuesRouter.put('/:id/grid-layout', requireAuth, async (req, res) => {
   }
 
   const [existingVenue, zones] = await Promise.all([
-    prisma.venue.findUnique({ where: { id: venueId }, select: { gridLayout: true } }),
+    prisma.venue.findUnique({ where: { id: venueId }, select: { gridLayout: true, createdById: true } }),
     prisma.zone.findMany({ where: { venueId } }),
   ]);
   if (!existingVenue) {
     return res.status(404).json({ success: false, error: 'Venue not found' });
+  }
+  try {
+    assertVenueAccess(actorOf(req), existingVenue.createdById);
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
+    throw err;
   }
   const zoneById = new Map(zones.map(z => [z.id, z]));
 
@@ -419,7 +445,7 @@ const IMAGE_EXT_BY_MIME: Record<string, string> = {
 };
 
 // POST /api/venues/:id/upload-floor-plan
-venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPlan'), async (req, res) => {
+venuesRouter.post('/:id/upload-floor-plan', requireAuth, requirePermission('events.edit'), upload.single('floorPlan'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
@@ -427,10 +453,7 @@ venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPla
     return res.status(400).json({ success: false, error: 'Invalid venue id' });
   }
   try {
-    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
-    if (!exists) {
-      return res.status(404).json({ success: false, error: 'Venue not found' });
-    }
+    await loadOwnedVenue(req.params.id, actorOf(req));
     const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `floorplans/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
@@ -440,13 +463,14 @@ venuesRouter.post('/:id/upload-floor-plan', requireAuth, upload.single('floorPla
     });
     return res.json({ success: true, data: venue });
   } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     console.error('[upload-floor-plan]', err);
     return res.status(500).json({ success: false, error: 'Failed to upload floor plan' });
   }
 });
 
 // POST /api/venues/:id/upload-poster
-venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), async (req, res) => {
+venuesRouter.post('/:id/upload-poster', requireAuth, requirePermission('events.edit'), upload.single('poster'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, error: 'No file uploaded' });
   }
@@ -454,10 +478,7 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
     return res.status(400).json({ success: false, error: 'Invalid venue id' });
   }
   try {
-    const exists = await prisma.venue.findUnique({ where: { id: req.params.id }, select: { id: true } });
-    if (!exists) {
-      return res.status(404).json({ success: false, error: 'Venue not found' });
-    }
+    await loadOwnedVenue(req.params.id, actorOf(req));
     const ext = IMAGE_EXT_BY_MIME[req.file.mimetype] ?? 'bin';
     const key = `posters/${req.params.id}/${Date.now()}.${ext}`;
     const url = await uploadFile(req.file.buffer, key, req.file.mimetype);
@@ -467,6 +488,7 @@ venuesRouter.post('/:id/upload-poster', requireAuth, upload.single('poster'), as
     });
     return res.json({ success: true, data: venue });
   } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     console.error('[upload-poster]', err);
     return res.status(500).json({ success: false, error: 'Failed to upload poster' });
   }

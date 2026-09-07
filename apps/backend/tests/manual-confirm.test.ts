@@ -1,11 +1,9 @@
 import { execSync } from 'child_process';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { registerTicket, resetDatabase, seedVenueWithZone } from './helpers';
+import { registerTicket, resetDatabase, seedSuperAdmin, seedVenueWithZone } from './helpers';
 
 const prisma = new PrismaClient();
 let app: ReturnType<typeof createApp>['app'];
@@ -17,14 +15,14 @@ beforeAll(async () => {
     env: process.env,
     stdio: 'pipe',
   });
-  process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash('test-admin', 10);
-  adminToken = jwt.sign({ admin: true }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+  process.env.ADMIN_PASSWORD_HASH = 'unused-in-tests';
   const ctx = createApp({ prisma });
   app = ctx.app;
 });
 
 beforeEach(async () => {
   await resetDatabase(prisma);
+  adminToken = (await seedSuperAdmin(prisma)).token;
 });
 
 describe('Manual ticket confirmation', () => {

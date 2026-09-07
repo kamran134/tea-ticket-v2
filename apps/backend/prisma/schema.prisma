@@ -42,20 +42,82 @@ enum TableShape {
   SOFA
 }
 
+// ── Admin accounts, roles and permissions ────────────────────────────────────
+// Permission codes live in src/services/permissions.ts, not in a table: every
+// code is referenced literally by a route's requirePermission(), so the catalog
+// is inherently code-coupled and a separate table would only add a way for the
+// two to drift apart.
+
+model AdminUser {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  name         String
+  passwordHash String
+  roleId       String
+  active       Boolean         @default(true)
+  // Bumped on logout, password change and deactivation — invalidates every
+  // token issued so far without needing a session table.
+  tokenVersion Int             @default(0)
+  lastLoginAt  DateTime?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  role         AdminRole       @relation(fields: [roleId], references: [id])
+  auditLogs    AdminAuditLog[]
+  venues       Venue[]
+
+  @@index([roleId])
+}
+
+model AdminRole {
+  id           String      @id @default(cuid())
+  slug         String      @unique
+  name         String
+  description  String?
+  permissions  String[]
+  isSystem     Boolean     @default(false)
+  // The super admin role bypasses the permission list entirely and its own
+  // permissions can never be edited.
+  isSuperAdmin Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  users        AdminUser[]
+}
+
+model AdminAuditLog {
+  id         String     @id @default(cuid())
+  actorId    String?
+  // Denormalised so the trail survives deletion of the account that acted.
+  actorEmail String
+  action     String
+  resource   String?
+  resourceId String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime   @default(now())
+  actor      AdminUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([action])
+}
+
 model Venue {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   name           String
-  slug           String   @unique
+  slug           String     @unique
   date           DateTime
-  active         Boolean  @default(true)
-  currency       String   @default("₼")
+  active         Boolean    @default(true)
+  currency       String     @default("₼")
   floorPlanImage String?
   posterImage    String?
   description    String?
   gridLayout     Json?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime   @default(now())
+  createdById    String?
+  createdBy      AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
   zones          Zone[]
   tickets        Ticket[]
+
+  @@index([createdById])
 }
 
 model GridTemplate {

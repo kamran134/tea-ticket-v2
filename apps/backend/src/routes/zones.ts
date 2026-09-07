@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { Prisma, TicketStatus, TableShape } from '@prisma/client';
-import { requireAuth } from '../middleware/auth';
+import { actorOf, requireAuth, requirePermission } from '../middleware/auth';
+import { loadOwnedVenue } from '../services/venue-access';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { prisma } from '../db';
 import { z } from 'zod';
@@ -93,15 +94,17 @@ const createZoneSchema = z.object({
   path: ['tableShape'],
 });
 
-zonesRouter.post('/', requireAuth, async (req, res) => {
+zonesRouter.post('/', requireAuth, requirePermission('events.edit'), async (req, res) => {
   const parsed = createZoneSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
   try {
+    await loadOwnedVenue(parsed.data.venueId, actorOf(req));
     const zone = await prisma.zone.create({ data: parsed.data });
     return res.status(201).json({ success: true, data: zone });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: 'Failed to create zone' });
   }
 });
@@ -117,13 +120,22 @@ const updateZoneSchema = z.object({
   tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).nullable().optional(),
 });
 
-zonesRouter.put('/:id', requireAuth, async (req, res) => {
+zonesRouter.put('/:id', requireAuth, requirePermission('events.edit'), async (req, res) => {
   const parsed = updateZoneSchema.safeParse(req.body);
   if (!parsed.success) {
     return failZod(res, parsed.error);
   }
   const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
   try {
+    const existingZone = await prisma.zone.findUnique({
+      where: { id: req.params.id },
+      select: { venueId: true },
+    });
+    if (!existingZone) {
+      throw new AppError(ErrorCodes.ZONE_NOT_FOUND, 'Zone not found', 404);
+    }
+    await loadOwnedVenue(existingZone.venueId, actorOf(req));
+
     const result = await prisma.$transaction(async tx => {
       const existing = await tx.zone.findUnique({ where: { id: req.params.id } });
       if (!existing) {
@@ -190,11 +202,20 @@ zonesRouter.put('/:id', requireAuth, async (req, res) => {
   }
 });
 
-zonesRouter.delete('/:id', requireAuth, async (req, res) => {
+zonesRouter.delete('/:id', requireAuth, requirePermission('events.edit'), async (req, res) => {
   try {
+    const existing = await prisma.zone.findUnique({
+      where: { id: req.params.id },
+      select: { venueId: true },
+    });
+    if (!existing) {
+      throw new AppError(ErrorCodes.ZONE_NOT_FOUND, 'Zone not found', 404);
+    }
+    await loadOwnedVenue(existing.venueId, actorOf(req));
     await prisma.zone.delete({ where: { id: req.params.id } });
     return res.json({ success: true, data: { deleted: true } });
   } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
       return res.status(409).json({ success: false, error: 'Cannot delete zone: tickets already exist for it' });
     }

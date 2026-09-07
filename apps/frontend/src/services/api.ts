@@ -18,6 +18,11 @@ import type {
   PaymentStatusResult,
   TicketEmailDelivery,
   TicketEvent,
+  AdminRole,
+  AdminUser,
+  AuditLogPage,
+  CurrentAdmin,
+  PermissionGroup,
 } from '../types';
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? '';
@@ -77,11 +82,117 @@ function authHeaders(): Record<string, string> {
 }
 
 export const api = {
-  async login(password: string): Promise<{ token: string }> {
+  async login(email: string, password: string): Promise<{ token: string; user: CurrentAdmin }> {
     return request('/api/auth/login', {
       method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+  },
+
+  async me(): Promise<CurrentAdmin> {
+    return request('/api/auth/me', { headers: authHeaders() });
+  },
+
+  async logout(): Promise<{ loggedOut: boolean }> {
+    return request('/api/auth/logout', { method: 'POST', headers: authHeaders() });
+  },
+
+  async changeOwnPassword(currentPassword: string, newPassword: string): Promise<{ token: string }> {
+    return request('/api/auth/change-password', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+  },
+
+  async getPermissionCatalog(): Promise<PermissionGroup[]> {
+    return request('/api/permissions', { headers: authHeaders() });
+  },
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return request('/api/admin-users', { headers: authHeaders() });
+  },
+
+  async createAdminUser(data: {
+    email: string;
+    name: string;
+    password: string;
+    roleId: string;
+  }): Promise<AdminUser> {
+    return request('/api/admin-users', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateAdminUser(
+    id: string,
+    data: { email?: string; name?: string; roleId?: string; active?: boolean },
+  ): Promise<AdminUser> {
+    return request(`/api/admin-users/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+  },
+
+  async resetAdminUserPassword(id: string, password: string): Promise<{ updated: boolean }> {
+    return request(`/api/admin-users/${encodeURIComponent(id)}/password`, {
+      method: 'POST',
+      headers: authHeaders(),
       body: JSON.stringify({ password }),
     });
+  },
+
+  async deleteAdminUser(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/admin-users/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
+  async getRoles(): Promise<AdminRole[]> {
+    return request('/api/roles', { headers: authHeaders() });
+  },
+
+  async createRole(data: {
+    name: string;
+    description?: string | null;
+    permissions: string[];
+  }): Promise<AdminRole> {
+    return request('/api/roles', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+  },
+
+  async updateRole(
+    id: string,
+    data: { name?: string; description?: string | null; permissions?: string[] },
+  ): Promise<AdminRole> {
+    return request(`/api/roles/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteRole(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/roles/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
+  async getAuditLog(opts: { limit?: number; offset?: number; action?: string } = {}): Promise<AuditLogPage> {
+    const params = new URLSearchParams();
+    if (opts.limit) params.set('limit', String(opts.limit));
+    if (opts.offset) params.set('offset', String(opts.offset));
+    if (opts.action) params.set('action', opts.action);
+    const qs = params.toString();
+    return request(`/api/audit-log${qs ? `?${qs}` : ''}`, { headers: authHeaders() });
   },
 
   async getVenues(opts: { all?: boolean; upcoming?: boolean } = {}): Promise<Venue[]> {

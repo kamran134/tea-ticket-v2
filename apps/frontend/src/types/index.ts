@@ -178,6 +178,75 @@ export interface CartItem {
   quantity?: number;
 }
 
+// ── Admin accounts, roles and permissions ────────────────────────────────────
+// Permission codes are produced by the backend catalog
+// (apps/backend/src/services/permissions.ts) and used here only to decide what
+// to render. Every code is enforced again server-side.
+
+export type PermissionCode = string;
+
+export interface AdminRoleRef {
+  id: string;
+  slug: string;
+  name: string;
+  isSuperAdmin: boolean;
+}
+
+export interface CurrentAdmin {
+  id: string;
+  email: string;
+  name: string;
+  role: AdminRoleRef;
+  isSuperAdmin: boolean;
+  permissions: PermissionCode[];
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  active: boolean;
+  lastLoginAt: string | null;
+  createdAt: string;
+  role: AdminRoleRef;
+}
+
+export interface AdminRole {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  permissions: PermissionCode[];
+  isSystem: boolean;
+  isSuperAdmin: boolean;
+  createdAt: string;
+  userCount: number;
+}
+
+export interface PermissionGroup {
+  resource: string;
+  permissions: { code: PermissionCode; label: string }[];
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actorId: string | null;
+  actorEmail: string;
+  action: string;
+  resource: string | null;
+  resourceId: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  entries: AuditLogEntry[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface ApiErrorBody {
   code: string;
   message: string;

@@ -3,22 +3,11 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { api } from '../services/api';
 import type { PublicTicket } from '../types';
 import { ThemeToggle } from './ThemeToggle';
-
-function isTokenValid(): boolean {
-  const token = localStorage.getItem('admin_token');
-  if (!token) return false;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1])) as { exp: number };
-    return payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-}
+import { useAdminAuth } from '../lib/adminAuth';
+import { AdminLoginGate, NoAccess } from './AdminLoginGate';
 
 export function AdminScanner() {
-  const [authenticated, setAuthenticated] = useState(isTokenValid);
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  const auth = useAdminAuth();
   const [scanning, setScanning] = useState(false);
   const [ticket, setTicket] = useState<PublicTicket | null>(null);
   const [members, setMembers] = useState<PublicTicket[]>([]);
@@ -43,22 +32,9 @@ export function AdminScanner() {
     setTimeout(() => setMessage(''), 3000);
   };
 
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    try {
-      const { token } = await api.login(password);
-      localStorage.setItem('admin_token', token);
-      setAuthenticated(true);
-    } catch {
-      setAuthError('Неверный пароль');
-    }
-  };
-
   const logout = () => {
     stopScanning();
-    localStorage.removeItem('admin_token');
-    setAuthenticated(false);
+    void auth.logout();
   };
 
   const startScanning = () => {
@@ -157,42 +133,26 @@ export function AdminScanner() {
     }
   };
 
-  if (!authenticated) {
+  if (!auth.can('tickets.checkin') && auth.state === 'authenticated') {
     return (
-      <div className="app-bg flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg w-full max-w-sm p-6">
-          <div className="flex justify-between items-start mb-4">
-            <h1 className="text-xl font-bold text-gray-800">Вход для администратора</h1>
-            <ThemeToggle />
-          </div>
-          {authError && (
-            <div className="mb-3 p-2 bg-red-50 text-red-700 rounded text-sm">{authError}</div>
-          )}
-          <form data-testid="admin-login" onSubmit={login} className="space-y-3">
-            <input
-              type="password"
-              data-testid="admin-password"
-              aria-label="Пароль"
-              placeholder="Пароль"
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              autoFocus
-            />
+      <AdminLoginGate auth={auth} title="Вход для администратора">
+        <div className="app-bg flex items-center justify-center p-4">
+          <div className="max-w-sm w-full space-y-4">
+            <NoAccess message="У вашей роли нет права отмечать приход гостей." />
             <button
-              type="submit"
-              data-testid="admin-login-submit"
-              className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+              onClick={() => void auth.logout()}
+              className="w-full text-sm text-gray-500 hover:text-gray-800"
             >
-              Войти
+              Выйти
             </button>
-          </form>
+          </div>
         </div>
-      </div>
+      </AdminLoginGate>
     );
   }
 
   return (
+    <AdminLoginGate auth={auth} title="Вход для администратора">
     <div data-testid="scanner" className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-md mx-auto space-y-4">
         <div className="flex justify-between items-center">
@@ -321,5 +281,6 @@ export function AdminScanner() {
         )}
       </div>
     </div>
+    </AdminLoginGate>
   );
 }

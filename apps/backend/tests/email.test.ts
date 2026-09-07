@@ -1,6 +1,4 @@
 import { execSync } from 'child_process';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { Webhook } from 'standardwebhooks';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
@@ -21,6 +19,7 @@ import {
   postMockWebhook,
   registerTicket,
   resetDatabase,
+  seedSuperAdmin,
   seedVenueWithZone,
 } from './helpers';
 
@@ -37,8 +36,7 @@ beforeAll(async () => {
     env: process.env,
     stdio: 'pipe',
   });
-  process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash('test-admin', 10);
-  adminToken = jwt.sign({ admin: true }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+  process.env.ADMIN_PASSWORD_HASH = 'unused-in-tests';
   const ctx = createApp({ prisma });
   app = ctx.app;
   emailJobProcessor = ctx.emailJobProcessor;
@@ -46,6 +44,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetDatabase(prisma);
+  adminToken = (await seedSuperAdmin(prisma)).token;
 });
 
 async function confirmViaPayment(ticketId: string) {

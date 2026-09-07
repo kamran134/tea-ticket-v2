@@ -1,11 +1,9 @@
 import { execSync } from 'child_process';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { createApp } from '../src/app';
-import { resetDatabase, seedVenueWithZone } from './helpers';
+import { resetDatabase, seedSuperAdmin, seedVenueWithZone } from './helpers';
 import { ErrorCodes } from '../src/errors';
 import { tableFootprint } from '../src/services/tableFootprint';
 import { syncTableSeats } from '../src/services/tableSeats';
@@ -20,13 +18,13 @@ beforeAll(async () => {
     env: process.env,
     stdio: 'pipe',
   });
-  process.env.ADMIN_PASSWORD_HASH = await bcrypt.hash('test-admin', 10);
-  adminToken = jwt.sign({ admin: true }, process.env.JWT_SECRET!, { expiresIn: '24h' });
+  process.env.ADMIN_PASSWORD_HASH = 'unused-in-tests';
   app = createApp({ prisma }).app;
 });
 
 beforeEach(async () => {
   await resetDatabase(prisma);
+  adminToken = (await seedSuperAdmin(prisma)).token;
 });
 
 describe('Zone table sync (B3)', () => {

@@ -5,6 +5,9 @@ import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { prisma as sharedPrisma } from './db';
 import { authRouter } from './routes/auth';
+import { adminUsersRouter } from './routes/admin-users';
+import { permissionsRouter, rolesRouter } from './routes/roles';
+import { auditLogRouter } from './routes/audit-log';
 import { ticketsRouter, setTicketsEmailProcessor } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
 import { zonesRouter } from './routes/zones';
@@ -102,6 +105,10 @@ export function createApp(options?: {
   });
 
   app.use('/api/auth', authRouter);
+  app.use('/api/admin-users', adminUsersRouter);
+  app.use('/api/roles', rolesRouter);
+  app.use('/api/permissions', permissionsRouter);
+  app.use('/api/audit-log', auditLogRouter);
   app.use('/api/tickets', ticketsRouter);
   app.use('/api/venues', venuesRouter);
   app.use('/api/zones', zonesRouter);

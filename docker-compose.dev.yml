@@ -28,6 +28,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-teaticket}:${POSTGRES_PASSWORD:-secret}@db:5432/${POSTGRES_DB:-teaticket}
       JWT_SECRET: ${JWT_SECRET:-dev-secret}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH}
       S3_ENDPOINT: ${S3_ENDPOINT}
       S3_REGION: ${S3_REGION}

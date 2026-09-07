@@ -5,7 +5,8 @@ import {
   TicketStatus as PrismaTicketStatus,
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
-import { requireAuth } from '../middleware/auth';
+import { actorOf, requireAuth, requirePermission } from '../middleware/auth';
+import { AuditActions, recordAudit } from '../services/audit';
 import { resolveUploadPath } from '../services/storage';
 import { prisma } from '../db';
 import { getBookingHoldMs } from '../services/payments/payment-service';
@@ -17,6 +18,8 @@ import { AppError, ErrorCodes, fail, failApp, failZod, isPrismaErrorCode, regist
 import { logScope } from '../middleware/requestId';
 import { TICKET_PLACE_INCLUDE, eventSummary, withPlace } from '../services/ticket-dto';
 import { allocateFreeTableSeats, lockSeats } from '../services/tableSeats';
+import { loadOwnedVenue } from '../services/venue-access';
+import type { Actor } from '../services/permissions';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
 
@@ -84,14 +87,26 @@ function withoutContactInfo<T extends { phone: string; email: string | null }>(
   return rest;
 }
 
+async function assertTicketVenueAccess(ticket: { venueId: string }, actor: Actor): Promise<void> {
+  await loadOwnedVenue(ticket.venueId, actor);
+}
+
 // GET /api/tickets?status=PENDING&venueId=xxx  (admin only)
-ticketsRouter.get('/', requireAuth, async (req, res) => {
+ticketsRouter.get('/', requireAuth, requirePermission('tickets.view'), async (req, res) => {
   const { status, venueId } = req.query;
   try {
+    const actor = actorOf(req);
+    if (typeof venueId === 'string' && venueId.length > 0) {
+      await loadOwnedVenue(venueId, actor);
+    }
     const tickets = await prisma.ticket.findMany({
       where: {
         ...(status ? { status: status as PrismaTicketStatus } : {}),
-        ...(venueId ? { venueId: venueId as string } : {}),
+        ...(typeof venueId === 'string' && venueId.length > 0
+          ? { venueId }
+          : actor.isSuperAdmin
+            ? {}
+            : { venue: { createdById: actor.id } }),
       },
       include: TICKET_PLACE_INCLUDE,
       orderBy: { createdAt: 'desc' },
@@ -125,7 +140,8 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
     });
 
     return res.json({ success: true, data });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: { code: ErrorCodes.INTERNAL_ERROR, message: 'Failed to fetch tickets' } });
   }
 });
@@ -472,7 +488,7 @@ const confirmManuallySchema = z.object({
   confirmGroup: z.boolean().optional().default(true),
 });
 
-ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
+ticketsRouter.post('/:id/confirm-manually', requireAuth, requirePermission('tickets.edit'), async (req, res) => {
   const parsed = confirmManuallySchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -486,6 +502,7 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
       if (!ticket) {
         throw new AppError(ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found', 404);
       }
+      await assertTicketVenueAccess(ticket, actorOf(req));
       if (ticket.status === 'CONFIRMED' && ticket.confirmationSource === 'MANUAL') {
         return { ticket, alreadyConfirmed: true };
       }
@@ -555,10 +572,14 @@ ticketsRouter.post('/:id/confirm-manually', requireAuth, async (req, res) => {
 // /uploads/receipts/... path with no auth at all — a bank receipt is
 // sensitive, so it's gated behind requireAuth here instead (see index.ts,
 // which now blocks /uploads/receipts/* from the static mount).
-ticketsRouter.get('/:id/receipt', requireAuth, async (req, res) => {
+ticketsRouter.get('/:id/receipt', requireAuth, requirePermission('tickets.view'), async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
-    if (!ticket || !ticket.receiptLink) {
+    if (!ticket) {
+      return res.status(404).json({ success: false, error: 'Receipt not found' });
+    }
+    await assertTicketVenueAccess(ticket, actorOf(req));
+    if (!ticket.receiptLink) {
       return res.status(404).json({ success: false, error: 'Receipt not found' });
     }
     return res.sendFile(resolveUploadPath(ticket.receiptLink), err => {
@@ -566,18 +587,20 @@ ticketsRouter.get('/:id/receipt', requireAuth, async (req, res) => {
         res.status(404).json({ success: false, error: 'Receipt file not found' });
       }
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: 'Failed to fetch receipt' });
   }
 });
 
 // POST /api/tickets/:id/checkin
-ticketsRouter.post('/:id/checkin', requireAuth, async (req, res) => {
+ticketsRouter.post('/:id/checkin', requireAuth, requirePermission('tickets.checkin'), async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     if (!ticket) {
       return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found');
     }
+    await assertTicketVenueAccess(ticket, actorOf(req));
     if (ticket.status !== 'CONFIRMED') {
       return fail(res, 409, ErrorCodes.TICKET_NOT_CONFIRMED, 'Ticket is not confirmed');
     }
@@ -590,7 +613,8 @@ ticketsRouter.post('/:id/checkin', requireAuth, async (req, res) => {
     });
     logScope('tickets/checkin', 'ticket checked in', { ticketId: ticket.id, groupId: ticket.groupId });
     return res.json({ success: true, data: updated });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Failed to check in');
   }
 });
@@ -600,7 +624,7 @@ const checkinGroupSchema = z.object({
   personIds: z.array(z.string()).min(1),
 });
 
-ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
+ticketsRouter.post('/group/:groupId/checkin', requireAuth, requirePermission('tickets.checkin'), async (req, res) => {
   const parsed = checkinGroupSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
@@ -612,6 +636,7 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
     if (!members.length) {
       return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Group not found');
     }
+    await assertTicketVenueAccess(members[0], actorOf(req));
     const targets = members.filter(m => parsed.data.personIds.includes(m.id));
     if (targets.length === 0) {
       return fail(res, 400, ErrorCodes.VALIDATION_ERROR, 'No matching tickets in group');
@@ -639,21 +664,32 @@ ticketsRouter.post('/group/:groupId/checkin', requireAuth, async (req, res) => {
       count: targets.filter(t => !t.checkedIn).length,
     });
     return res.json({ success: true, data: { groupId: req.params.groupId, members: updatedMembers } });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: 'Failed to check in group' });
   }
 });
 
 // DELETE /api/tickets/:id  (admin: delete a single ticket, even inside a group)
-ticketsRouter.delete('/:id', requireAuth, async (req, res) => {
+ticketsRouter.delete('/:id', requireAuth, requirePermission('tickets.delete'), async (req, res) => {
   try {
     const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
     if (!ticket) {
       return res.status(404).json({ success: false, error: 'Ticket not found' });
     }
+    await assertTicketVenueAccess(ticket, actorOf(req));
     await prisma.ticket.delete({ where: { id: req.params.id } });
+    await recordAudit({
+      action: AuditActions.TICKET_DELETE,
+      actor: actorOf(req),
+      req,
+      resource: 'ticket',
+      resourceId: ticket.id,
+      metadata: { name: ticket.name, venueId: ticket.venueId, groupId: ticket.groupId },
+    });
     return res.json({ success: true, data: { deleted: true } });
-  } catch {
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: 'Failed to delete ticket' });
   }
 });
@@ -663,23 +699,35 @@ const statusSchema = z.object({
   status: z.enum(['CONFIRMED', 'REJECTED']),
 });
 
-ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
+ticketsRouter.patch('/:id/status', requireAuth, requirePermission('tickets.edit'), async (req, res) => {
   const parsed = statusSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
+  const auditStatusChange = () =>
+    recordAudit({
+      action: AuditActions.TICKET_STATUS,
+      actor: actorOf(req),
+      req,
+      resource: 'ticket',
+      resourceId: req.params.id,
+      metadata: { status: parsed.data.status },
+    });
+
   try {
     if (parsed.data.status === 'REJECTED') {
       const ticket = await prisma.ticket.findUnique({ where: { id: req.params.id } });
       if (!ticket) {
         return res.status(404).json({ success: false, error: 'Ticket not found' });
       }
+      await assertTicketVenueAccess(ticket, actorOf(req));
       const updateFilter = ticket.groupId ? { groupId: ticket.groupId } : { id: ticket.id };
       await prisma.ticket.updateMany({
         where: updateFilter,
         data: { status: 'REJECTED' },
       });
       const updated = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+      await auditStatusChange();
       return res.json({ success: true, data: updated });
     }
 
@@ -688,6 +736,7 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
       if (!ticket) {
         throw new AppError(ErrorCodes.TICKET_NOT_FOUND, 'Ticket not found', 404);
       }
+      await assertTicketVenueAccess(ticket, actorOf(req));
 
       const checkoutId = ticket.groupId ?? ticket.id;
       const group = await tx.ticket.findMany({
@@ -739,6 +788,7 @@ ticketsRouter.patch('/:id/status', requireAuth, async (req, res) => {
       kickEmailJobs();
     }
 
+    await auditStatusChange();
     return res.json({ success: true, data: result.ticket });
   } catch (err) {
     if (err instanceof AppError) {

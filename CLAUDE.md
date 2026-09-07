@@ -21,7 +21,7 @@
 
 - **Монорепо**: npm workspaces, `apps/backend` + `apps/frontend`.
 - **Backend**: Express 4 + TypeScript (CommonJS) + Prisma 5 + PostgreSQL 17. Валидация — zod.
-  Авторизация — один bcrypt-хеш пароля в env + JWT на 24 часа.
+  Авторизация админки — `AdminUser` + `AdminRole` с granular permissions, JWT на 24 часа.
 - **Frontend**: React 18 + Vite (MPA, 4 точки входа) + Tailwind 3. Роутера нет.
 - **Файлы**: загружаются на локальный диск контейнера (`services/storage.ts`), том
   `/opt/tea-ticket-v2/uploads`, раздаются через `express.static('/uploads')`.
@@ -50,6 +50,9 @@ Venue ──< Zone ──< Seat          (SEATED: 1 клетка сетки = 1 
       │        └─< ZoneTable     (TABLE:  прямоугольный footprint = 1 стол)
       └──────────< Ticket        (1 билет = 1 человек)
 GridTemplate (глобальный, не привязан к Venue)
+AdminUser ──< AdminRole          (одна роль на пользователя, permissions String[])
+      └────< Venue               (createdById, onDelete SetNull)
+AdminAuditLog                    (кто что сделал в админке)
 ```
 
 - `Venue.gridLayout: Json` — `{ rows, cols, cells: string[][] }`, **главный источник правды
@@ -74,28 +77,36 @@ GridTemplate (глобальный, не привязан к Venue)
 ## API (`apps/backend/src/routes/`)
 
 Формат ответа везде `{ success: boolean, data?: T, error?: string }`.
-`requireAuth` = заголовок `Bearer <jwt>`.
+`requireAuth` проверяет JWT и грузит `req.actor` из БД; `requirePermission('events.edit')`
+проверяет право. Super Admin проходит любую проверку прав и видит все мероприятия;
+остальные админы — только свои (`Venue.createdById`). Публичная афиша не фильтруется.
 
 | Метод | Путь | Auth | Комментарий |
 |---|---|---|---|
-| POST | `/api/auth/login` | — | пароль → JWT 24ч |
-| GET | `/api/venues?all&upcoming` | — | `all=true` отдаёт и скрытые (см. AUDIT S4) |
+| POST | `/api/auth/login` | — | `{ email, password }` → JWT 24ч + user |
+| GET | `/api/auth/me` | ✔ | текущий админ и его permissions |
+| POST | `/api/auth/logout` | ✔ | инкремент `tokenVersion` |
+| POST | `/api/auth/change-password` | ✔ | свой пароль |
+| GET/POST/PATCH/DELETE | `/api/admin-users[/:id]` | ✔ | `users.*` |
+| GET/POST/PATCH/DELETE | `/api/roles[/:id]` | ✔ | `roles.*` |
+| GET | `/api/permissions` | ✔ | каталог прав |
+| GET | `/api/audit-log` | ✔ | `audit.view` |
+| GET | `/api/venues?all&upcoming` | `all=true` → `events.view` | `all=true` только свои (Super Admin — все); публичные режимы без auth |
 | GET | `/api/venues/by-slug/:slug` | — | только `active` |
-| GET | `/api/venues/slug-available` | ✔ | |
-| POST/PATCH | `/api/venues[/:id]` | ✔ | |
-| PUT | `/api/venues/:id/grid-layout` | ✔ | **ключевой**: в одной транзакции синхронизирует `Seat` и `ZoneTable` с сеткой |
-| POST | `/api/venues/:id/upload-{floor-plan,poster}` | ✔ | |
+| GET | `/api/venues/slug-available` | `events.create` | |
+| POST/PATCH | `/api/venues[/:id]` | `events.create` / `events.edit` | POST пишет `createdById`; PATCH чужого → 403 |
+| PUT | `/api/venues/:id/grid-layout` | `events.edit` | **ключевой**: в одной транзакции синхронизирует `Seat` и `ZoneTable` с сеткой |
+| POST | `/api/venues/:id/upload-{floor-plan,poster}` | `events.edit` | только своё мероприятие |
 | GET | `/api/zones?venueId` | — | считает `available` по типу зоны |
-| POST/PUT/DELETE | `/api/zones[/:id]` | ✔ | |
+| POST/PUT/DELETE | `/api/zones[/:id]` | `events.edit` | только зоны своего мероприятия |
 | GET | `/api/zones/:id/{seats,tables}` | — | |
-| POST | `/api/zones/:id/generate-{seats,tables}` | ✔ | легаси |
 | POST | `/api/tickets/register` | — | корзина из нескольких зон → N билетов в одной транзакции |
-| GET | `/api/tickets/:id`, `/group/:groupId` | — | публичные, отдают ПДн (см. AUDIT S2) |
-| GET | `/api/tickets?status&venueId` | ✔ | |
-| PATCH | `/api/tickets/:id/status` | ✔ | подтверждение/отклонение — **на всю группу** |
-| POST | `/api/tickets/:id/checkin`, `/group/:groupId/checkin` | ✔ | |
-| DELETE | `/api/tickets/:id` | ✔ | |
-| GET/POST/DELETE | `/api/grid-templates` | ✔ | шаблоны схем залов |
+| GET | `/api/tickets/:id`, `/group/:groupId` | — | публичные, контакты урезаны |
+| GET | `/api/tickets?status&venueId` | `tickets.view` | только билеты своих мероприятий |
+| PATCH | `/api/tickets/:id/status` | `tickets.edit` | подтверждение/отклонение — **на всю группу**; чужое мероприятие → 403 |
+| POST | `/api/tickets/:id/checkin`, `/group/:groupId/checkin` | `tickets.checkin` | Super Admin — любой билет, остальные — только свои события |
+| DELETE | `/api/tickets/:id` | `tickets.delete` | только билеты своих мероприятий |
+| GET/POST/DELETE | `/api/grid-templates` | `events.view` / `events.create` / `events.delete` | шаблоны схем залов |
 
 ## Ключевые компоненты фронта
 
@@ -104,7 +115,7 @@ GridTemplate (глобальный, не привязан к Venue)
 - `VenueGridMap.tsx` (508 стр.) — та же сетка «для покупателя», полноэкранный оверлей.
   Дублирует значительную часть логики отрисовки из `GridMapEditor` (см. AUDIT A1).
 - `RegisterForm.tsx` (589 стр.) — страница мероприятия + корзина + оформление.
-- `ManagePanel.tsx` (988 стр.) — админка: мероприятия, билеты, статистика (+2 мёртвых таба).
+- `ManagePanel.tsx` — админка: мероприятия, схема, билеты, статистика, пользователи, роли, журнал.
 - `TableIcon.tsx` — SVG мебели и функция `tableFootprint(shape, chairs)` — сколько клеток
   занимает стол. Редактор считает footprint ею, а БД хранит результат в `ZoneTable.rows/cols`.
 
@@ -116,7 +127,8 @@ npm run dev:backend                                  # :3000
 npm run dev:frontend                                 # :5173 (нужен VITE_API_URL=http://localhost:3000)
 ```
 
-Env — по `.env.example`. Пароль админа: `node -e "require('bcryptjs').hash('pass',10).then(console.log)"`.
+Env — по `.env.example`. Первый Super Admin создаётся при старте из `ADMIN_EMAIL` + `ADMIN_PASSWORD_HASH`
+(`node -e "require('bcryptjs').hash('pass',10).then(console.log)"`). Дальше вход по email+паролю.
 Миграции: `npm run db:migrate --workspace=apps/backend`. В контейнере `prisma migrate deploy`
 выполняется в `CMD` при старте.
 
