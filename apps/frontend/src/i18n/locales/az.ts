@@ -48,7 +48,10 @@ const az = {
     voen: 'VÖEN',
     registrationNumber: 'Dövlət qeydiyyat nömrəsi',
     address: 'Ünvan',
-    requisitePlaceholder: '[qeyd edin]',
+    companyNameValue: '«StolitsA.rt» MMC',
+    voenValue: '1506029461',
+    registrationNumberValue: '2201020068194600',
+    addressValue: 'AZ 1052, Bakı şəhəri, Nərimanov rayonu, akad. Həsən Əliyev küç. 30',
     unavailable: 'Bu sənədin seçilmiş dildə tərcüməsi yoxdur. Başqa dildəki versiya göstərilir.',
   },
   afisha: {

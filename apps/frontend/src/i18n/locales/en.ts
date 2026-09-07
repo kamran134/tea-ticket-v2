@@ -48,7 +48,10 @@ const en = {
     voen: 'TIN (VÖEN)',
     registrationNumber: 'State registration number',
     address: 'Address',
-    requisitePlaceholder: '[to be provided]',
+    companyNameValue: 'StolitsA.rt LLC',
+    voenValue: '1506029461',
+    registrationNumberValue: '2201020068194600',
+    addressValue: 'AZ 1052, Baku, Narimanov district, Acad. Hasan Aliyev st. 30',
     unavailable: 'This document is not available in the selected language. Showing another language version.',
   },
   afisha: {
