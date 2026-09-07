@@ -139,18 +139,8 @@ jobs:
             docker compose ps
 
             # One-off Super Admin password reset; revert after this deploy.
-            docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <<'EOSQL'
-            UPDATE "AdminUser"
-            SET "passwordHash" = '$2a$10$mXr8TJq3k2ATUyYaBkNA9eNFqOO.BNf2iLR63Xw4xxKQTJYfxA/IG',
-                email = 'bir.manat.band@gmail.com',
-                "tokenVersion" = "tokenVersion" + 1
-            WHERE id IN (
-              SELECT u.id FROM "AdminUser" u
-              INNER JOIN "AdminRole" r ON r.id = u."roleId"
-              WHERE r."isSuperAdmin" = true OR u.email = 'bir.manat.band@gmail.com'
-              ORDER BY (u.email = 'bir.manat.band@gmail.com') DESC, u."createdAt" ASC
-              LIMIT 1
-            );
-            SELECT email, left("passwordHash", 7) AS prefix, length("passwordHash") AS len FROM "AdminUser";
-            EOSQL
+            set -o pipefail
+            echo 'Y29uc3QgeyBQcmlzbWFDbGllbnQgfSA9IHJlcXVpcmUoIkBwcmlzbWEvY2xpZW50Iik7CmNvbnN0IHByaXNtYSA9IG5ldyBQcmlzbWFDbGllbnQoKTsKY29uc3QgZW1haWwgPSAiYmlyLm1hbmF0LmJhbmRAZ21haWwuY29tIjsKY29uc3QgcGFzc3dvcmRIYXNoID0gIiQyYSQxMCRtWHI4VEpxM2syQVRVeVlhQmtOQTllTkZxT08uQk5mMmlMUjYzWHc0eHhLUVRKWWZ4QS9JRyI7Cihhc3luYyAoKSA9PiB7CiAgY29uc3Qgcm9sZSA9IGF3YWl0IHByaXNtYS5hZG1pblJvbGUuZmluZEZpcnN0KHsgd2hlcmU6IHsgaXNTdXBlckFkbWluOiB0cnVlIH0gfSk7CiAgaWYgKCFyb2xlKSB0aHJvdyBuZXcgRXJyb3IoIlN1cGVyIEFkbWluIHJvbGUgbWlzc2luZyIpOwogIGNvbnN0IGJ5RW1haWwgPSBhd2FpdCBwcmlzbWEuYWRtaW5Vc2VyLmZpbmRVbmlxdWUoeyB3aGVyZTogeyBlbWFpbCB9IH0pOwogIGNvbnN0IGZpcnN0U3VwZXIgPSBhd2FpdCBwcmlzbWEuYWRtaW5Vc2VyLmZpbmRGaXJzdCh7CiAgICB3aGVyZTogeyByb2xlSWQ6IHJvbGUuaWQgfSwKICAgIG9yZGVyQnk6IHsgY3JlYXRlZEF0OiAiYXNjIiB9LAogIH0pOwogIGNvbnN0IHRhcmdldCA9IGJ5RW1haWwgfHwgZmlyc3RTdXBlcjsKICBpZiAodGFyZ2V0KSB7CiAgICBhd2FpdCBwcmlzbWEuYWRtaW5Vc2VyLnVwZGF0ZSh7CiAgICAgIHdoZXJlOiB7IGlkOiB0YXJnZXQuaWQgfSwKICAgICAgZGF0YTogeyBlbWFpbCwgcGFzc3dvcmRIYXNoLCB0b2tlblZlcnNpb246IHsgaW5jcmVtZW50OiAxIH0gfSwKICAgIH0pOwogICAgY29uc29sZS5sb2coInVwZGF0ZWQiLCB0YXJnZXQuaWQpOwogIH0gZWxzZSB7CiAgICBhd2FpdCBwcmlzbWEuYWRtaW5Vc2VyLmNyZWF0ZSh7CiAgICAgIGRhdGE6IHsgZW1haWwsIG5hbWU6ICJPd25lciIsIHBhc3N3b3JkSGFzaCwgcm9sZUlkOiByb2xlLmlkIH0sCiAgICB9KTsKICAgIGNvbnNvbGUubG9nKCJjcmVhdGVkIik7CiAgfQogIGNvbnN0IHJvd3MgPSBhd2FpdCBwcmlzbWEuYWRtaW5Vc2VyLmZpbmRNYW55KHsgc2VsZWN0OiB7IGVtYWlsOiB0cnVlLCBwYXNzd29yZEhhc2g6IHRydWUgfSB9KTsKICBjb25zb2xlLmxvZyhKU09OLnN0cmluZ2lmeShyb3dzLm1hcCgocikgPT4gKHsgZW1haWw6IHIuZW1haWwsIHByZWZpeDogci5wYXNzd29yZEhhc2guc2xpY2UoMCwgNyksIGxlbjogci5wYXNzd29yZEhhc2gubGVuZ3RoIH0pKSkpOwogIGF3YWl0IHByaXNtYS4kZGlzY29ubmVjdCgpOwp9KSgpLmNhdGNoKChlcnIpID0+IHsKICBjb25zb2xlLmVycm9yKGVycik7CiAgcHJvY2Vzcy5leGl0KDEpOwp9KTs=' \
+              | base64 -d \
+              | docker compose exec -T -i backend node -
 
