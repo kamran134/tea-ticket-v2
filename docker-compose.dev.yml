@@ -61,7 +61,7 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
       RESEND_RECEIVING_WEBHOOK_SECRET: ${RESEND_RECEIVING_WEBHOOK_SECRET:-}
-      EMAIL_FROM: ${EMAIL_FROM:-TeaTicket <no-reply@tea-ticket.com>}
+      EMAIL_FROM: ${EMAIL_FROM:-StolitsArt Ticket <no-reply@tea-ticket.com>}
       EMAIL_REPLY_TO: ${EMAIL_REPLY_TO:-support@tea-ticket.com}
       EMAIL_MAX_ATTEMPTS: ${EMAIL_MAX_ATTEMPTS:-5}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

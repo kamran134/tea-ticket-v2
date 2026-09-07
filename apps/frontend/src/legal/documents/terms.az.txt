@@ -1,138 +1,27 @@
-İSTİFADƏÇİ SAZİŞİ
+İstifadəçi sazişi
 
-Son yenilənmə tarixi: [DOLDURULMALIDIR: TARİX]
+1. Ümumi müddəalar
 
-Bu İstifadəçi Sazişi stolits.art saytından istifadəni və Stolitsa Art tərəfindən təşkil olunan tədbirlər üçün biletlərin alınması qaydasını tənzimləyir.
+StolitsArt Ticket tədbirlər üçün elektron biletlər satır. Bilet alaraq bu sazişi, Məxfilik siyasətini və Qaytarılma şərtlərini qəbul edirsiniz. Qeydiyyat və şəxsi kabinet lazım deyil.
 
-1. ÜMUMİ MÜDDƏALAR
+2. Bron və ödəniş
 
-1.1. stolits.art saytı Stolitsa Art tərəfindən tədbirlər haqqında məlumat yerləşdirmək, biletləri bron etmək və elektron biletləri satmaq üçün istifadə olunur.
+Seçilmiş yerlər 15 dəqiqə saxlanılır. Ödəniş Kapital Bank-ın təhlükəsiz səhifəsində keçir. Bu müddətdə ödəməsəniz, bron ləğv olunur. Uğurlu ödənişdən sonra bilet e-poçta gəlir və keçid ilə açılır.
 
-1.2. Saytdan istifadə etməklə, bron və ya bilet rəsmiləşdirməklə istifadəçi İstifadəçi Sazişi, Məxfilik Siyasəti və Biletlərin Qaytarılması Şərtləri ilə tanış olduğunu təsdiq edir.
+Alış üçün ad, telefon və e-poçt lazımdır. Qonaqların adlarını istəyə görə qeyd etmək olar.
 
-1.3. Alış üçün saytda qeydiyyatdan keçmək və şəxsi kabinet yaratmaq tələb olunmur.
+3. Bilet və giriş
 
-2. BRON VƏ BİLET ALIŞI
+Giriş QR-kod ilə təsdiqlənir. Bilet keçidini başqa şəxsə vermək olar. Keçidin qorunmasına siz cavabdehsiniz.
 
-2.1. Biletlər seçildikdən sonra istifadəçi bron yarada bilər.
+4. Ləğv və təxirə salınma
 
-2.2. Bron edilmiş biletlər 15 dəqiqə ərzində saxlanılır.
+Tədbir ləğv olunarsa, pul tam qaytarılır. Başqa tarixə keçirilərsə, bilet yeni tarixdə keçərlidir, ya da Qaytarılma şərtlərinə görə qaytarmaq olar.
 
-2.3. Bron müddəti ərzində ödəniş tamamlanmadıqda bron avtomatik ləğv edilir və biletlər yenidən satış üçün əlçatan olur.
+5. Məkan qaydaları
 
-2.4. İstifadəçi bron müddəti bitməzdən əvvəl ödəniş prosesinə başlayıbsa, seçilmiş biletlər ödəniş sistemi yekun nəticəni təqdim edənədək saxlanılır.
+Tədbirdə məkanın qaydaları və təşkilatçının tələbləri keçərlidir. Pozuntu halında girişdən imtina edilə bilər və biletin dəyəri qaytarılmır.
 
-2.5. Bron linki istifadəçiyə bron müddəti ərzində sifarişə qayıtmağa imkan verir.
+6. Suallar
 
-2.6. Ödəniş uğurla başa çatdıqdan sonra sifariş və elektron bilet yaradılır.
-
-2.7. Alış üçün alıcı öz adını, soyadını, telefon nömrəsini və elektron poçt ünvanını təqdim etməlidir. Qonaqların adları alıcının istəyinə uyğun olaraq göstərilə bilər.
-
-3. ELEKTRON BİLET
-
-3.1. Elektron bilet alıcının göstərdiyi elektron poçt ünvanına göndərilir.
-
-3.2. Bilet həmçinin başqa cihazda açıla və ya başqa şəxsə ötürülə bilən link vasitəsilə əlçatandır.
-
-3.3. Tədbirə giriş etibarlı bilet və QR kodu ilə təsdiqlənir.
-
-3.4. Bilet etibarlı olduğu halda, bileti təqdim edən şəxsin adının alıcının və ya qonağın adı ilə uyğun olması tələb olunmur.
-
-3.5. Qonağın adı göstərilibsə, biletin yoxlanılması zamanı istifadə edilə bilər.
-
-3.6. Alıcı sifariş zamanı təqdim etdiyi məlumatların, o cümlədən qonaqlar haqqında məlumatların düzgünlüyünə görə məsuliyyət daşıyır.
-
-4. BİLETİN YOXLANILMASI
-
-4.1. Biletin yoxlanılmasının əsas üsulu QR kodunun skan edilməsidir.
-
-4.2. Zəruri hallarda tədbir əməkdaşı sifarişi alıcının adı, telefon nömrəsi və ya elektron poçt ünvanı, habelə göstərilmiş qonağın adı ilə əl ilə tapa bilər.
-
-4.3. Bilet bir neçə nəfərin girişini nəzərdə tutursa, faktiki daxil olan hər bir şəxs sistemdə ayrıca qeyd olunur.
-
-4.4. Sifariş üzrə nəzərdə tutulan şəxslərin hamısı daxil olmayıbsa, istifadə olunmamış biletlər tədbir başlayana qədər qüvvədə qalır.
-
-4.5. Bütün biletlər istifadə edildikdən sonra müvafiq bilet/sifariş üzrə təkrar giriş mümkün deyil.
-
-5. BİLETİN ÖTÜRÜLMƏSİ
-
-5.1. Alıcı aldığı bileti başqa şəxsə ötürə bilər.
-
-5.2. Bilet etibarlı olduğu halda Stolitsa Art bileti təqdim edən şəxsin adının alıcının və ya qonağın adı ilə uyğun olmasını tələb etmir.
-
-5.3. Alıcı bilet linkinin və ona giriş məlumatlarının qorunmasına görə məsuliyyət daşıyır.
-
-6. ÖDƏNİŞ
-
-6.1. Biletlərin ödənişi qoşulmuş ödəniş xidməti vasitəsilə onlayn bank kartı ilə həyata keçirilir.
-
-6.2. Bank kartı məlumatları ödəniş xidmətinin tərəfində daxil edilir. İstifadə olunan ödəniş infrastrukturu bunu nəzərdə tutmadığı halda Stolitsa Art bank kartının tam rekvizitlərini saxlamır.
-
-6.3. Ödənişin nəticəsi əlavə yoxlama tələb edərsə, sifariş müvəqqəti olaraq ödənişin yoxlanılması statusuna keçirilə bilər.
-
-6.4. Ödəniş zamanı texniki problem yarandıqda istifadəçi saytın əlaqə forması vasitəsilə müraciət edə bilər.
-
-7. TƏDBİRİN LƏĞVİ VƏ TƏXİRƏ SALINMASI
-
-7.1. Stolitsa Art tədbiri ləğv edə və ya başqa tarixə keçirə bilər.
-
-7.2. Tədbir ləğv edildikdə alınmış biletlərin dəyəri tam məbləğdə qaytarılır.
-
-7.3. Tədbir başqa tarixə keçirildikdə, Stolitsa Art tərəfindən başqa qayda bildirilmədiyi halda, alınmış bilet yeni tarix üçün qüvvədə qalır.
-
-7.4. Tədbir başqa tarixə keçirildikdə alıcı Biletlərin Qaytarılması Şərtlərinə uyğun olaraq ödənişin qaytarılmasını tələb edə bilər.
-
-7.5. Tədbirin keçirildiyi məkan dəyişdikdə Stolitsa Art alıcıları məlumatlandırır. Vəziyyətdən asılı olaraq bilet yeni məkanda istifadə edilə və ya geri qaytarıla bilər.
-
-8. TƏDBİRLƏRƏ ZİYARƏT QAYDALARI
-
-8.1. Ziyarətçi məkanın qaydalarına, təşkilatçının tələblərinə və təhlükəsizlik qaydalarına əməl etməlidir.
-
-8.2. Bu qaydaların pozulması halında Stolitsa Art girişdən imtina edə və ya ziyarətçini tədbirdən uzaqlaşdıra bilər.
-
-8.3. Bu hallarda biletin dəyəri qaytarılmır.
-
-9. BİLETLƏRİN QAYTARILMASI
-
-9.1. Biletlərin qaytarılması saytda dərc edilmiş ayrıca Biletlərin Qaytarılması Şərtlərinə uyğun həyata keçirilir.
-
-9.2. Alıcı eyni sifarişə daxil olan bir və ya bir neçə istifadə olunmamış biletin qaytarılmasını tələb edə bilər, əgər bu, Biletlərin Qaytarılması Şərtləri ilə icazə verilirsə.
-
-9.3. Tədbir başladıqdan sonra bilet qaytarılmır.
-
-10. İSTİFADƏÇİ MÜRACİƏTLƏRİ
-
-10.1. Sifariş, ödəniş, bilet, qaytarılma və digər məsələlərlə bağlı istifadəçi saytın əlaqə forması vasitəsilə Stolitsa Art-a müraciət edə bilər.
-
-10.2. Forma aşağıdakı məlumatları tələb edir:
-ad;
-elektron poçt və ya telefon nömrəsi;
-müraciətin mövzusu;
-mesaj.
-
-10.3. Müraciətlər iş vaxtı ərzində nəzərdən keçirilir.
-
-11. TEXNİKİ MƏHDUDİYYƏTLƏR
-
-11.1. Stolitsa Art saytın və xidmətin işləkliyini təmin etmək üçün ağlabatan tədbirlər görür.
-
-11.2. Stolitsa Art özündən asılı olmayan səbəblərdən saytın, ödəniş xidmətinin və ya ayrı-ayrı funksiyaların müvəqqəti əlçatmazlığına görə məsuliyyət daşımır.
-
-12. ŞƏXSİ MƏLUMATLAR
-
-12.1. Şəxsi məlumatların emalı Stolitsa Art-ın Məxfilik Siyasətinə və Azərbaycan Respublikasının qanunvericiliyinə uyğun həyata keçirilir.
-
-12.2. Sifarişi rəsmiləşdirməzdən əvvəl istifadəçi İstifadəçi Sazişi, Məxfilik Siyasəti və Biletlərin Qaytarılması Şərtləri ilə tanış olduğunu təsdiq edir.
-
-13. TƏTBİQ OLUNAN QANUNVERİCİLİK
-
-13.1. Bu İstifadəçi Sazişi Azərbaycan Respublikasının qanunvericiliyi ilə tənzimlənir.
-
-14. ŞİRKƏT MƏLUMATLARI
-
-[DOLDURULMALIDIR: TAM HÜQUQİ AD]
-[DOLDURULMALIDIR: HÜQUQİ TƏŞKİLAT FORMASI]
-[DOLDURULMALIDIR: VÖEN]
-[DOLDURULMALIDIR: HÜQUQİ ÜNVAN]
-[DOLDURULMALIDIR: EMAIL]
-[DOLDURULMALIDIR: TELEFON]
+Sifariş, ödəniş və bilet barədə support@tea-ticket.com ünvanına yazın.

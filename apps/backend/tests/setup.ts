@@ -8,7 +8,7 @@ process.env.BOOKING_TTL_SECONDS = '30';
 process.env.PAYMENT_TTL_SECONDS = '30';
 process.env.JWT_SECRET = 'test-jwt-secret';
 process.env.EMAIL_ENABLED = 'false';
-process.env.EMAIL_FROM = 'TeaTicket <no-reply@tea-ticket.com>';
+process.env.EMAIL_FROM = 'StolitsArt Ticket <no-reply@tea-ticket.com>';
 process.env.EMAIL_REPLY_TO = 'support@tea-ticket.com';
 process.env.EMAIL_MAX_ATTEMPTS = '5';
 process.env.RESEND_WEBHOOK_SECRET = 'whsec_dGVzdHNlY3JldDEyMzQ1Njc4OTA=';

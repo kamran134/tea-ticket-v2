@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import brandLogo from '../assets/brand-logo.svg';
 import { changeLanguage } from '../i18n';
 import { LANGS, type Lang } from '../i18n/types';
-import { SITE_URL, siteSectionUrl } from '../lib/site';
+import { SITE_URL } from '../lib/site';
 import { ThemeToggle } from './ThemeToggle';
 
 export function Header() {
@@ -13,11 +13,9 @@ export function Header() {
   const lang = i18n.language as Lang;
 
   const sectionLinks = useMemo(() => [
-    { href: `${siteSectionUrl(lang, '')}#videos`, label: t('header.videos') },
-    { href: siteSectionUrl(lang, '/repertoire'), label: t('header.repertoire') },
-    { href: `${siteSectionUrl(lang, '')}#reviews`, label: t('header.reviews') },
-    { href: `${siteSectionUrl(lang, '')}#contact`, label: t('header.contacts') },
-  ], [lang, t]);
+    { href: '/', label: t('header.events') },
+    { href: '/about', label: t('header.about') },
+  ], [t]);
 
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 0);
@@ -52,8 +50,6 @@ export function Header() {
             <a
               key={l.href}
               href={l.href}
-              target="_blank"
-              rel="noreferrer"
               className="text-[12px] xl:text-[13px] tracking-[0.12em] xl:tracking-[0.18em] uppercase text-[var(--header-muted)] hover:text-[var(--header-accent)] transition-colors whitespace-nowrap"
             >
               {l.label}
@@ -103,8 +99,6 @@ export function Header() {
               <a
                 key={l.href}
                 href={l.href}
-                target="_blank"
-                rel="noreferrer"
                 className="text-sm tracking-[0.2em] uppercase text-[var(--header-muted)] hover:text-[var(--header-accent)]"
                 onClick={() => setOpen(false)}
               >

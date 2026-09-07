@@ -16,7 +16,7 @@ const baseInput: CreatePaymentInput = {
   orderId: 'pay_1',
   amount: '12.5000',
   currency: 'AZN',
-  description: 'Tea Ticket checkout pay_1',
+  description: 'StolitsArt Ticket checkout pay_1',
   returnUrl: 'http://localhost:3001/api/payments/return/tok123',
   webhookUrl: 'http://localhost:3000/api/webhooks/payments/kapital',
 };

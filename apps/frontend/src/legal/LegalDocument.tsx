@@ -60,7 +60,7 @@ export function LegalDocument({ text }: { text: string }) {
       {blocks.map((block, i) => {
         if (block.type === 'h1') {
           return (
-            <h1 key={i} className="text-2xl sm:text-3xl font-bold text-emerald-800 tracking-tight">
+            <h1 key={i} className="text-2xl sm:text-3xl font-bold text-emerald-800 tracking-tight text-center">
               {block.text}
             </h1>
           );

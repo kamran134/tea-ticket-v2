@@ -1,83 +1,21 @@
-BİLETLƏRİN QAYTARILMASI ŞƏRTLƏRİ
+Biletlərin qaytarılması şərtləri
 
-Son yenilənmə tarixi: [DOLDURULMALIDIR: TARİX]
+Qaytarılma StolitsArt Ticket biletləri üçün tədbirə qədər qalan vaxtdan və ödəniş üsulundan asılıdır.
 
-1. ÜMUMİ ŞƏRTLƏR
+1. Tədbir planlaşdırıldığı kimi keçirilərsə
 
-1.1. stolits.art saytı vasitəsilə alınmış elektron biletlərin qaytarılması bu Şərtlərə uyğun həyata keçirilir.
+Başlamaya 24 saatdan çox qalıbsa, biletin dəyəri tam qaytarılır. 24 saat və ya daha az qalıbsa, 20% tutulur: sizə 80% qaytarılır. Tədbir başladıqdan sonra qaytarılma mümkün deyil.
 
-1.2. Qaytarılma bütün sifariş üzrə və ya sifarişə daxil olan ayrı-ayrı istifadə olunmamış biletlər üzrə həyata keçirilə bilər.
+2. Tədbir ləğv və ya təxirə salınarsa
 
-1.3. Tədbir başladıqdan sonra bilet qaytarılmır.
+Ləğv zamanı pul tam qaytarılır. Başqa tarixə keçirilərsə, bilet yeni tarixdə keçərlidir. Yeni tarix uyğun gəlmirsə, qaytarılma rəsmiləşdirmək olar.
 
-2. ALICININ TƏLƏBİ İLƏ QAYTARILMA
+3. Necə qaytarmaq olar
 
-2.1. Tədbirin başlamasına 24 saatdan çox qalmış qaytarılma tələb edildikdə, qaytarılan biletin dəyəri tam məbləğdə qaytarılır.
+support@tea-ticket.com ünvanına yazın. Pul ödəniş edilən karta qaytarılır. Köçürmə müddəti bankdan asılıdır.
 
-2.2. Tədbirin başlamasına 24 saat və ya daha az qaldıqda, qaytarılan biletin dəyərinin 20%-i tutulur. Alıcıya bilet dəyərinin 80%-i qaytarılır.
+Eyni sifarişdən istifadə olunmamış ayrı-ayrı biletləri qaytarmaq olar. Qaytarılma təsdiqləndikdən sonra bilet etibarlı olmur.
 
-2.3. Tədbir başladıqdan sonra qaytarılma həyata keçirilmir.
+4. Qaytarılma olmayanda
 
-3. QİSMƏN QAYTARILMA
-
-3.1. Bir sifarişdə bir neçə bilet alındıqda, alıcı bir və ya bir neçə istifadə olunmamış biletin qaytarılmasını tələb edə bilər.
-
-3.2. Qaytarılma tələbinə daxil edilməyən digər biletlər istifadə şərtlərinə uyğun olaraq qüvvədə qalır.
-
-3.3. Qaytarılma təsdiq edildikdən sonra müvafiq bilet etibarsız olur və giriş üçün istifadə edilə bilməz.
-
-4. TƏDBİRİN LƏĞVİ
-
-4.1. Stolitsa Art tədbiri ləğv edərsə, alınmış biletlərin dəyəri tam məbləğdə qaytarılır.
-
-4.2. Alıcının qaytarılma üçün ayrıca səbəb göstərməsi tələb olunmur.
-
-4.3. Qaytarılma ödəniş zamanı istifadə edilmiş bank kartına həyata keçirilir.
-
-5. TƏDBİRİN TƏXİRƏ SALINMASI
-
-5.1. Tədbir başqa tarixə keçirildikdə, Stolitsa Art tərəfindən başqa qayda bildirilmədiyi halda, bilet yeni tarix üçün avtomatik olaraq qüvvədə qalır.
-
-5.2. Yeni tarixdə tədbirdə iştirak edə bilməyən alıcı ödənişin qaytarılmasını tələb edə bilər.
-
-6. MƏKANIN DƏYİŞDİRİLMƏSİ
-
-6.1. Tədbirin keçirildiyi məkan dəyişdikdə Stolitsa Art alıcıları məlumatlandırır.
-
-6.2. Vəziyyətdən asılı olaraq alıcıya bileti yeni məkanda istifadə etmək və ya qaytarılma tələb etmək imkanı verilə bilər.
-
-7. QAYTARILMA TƏLƏBİNİN VERİLMƏSİ
-
-7.1. Qaytarılma tələbi stolits.art saytındakı əlaqə forması vasitəsilə göndərilir.
-
-7.2. Formada aşağıdakılar göstərilməlidir:
-ad;
-elektron poçt və ya telefon nömrəsi;
-müraciətin mövzusu;
-mesaj.
-
-7.3. Qaytarılmanın həyata keçirilməsi üçün zəruri olduqda Stolitsa Art əlavə məlumat tələb edə bilər.
-
-7.4. Qaytarılma barədə qərarı sifarişi, biletlərin statusunu və bu Şərtlərə uyğunluğu yoxladıqdan sonra administrator qəbul edir.
-
-8. PUL VƏSAİTLƏRİNİN QAYTARILMASI ÜSULU
-
-8.1. Pul vəsaitləri müvafiq sifariş üzrə ödəniş edilmiş bank kartına qaytarılır.
-
-8.2. Pul vəsaitlərinin karta faktiki daxil olma müddəti ödəniş xidmətindən və kartı emissiya edən bankdan asılı ola bilər.
-
-[DOLDURULMALIDIR: QAYTARILMANIN EMAL EDİLMƏSİ ÜZRƏ MAKSİMUM MÜDDƏT, ƏGƏR ŞİRKƏT AYRICA MÜDDƏT GÖSTƏRMƏK İSTƏYİRSƏ]
-
-9. MÜHÜM MÜDDƏALAR
-
-9.1. İstifadə olunmamış bilet tədbir başladıqdan sonra qaytarıla bilməz.
-
-9.2. Giriş üçün istifadə edilmiş bilet qaytarılmır.
-
-9.3. Ziyarətçinin məkanın qaydalarını və ya təşkilatçının tələblərini pozması səbəbindən girişdən imtina edildikdə və ya ziyarətçi tədbirdən uzaqlaşdırıldıqda biletin dəyəri qaytarılmır.
-
-10. ƏLAQƏ MƏLUMATLARI
-
-[DOLDURULMALIDIR: TAM HÜQUQİ AD]
-[DOLDURULMALIDIR: EMAIL]
-[DOLDURULMALIDIR: TELEFON]
+Bilet giriş üçün artıq istifadə olunub. Tədbir artıq başlayıb. Məkan qaydalarının pozulmasına görə girişdən imtina edilib.

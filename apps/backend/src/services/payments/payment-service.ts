@@ -123,7 +123,7 @@ export class PaymentService {
         orderId: payment.id,
         amount,
         currency: 'AZN',
-        description: `Tea Ticket checkout ${checkoutId}`,
+        description: `StolitsArt Ticket checkout ${checkoutId}`,
         returnUrl: `${this.deps.publicAppUrl}/api/payments/return/${returnToken}`,
         webhookUrl: `${this.deps.webhookBaseUrl}/api/webhooks/payments/${this.deps.provider.name}`,
       });

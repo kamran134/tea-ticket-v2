@@ -1,4 +1,4 @@
-# Tea Ticket v2 — карта проекта
+# StolitsArt Ticket v2 — карта проекта
 
 > Стиль работы, язык общения и правила по планам — в [.claude/CLAUDE.md](.claude/CLAUDE.md).
 > Известные проблемы и техдолг — в [AUDIT.md](AUDIT.md) (читать перед рефакторингом).
@@ -35,13 +35,13 @@
 |---|---|---|---|
 | `/` | `index.html` | `Afisha` | все |
 | `/e/:slug` | `index.html` (роутинг regex в `main.tsx`) | `RegisterForm` | покупатель |
-| `/privacy-policy`, `/terms`, `/refund-policy` | `index.html` | `LegalPage` | все |
+| `/privacy-policy`, `/terms`, `/refund-policy`, `/about` | `index.html` | `LegalPage` | все |
 | `/ticket?id=...` | `ticket.html` | `TicketView` | покупатель |
 | `/manage` | `manage.html` | `ManagePanel` | админ |
 | `/admin` | `admin.html` | `AdminScanner` | админ на входе |
 
 `main.tsx` разводит `/`, `/e/:slug` и юридические URL по `window.location.pathname`. Nginx фронта отдаёт
-`index.html` для `/e/` и `/privacy-policy` `/terms` `/refund-policy`.
+`index.html` для `/e/` и `/privacy-policy` `/terms` `/refund-policy` `/about`.
 
 ## Модель данных (`apps/backend/prisma/schema.prisma`)
 

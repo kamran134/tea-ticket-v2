@@ -4,6 +4,7 @@ import { formatEventDate } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue } from '../types';
 import { PublicLayout } from './PublicLayout';
+import { TicketMark } from './TicketMark';
 
 export function Afisha() {
   const { t } = useTranslation();
@@ -22,7 +23,10 @@ export function Afisha() {
       <div className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
-            <h1 className="text-3xl font-bold text-emerald-800">🍵 {t('afisha.title')}</h1>
+            <h1 className="inline-flex items-center justify-center gap-3 text-3xl font-bold text-emerald-800">
+              <TicketMark className="h-8 w-8 shrink-0" />
+              {t('afisha.title')}
+            </h1>
             <p className="text-gray-600 mt-2">{t('afisha.subtitle')}</p>
           </div>
 
@@ -53,7 +57,9 @@ export function Afisha() {
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl">🍵</div>
+                      <div className="w-full h-full flex items-center justify-center text-emerald-800/35">
+                        <TicketMark className="h-16 w-16" />
+                      </div>
                     )}
                   </div>
                   <div className="p-4">

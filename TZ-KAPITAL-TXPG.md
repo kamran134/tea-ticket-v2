@@ -157,7 +157,7 @@ POST {apiBaseUrl}/order
   "amount":         input.amount,      // как есть, "12.5000" — проверено, принимается
   "currency":       input.currency,    // "AZN"
   "language":       config.language,
-  "title":          "Tea Ticket",
+  "title":          "StolitsArt Ticket",
   "description":    input.description, // сюда уходит наш payment.id из вызывающего кода
   "hppRedirectUrl": input.returnUrl
 }}

@@ -1,138 +1,27 @@
-USER AGREEMENT
+User Agreement
 
-Last updated: [TO FILL IN: DATE]
+1. General
 
-This User Agreement governs the use of stolits.art and the purchase of tickets for events organized by Stolitsa Art.
+StolitsArt Ticket sells electronic tickets for events. By buying a ticket you accept this agreement, the Privacy Policy and the Refund Policy. No registration or account is required.
 
-1. GENERAL PROVISIONS
+2. Booking and payment
 
-1.1. The website stolits.art is used by Stolitsa Art to provide information about events, make reservations and sell electronic tickets.
+Selected seats are held for 15 minutes. Payment is made on Kapital Bank's secure page. If you do not pay in time, the hold is released. After a successful payment the ticket is emailed to you and is also available via a link.
 
-1.2. By using the website, making a reservation or purchasing a ticket, the user confirms that they have read the User Agreement, Privacy Policy and Ticket Refund Policy.
+To buy a ticket you need a name, phone number and email. Guest names are optional.
 
-1.3. Registration and creation of a personal account are not required to make a purchase.
+3. Ticket and entry
 
-2. RESERVATIONS AND TICKET PURCHASES
+Entry is confirmed with a QR code. You may pass the ticket link to someone else. You are responsible for keeping the link safe.
 
-2.1. After selecting tickets, the user may make a reservation.
+4. Cancellation and postponement
 
-2.2. Reserved tickets are held for 15 minutes.
+If an event is cancelled, you get a full refund. If it is postponed, the ticket remains valid for the new date, or you can request a refund under the Refund Policy.
 
-2.3. If payment is not completed within the reservation period, the reservation is automatically cancelled and the tickets become available for purchase again.
+5. Venue rules
 
-2.4. If the user starts payment before the reservation period expires, the selected tickets remain held until the payment system provides a final result.
+Venue rules and the organiser's requirements apply at the event. If you break them, you may be refused entry without a refund.
 
-2.5. The reservation link allows the user to return to the order during the reservation period.
+6. Questions
 
-2.6. After successful payment, an order and electronic ticket are created.
-
-2.7. To make a purchase, the buyer must provide their first name, last name, phone number and email address. Guest names may be provided at the buyer's discretion.
-
-3. ELECTRONIC TICKET
-
-3.1. The electronic ticket is sent to the email address provided by the buyer.
-
-3.2. The ticket is also available through a link that the user may open on another device or share with another person.
-
-3.3. Admission is confirmed by a valid ticket and QR code.
-
-3.4. The name of the buyer or guest does not have to match the person presenting a valid ticket.
-
-3.5. If a guest name was provided, it may be used when checking the ticket.
-
-3.6. The buyer is responsible for the accuracy of the information provided during the order, including guest information.
-
-4. TICKET CHECKING
-
-4.1. The primary method of checking a ticket is scanning the QR code.
-
-4.2. If necessary, event staff may find the order manually using the buyer's name, phone number or email address, or a provided guest name.
-
-4.3. If a ticket covers several people, each person who actually enters is recorded separately.
-
-4.4. If not all people covered by the order have entered, the remaining unused tickets remain valid until the event starts.
-
-4.5. Once all tickets have been used, further admission using the corresponding ticket/order is not possible.
-
-5. TRANSFER OF TICKETS
-
-5.1. The buyer may transfer a purchased ticket to another person.
-
-5.2. Stolitsa Art does not require the name of the person presenting the ticket to match the buyer's or guest's name if the ticket is valid.
-
-5.3. The buyer is responsible for keeping the ticket link and access information secure.
-
-6. PAYMENT
-
-6.1. Tickets are paid for online by bank card through the connected payment service.
-
-6.2. Card details are entered on the payment service's side. Stolitsa Art does not store full card details unless this is expressly provided for by the payment infrastructure used.
-
-6.3. If a payment requires additional verification, the order may temporarily have a payment verification status.
-
-6.4. In case of a technical payment issue, the user may contact Stolitsa Art through the website contact form.
-
-7. EVENT CANCELLATION AND POSTPONEMENT
-
-7.1. Stolitsa Art may cancel or postpone an event.
-
-7.2. If an event is cancelled, the cost of purchased tickets is refunded in full.
-
-7.3. If an event is postponed, the purchased ticket remains valid for the new date unless Stolitsa Art states otherwise.
-
-7.4. If an event is postponed, the buyer may request a refund in accordance with the Ticket Refund Policy.
-
-7.5. If the venue changes, Stolitsa Art notifies buyers. Depending on the circumstances, the buyer may be allowed to use the ticket at the new venue or request a refund.
-
-8. EVENT RULES
-
-8.1. Visitors must comply with venue rules, organizer requirements and safety rules.
-
-8.2. Stolitsa Art may refuse admission or remove a visitor from an event for violating these rules.
-
-8.3. In such cases, the ticket price is not refunded.
-
-9. TICKET REFUNDS
-
-9.1. Ticket refunds are governed by the separate Ticket Refund Policy published on the website.
-
-9.2. The buyer may request a refund for one or more unused tickets from the same order if permitted by the Ticket Refund Policy.
-
-9.3. No ticket refund is available after the event has started.
-
-10. USER REQUESTS
-
-10.1. For questions concerning orders, payments, tickets, refunds or other matters, users may contact Stolitsa Art through the website contact form.
-
-10.2. The form requires:
-name;
-email or phone number;
-subject;
-message.
-
-10.3. Requests are reviewed during business hours.
-
-11. TECHNICAL LIMITATIONS
-
-11.1. Stolitsa Art takes reasonable measures to maintain website availability and service operation.
-
-11.2. Stolitsa Art is not responsible for temporary unavailability of the website, payment service or individual functions due to causes beyond its reasonable control.
-
-12. PERSONAL DATA
-
-12.1. Personal data are processed in accordance with Stolitsa Art's Privacy Policy and the laws of the Republic of Azerbaijan.
-
-12.2. Before placing an order, the user confirms that they have read the User Agreement, Privacy Policy and Ticket Refund Policy.
-
-13. GOVERNING LAW
-
-13.1. This User Agreement is governed by the laws of the Republic of Azerbaijan.
-
-14. COMPANY DETAILS
-
-[TO FILL IN: FULL LEGAL NAME]
-[TO FILL IN: LEGAL FORM]
-[TO FILL IN: VÖEN]
-[TO FILL IN: LEGAL ADDRESS]
-[TO FILL IN: EMAIL]
-[TO FILL IN: PHONE]
+For orders, payments and tickets, write to support@tea-ticket.com.
