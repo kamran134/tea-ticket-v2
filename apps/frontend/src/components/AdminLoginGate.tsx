@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { ThemeToggle } from './ThemeToggle';
+import { PasswordInput } from './PasswordInput';
 import type { AdminAuth } from '../lib/adminAuth';
 
 const INPUT_CLASS =
@@ -71,8 +72,7 @@ export function AdminLoginGate({
             autoFocus
             required
           />
-          <input
-            type="password"
+          <PasswordInput
             data-testid="admin-password"
             aria-label="Пароль"
             placeholder="Пароль"

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { toast } from '../../services/toast';
 import { ConfirmDialog } from '../ConfirmDialog';
+import { PasswordInput } from '../PasswordInput';
 import { NoAccess } from '../AdminLoginGate';
 import type { AdminAuth } from '../../lib/adminAuth';
 import type { AdminRole, AdminUser } from '../../types';
@@ -164,8 +165,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
               value={newUser.name}
               onChange={e => setNewUser({ ...newUser, name: e.target.value })}
             />
-            <input
-              type="password"
+            <PasswordInput
               required
               minLength={PASSWORD_MIN_LENGTH}
               autoComplete="new-password"
@@ -321,8 +321,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
 
                     {resettingId === user.id && (
                       <div className="flex gap-2 pt-1">
-                        <input
-                          type="password"
+                        <PasswordInput
                           autoComplete="new-password"
                           minLength={PASSWORD_MIN_LENGTH}
                           placeholder={`Новый пароль (от ${PASSWORD_MIN_LENGTH} символов)`}

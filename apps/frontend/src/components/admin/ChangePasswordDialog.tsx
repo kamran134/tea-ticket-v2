@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../../services/api';
 import { storeToken } from '../../lib/adminAuth';
 import { toast } from '../../services/toast';
+import { PasswordInput } from '../PasswordInput';
 
 const PASSWORD_MIN_LENGTH = 10;
 
@@ -42,8 +43,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
         className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-3"
       >
         <h3 className="text-lg font-semibold text-gray-800">Сменить пароль</h3>
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="current-password"
           required
           placeholder="Текущий пароль"
@@ -51,8 +51,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           value={currentPassword}
           onChange={e => setCurrentPassword(e.target.value)}
         />
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
@@ -61,8 +60,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           value={newPassword}
           onChange={e => setNewPassword(e.target.value)}
         />
-        <input
-          type="password"
+        <PasswordInput
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN_LENGTH}
