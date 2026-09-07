@@ -78,6 +78,7 @@ const en = {
     guestDefaultHint: 'Will be marked as "Guest 1", "Guest 2"...',
     buying: 'Processing...',
     buy: 'Buy',
+    priceFrom: 'from {{price}}',
     tableTitle: 'Table {{number}}',
     registerError: 'Registration error',
     tickets_one: 'ticket',

@@ -78,6 +78,7 @@ const ru = {
     guestDefaultHint: 'Будут отмечены как «Гость 1», «Гость 2»...',
     buying: 'Покупка...',
     buy: 'Купить',
+    priceFrom: 'от {{price}}',
     tableTitle: 'Стол {{number}}',
     registerError: 'Ошибка при регистрации',
     tickets_one: 'билет',

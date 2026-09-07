@@ -22,6 +22,8 @@ type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
 type Tab = 'venues' | 'gridmap' | 'tickets' | 'stats' | 'users' | 'roles' | 'audit';
 
+const AGE_RATING_OPTIONS = ['', '0+', '6+', '12+', '16+', '18+'] as const;
+
 const TABS: { id: Tab; label: string; permission: PermissionCode }[] = [
   { id: 'venues', label: 'Мероприятия', permission: 'events.view' },
   { id: 'gridmap', label: 'Схема', permission: 'events.edit' },
@@ -141,6 +143,7 @@ export function ManagePanel() {
   const [newVenueDate, setNewVenueDate] = useState('');
   const [newVenueTime, setNewVenueTime] = useState('');
   const [newVenueDescription, setNewVenueDescription] = useState('');
+  const [newVenueAgeRating, setNewVenueAgeRating] = useState('');
   const [newVenueSlug, setNewVenueSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -152,6 +155,7 @@ export function ManagePanel() {
   const [editVenueDate, setEditVenueDate] = useState('');
   const [editVenueTime, setEditVenueTime] = useState('');
   const [editVenueDescription, setEditVenueDescription] = useState('');
+  const [editVenueAgeRating, setEditVenueAgeRating] = useState('');
   const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
   // Schema (grid map) — which venue is selected for editing
@@ -217,12 +221,14 @@ export function ManagePanel() {
         date: toIsoFromDateAndTime(newVenueDate, newVenueTime),
         slug: newVenueSlug || undefined,
         description: descriptionForApi(newVenueDescription),
+        ageRating: newVenueAgeRating || null,
       });
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
       setNewVenueTime('');
       setNewVenueDescription('');
+      setNewVenueAgeRating('');
       setNewVenueSlug('');
       setSlugManuallyEdited(false);
       setSlugStatus('idle');
@@ -238,6 +244,7 @@ export function ManagePanel() {
     setEditVenueDate(toDateInputValue(v.date));
     setEditVenueTime(toTimeInputValue(v.date));
     setEditVenueDescription(v.description ?? '');
+    setEditVenueAgeRating(v.ageRating ?? '');
   };
 
   const saveVenueEdit = async (id: string) => {
@@ -248,6 +255,7 @@ export function ManagePanel() {
         name: editVenueName.trim(),
         date: toIsoFromDateAndTime(editVenueDate, editVenueTime),
         description: descriptionForApi(editVenueDescription),
+        ageRating: editVenueAgeRating || null,
       });
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
       setEditingVenueId(null);
@@ -508,6 +516,20 @@ export function ManagePanel() {
                 placeholder="Описание"
               />
               <div>
+                <label className="block text-xs text-gray-400 mb-1">Возрастной ценз</label>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500 bg-white"
+                  value={newVenueAgeRating}
+                  onChange={e => setNewVenueAgeRating(e.target.value)}
+                >
+                  {AGE_RATING_OPTIONS.map(opt => (
+                    <option key={opt || 'none'} value={opt}>
+                      {opt || 'Не указан'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
                 <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-1">
                   <span className="font-mono">/e/</span>
                   <span>слаг ссылки на страницу мероприятия</span>
@@ -580,6 +602,18 @@ export function ManagePanel() {
                               placeholder="Описание"
                               compact
                             />
+                            <select
+                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300 bg-white"
+                              value={editVenueAgeRating}
+                              onChange={e => setEditVenueAgeRating(e.target.value)}
+                              aria-label="Возрастной ценз"
+                            >
+                              {AGE_RATING_OPTIONS.map(opt => (
+                                <option key={opt || 'none'} value={opt}>
+                                  {opt || 'Ценз не указан'}
+                                </option>
+                              ))}
+                            </select>
                             <div className="flex gap-3">
                               <button
                                 onClick={() => saveVenueEdit(v.id)}
@@ -608,6 +642,7 @@ export function ManagePanel() {
                             </div>
                             <div className="text-sm text-gray-500 mt-0.5">
                               {new Date(v.date).toLocaleString('ru-RU')}
+                              {v.ageRating ? ` · ${v.ageRating}` : ''}
                             </div>
                           </>
                         )}

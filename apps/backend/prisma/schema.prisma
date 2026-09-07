@@ -110,6 +110,7 @@ model Venue {
   floorPlanImage String?
   posterImage    String?
   description    String?
+  ageRating      String?
   gridLayout     Json?
   createdAt      DateTime   @default(now())
   createdById    String?

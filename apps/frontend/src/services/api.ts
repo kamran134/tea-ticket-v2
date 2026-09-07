@@ -224,7 +224,12 @@ export const api = {
     });
   },
 
-  async updateVenue(id: string, data: { name?: string; date?: string; description?: string | null }): Promise<Venue> {
+  async updateVenue(id: string, data: {
+    name?: string;
+    date?: string;
+    description?: string | null;
+    ageRating?: string | null;
+  }): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: authHeaders(),
@@ -383,8 +388,10 @@ export const api = {
     date: string;
     slug?: string;
     description?: string | null;
+    ageRating?: string | null;
   }): Promise<Venue> {
     const description = data.description?.trim();
+    const ageRating = data.ageRating?.trim() || null;
     return request('/api/venues', {
       method: 'POST',
       headers: authHeaders(),
@@ -393,6 +400,7 @@ export const api = {
         date: data.date,
         ...(data.slug && { slug: data.slug }),
         ...(description ? { description } : {}),
+        ...(ageRating ? { ageRating } : {}),
       }),
     });
   },

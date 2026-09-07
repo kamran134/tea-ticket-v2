@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { translateApiError } from '../i18n/apiErrors';
-import { formatEventDateTime } from '../i18n/format';
 import { api } from '../services/api';
 import type { Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
@@ -24,6 +23,7 @@ import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
 import { PublicLayout } from './PublicLayout';
 import { FormattedDescription } from './FormattedDescription';
+import { EventPoster } from './EventPoster';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -249,15 +249,27 @@ export function RegisterForm({ slug }: Props) {
   const legacySeatZone = legacySeatZoneId ? zoneById.get(legacySeatZoneId) : undefined;
   const quantityModalZone = quantityModalZoneId ? zoneById.get(quantityModalZoneId) : undefined;
 
+  const zonePrices = zones.filter(z => !isPhantomZone(z)).map(z => z.price);
+  const minPrice = zonePrices.length > 0 ? Math.min(...zonePrices) : null;
+  const maxPrice = zonePrices.length > 0 ? Math.max(...zonePrices) : null;
+  const hasPriceRange = minPrice != null && maxPrice != null && minPrice !== maxPrice;
+
   return (
     <PublicLayout>
       <div className="flex-1 flex items-start justify-center p-4">
       <div className="w-full max-w-md">
         <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold text-emerald-800">🍵 {venue.name}</h1>
-          <p className="text-gray-600 mt-2">{formatEventDateTime(venue.date)}</p>
-          <FormattedDescription html={venue.description ?? ''} className="text-sm text-gray-600 mt-3 text-left" />
+        <div className="mb-6 space-y-4">
+          <EventPoster
+            name={venue.name}
+            date={venue.date}
+            posterImage={venue.posterImage}
+            ageRating={venue.ageRating}
+            currency={currency}
+            minPrice={minPrice}
+            hasPriceRange={hasPriceRange}
+          />
+          <FormattedDescription html={venue.description ?? ''} className="text-sm text-gray-600 text-left" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">

@@ -46,6 +46,7 @@ export interface Venue {
   floorPlanImage: string | null;
   posterImage: string | null;
   description: string | null;
+  ageRating: string | null;
   gridLayout: GridLayout | null;
 }
 

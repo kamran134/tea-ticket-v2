@@ -78,6 +78,7 @@ const az = {
     guestDefaultHint: '«Qonaq 1», «Qonaq 2»... kimi qeyd olunacaq',
     buying: 'Alınır...',
     buy: 'Al',
+    priceFrom: '{{price}}-dən',
     tableTitle: 'Masa {{number}}',
     registerError: 'Qeydiyyat xətası',
     tickets_one: 'bilet',
