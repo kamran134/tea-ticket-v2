@@ -48,7 +48,7 @@ const en = {
     voen: 'TIN (VÖEN)',
     registrationNumber: 'State registration number',
     address: 'Address',
-    companyNameValue: 'StolitsA.rt LLC',
+    companyNameValue: 'Stolic Art LLC',
     voenValue: '1506029461',
     registrationNumberValue: '2201020068194600',
     addressValue: 'AZ 1052, Baku, Narimanov district, Acad. Hasan Aliyev st. 30',

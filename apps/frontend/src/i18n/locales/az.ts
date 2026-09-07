@@ -48,7 +48,7 @@ const az = {
     voen: 'VÖEN',
     registrationNumber: 'Dövlət qeydiyyat nömrəsi',
     address: 'Ünvan',
-    companyNameValue: '«StolitsA.rt» MMC',
+    companyNameValue: '«Stolic Art» MMC',
     voenValue: '1506029461',
     registrationNumberValue: '2201020068194600',
     addressValue: 'AZ 1052, Bakı şəhəri, Nərimanov rayonu, akad. Həsən Əliyev küç. 30',

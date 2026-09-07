@@ -48,7 +48,7 @@ const ru = {
     voen: 'ИНН',
     registrationNumber: 'Государственный регистрационный номер',
     address: 'Адрес',
-    companyNameValue: '«StolitsA.rt» ООО',
+    companyNameValue: '«Stolic Art» ООО',
     voenValue: '1506029461',
     registrationNumberValue: '2201020068194600',
     addressValue: 'AZ 1052, г. Баку, Наримановский р-н, ул. ак. Гасана Алиева 30',

@@ -1,5 +1,7 @@
 Məxfilik siyasəti
 
+Fərdi məlumatların operatoru — «Stolic Art» MMC.
+
 1. Hansı məlumatları toplayırıq
 
 StolitsArt Ticket saytında bilet alarkən bizə daxil olur:
