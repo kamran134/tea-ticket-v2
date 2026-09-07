@@ -14,12 +14,27 @@ const config: ResendInboundConfig = {
   telegramChatId: '-100123',
 };
 
+function createDependencies(
+  overrides: Partial<ResendInboundDependencies> = {},
+): ResendInboundDependencies {
+  return {
+    verifyWebhook: vi.fn().mockReturnValue({
+      type: 'email.received',
+      data: { email_id: 'email_123' },
+    }),
+    persistInboundEmail: vi.fn().mockResolvedValue(undefined),
+    getReceivedEmail: vi.fn(),
+    sendTelegramMessage: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  };
+}
+
 function createTestApp(dependencies: ResendInboundDependencies) {
   const app = express();
   app.post(
     '/api/resend/inbound',
     express.raw({ type: 'application/json' }),
-    createResendInboundWebhookHandler(config, dependencies),
+    createResendInboundWebhookHandler({} as never, config, dependencies),
   );
   return app;
 }
@@ -35,6 +50,18 @@ function webhookRequest(app: ReturnType<typeof createTestApp>, body: object) {
 }
 
 describe('Resend inbound webhook', () => {
+  it('persists the inbound email before optional forwarding', async () => {
+    const persistInboundEmail = vi.fn().mockResolvedValue(undefined);
+    const dependencies = createDependencies({ persistInboundEmail });
+
+    await webhookRequest(createTestApp(dependencies), {
+      type: 'email.received',
+      data: { email_id: 'email_123' },
+    }).expect(200);
+
+    expect(persistInboundEmail).toHaveBeenCalledWith('email_123');
+  });
+
   it('retrieves the received email and forwards its full text to Telegram', async () => {
     const getReceivedEmail = vi.fn().mockResolvedValue({
       from: 'sender@example.com',
@@ -46,14 +73,10 @@ describe('Resend inbound webhook', () => {
       attachments: [{ filename: 'details.pdf' }],
     });
     const sendTelegramMessage = vi.fn().mockResolvedValue(undefined);
-    const dependencies: ResendInboundDependencies = {
-      verifyWebhook: vi.fn().mockReturnValue({
-        type: 'email.received',
-        data: { email_id: 'email_123' },
-      }),
+    const dependencies = createDependencies({
       getReceivedEmail,
       sendTelegramMessage,
-    };
+    });
 
     await webhookRequest(createTestApp(dependencies), {
       type: 'email.received',
@@ -75,7 +98,7 @@ describe('Resend inbound webhook', () => {
 
   it('splits long emails into Telegram-sized messages', async () => {
     const sendTelegramMessage = vi.fn().mockResolvedValue(undefined);
-    const dependencies: ResendInboundDependencies = {
+    const dependencies = createDependencies({
       verifyWebhook: vi.fn().mockReturnValue({
         type: 'email.received',
         data: { email_id: 'email_long' },
@@ -90,7 +113,7 @@ describe('Resend inbound webhook', () => {
         attachments: [],
       }),
       sendTelegramMessage,
-    };
+    });
 
     await webhookRequest(createTestApp(dependencies), {
       type: 'email.received',
@@ -103,23 +126,76 @@ describe('Resend inbound webhook', () => {
     }
   });
 
-  it('ignores webhook events other than email.received', async () => {
+  it('returns 200 without calling Telegram when credentials are missing', async () => {
+    const noTelegramConfig: ResendInboundConfig = {
+      apiKey: '',
+      webhookSecret: 'whsec_test',
+      telegramBotToken: '',
+      telegramChatId: '',
+    };
     const getReceivedEmail = vi.fn();
     const sendTelegramMessage = vi.fn();
-    const dependencies: ResendInboundDependencies = {
+    const dependencies = createDependencies({
+      getReceivedEmail,
+      sendTelegramMessage,
+    });
+    const app = express();
+    app.post(
+      '/api/resend/inbound',
+      express.raw({ type: 'application/json' }),
+      createResendInboundWebhookHandler({} as never, noTelegramConfig, dependencies),
+    );
+
+    await webhookRequest(app, {
+      type: 'email.received',
+      data: { email_id: 'email_no_tg' },
+    }).expect(200);
+
+    expect(getReceivedEmail).not.toHaveBeenCalled();
+    expect(sendTelegramMessage).not.toHaveBeenCalled();
+  });
+
+  it('returns 200 when Telegram forwarding fails', async () => {
+    const sendTelegramMessage = vi.fn().mockRejectedValue(new Error('Telegram down'));
+    const dependencies = createDependencies({
+      getReceivedEmail: vi.fn().mockResolvedValue({
+        from: 'sender@example.com',
+        to: ['inbox@example.com'],
+        subject: 'Tea ceremony',
+        text: 'Body',
+        html: null,
+        headers: null,
+        attachments: [],
+      }),
+      sendTelegramMessage,
+    });
+
+    await webhookRequest(createTestApp(dependencies), {
+      type: 'email.received',
+      data: { email_id: 'email_tg_fail' },
+    }).expect(200);
+  });
+
+  it('ignores webhook events other than email.received', async () => {
+    const persistInboundEmail = vi.fn();
+    const getReceivedEmail = vi.fn();
+    const sendTelegramMessage = vi.fn();
+    const dependencies = createDependencies({
       verifyWebhook: vi.fn().mockReturnValue({
         type: 'email.delivered',
         data: { email_id: 'email_sent' },
       }),
+      persistInboundEmail,
       getReceivedEmail,
       sendTelegramMessage,
-    };
+    });
 
     await webhookRequest(createTestApp(dependencies), {
       type: 'email.delivered',
       data: { email_id: 'email_sent' },
     }).expect(200);
 
+    expect(persistInboundEmail).not.toHaveBeenCalled();
     expect(getReceivedEmail).not.toHaveBeenCalled();
     expect(sendTelegramMessage).not.toHaveBeenCalled();
   });

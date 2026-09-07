@@ -1,3 +1,4 @@
+import { Prisma, PrismaClient } from '@prisma/client';
 import { Request, Response } from 'express';
 import { Resend } from 'resend';
 
@@ -32,6 +33,7 @@ export interface ResendInboundDependencies {
     payload: string,
     headers: { id: string; timestamp: string; signature: string },
   ): ResendInboundEvent;
+  persistInboundEmail(emailId: string): Promise<void>;
   getReceivedEmail(emailId: string): Promise<ReceivedEmail>;
   sendTelegramMessage(text: string): Promise<void>;
 }
@@ -80,8 +82,32 @@ function formatInboundEmail(email: ReceivedEmail): string {
   return lines.join('\n');
 }
 
+function isTelegramForwardingEnabled(config: ResendInboundConfig): boolean {
+  return Boolean(config.apiKey && config.telegramBotToken && config.telegramChatId);
+}
+
+async function persistInboundEmail(
+  prisma: PrismaClient,
+  providerEmailId: string,
+): Promise<void> {
+  try {
+    await prisma.inboundEmail.create({
+      data: { providerEmailId, isRead: false },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError
+      && error.code === 'P2002'
+    ) {
+      return;
+    }
+    throw error;
+  }
+}
+
 function createDefaultDependencies(
   config: ResendInboundConfig,
+  prisma: PrismaClient,
 ): ResendInboundDependencies {
   const resend = new Resend(config.apiKey || 're_inbound_not_configured');
 
@@ -92,6 +118,10 @@ function createDefaultDependencies(
         headers,
         webhookSecret: config.webhookSecret,
       }) as ResendInboundEvent;
+    },
+
+    async persistInboundEmail(emailId) {
+      await persistInboundEmail(prisma, emailId);
     },
 
     async getReceivedEmail(emailId) {
@@ -135,10 +165,11 @@ function createDefaultDependencies(
 }
 
 export function createResendInboundWebhookHandler(
+  prisma: PrismaClient,
   config: ResendInboundConfig = loadResendInboundConfig(),
   dependencies?: ResendInboundDependencies,
 ) {
-  const deps = dependencies ?? createDefaultDependencies(config);
+  const deps = dependencies ?? createDefaultDependencies(config, prisma);
 
   return async (req: Request, res: Response): Promise<void> => {
     const rawBody = req.body as Buffer;
@@ -185,28 +216,33 @@ export function createResendInboundWebhookHandler(
       return;
     }
 
-    if (!config.apiKey || !config.telegramBotToken || !config.telegramChatId) {
-      console.error('[resend-inbound] Resend or Telegram credentials are not configured');
-      res.status(500).json({ success: false, error: 'Inbound forwarding not configured' });
+    try {
+      await deps.persistInboundEmail(emailId);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : 'unknown error';
+      console.error(`[resend-inbound] failed to persist emailId=${emailId}: ${reason}`);
+      res.status(500).json({ success: false, error: 'Failed to record inbound email' });
       return;
     }
 
-    try {
-      const email = await deps.getReceivedEmail(emailId);
-      const messages = splitTelegramMessage(formatInboundEmail(email));
+    if (isTelegramForwardingEnabled(config)) {
+      try {
+        const email = await deps.getReceivedEmail(emailId);
+        const messages = splitTelegramMessage(formatInboundEmail(email));
 
-      for (const message of messages) {
-        await deps.sendTelegramMessage(message);
+        for (const message of messages) {
+          await deps.sendTelegramMessage(message);
+        }
+
+        console.log(
+          `[resend-inbound] forwarded emailId=${emailId} messages=${messages.length}`,
+        );
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'unknown error';
+        console.error(`[resend-inbound] forwarding failed emailId=${emailId}: ${reason}`);
       }
-
-      console.log(
-        `[resend-inbound] forwarded emailId=${emailId} messages=${messages.length}`,
-      );
-      res.status(200).json({ success: true });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : 'unknown error';
-      console.error(`[resend-inbound] forwarding failed emailId=${emailId}: ${reason}`);
-      res.status(502).json({ success: false, error: 'Failed to forward inbound email' });
     }
+
+    res.status(200).json({ success: true });
   };
 }

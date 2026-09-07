@@ -16,6 +16,7 @@ import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
 import { AuditTab } from './admin/AuditTab';
 import { ChangePasswordDialog } from './admin/ChangePasswordDialog';
+import { InboundEmailBadge } from './InboundEmailBadge';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
@@ -431,6 +432,7 @@ export function ManagePanel() {
             )}
           </div>
           <div className="flex items-center gap-3">
+            <InboundEmailBadge authenticated={authenticated} />
             <ThemeToggle />
             {canCheckin && (
               <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">

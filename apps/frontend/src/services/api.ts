@@ -473,4 +473,15 @@ export const api = {
       headers: authHeaders(),
     });
   },
+
+  async getInboundEmailUnreadCount(): Promise<{ unreadCount: number }> {
+    return request('/api/inbound-emails/unread-count', { headers: authHeaders() });
+  },
+
+  async markAllInboundEmailsRead(): Promise<{ markedCount: number }> {
+    return request('/api/inbound-emails/mark-all-read', {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+  },
 };

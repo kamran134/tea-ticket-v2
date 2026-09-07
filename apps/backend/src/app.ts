@@ -16,6 +16,7 @@ import { paymentsRouter } from './routes/payments';
 import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { createResendInboundWebhookHandler } from './routes/resend-inbound';
+import { inboundEmailsRouter } from './routes/inbound-emails';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { testRouter } from './routes/test';
 import { isTestMode } from './errors';
@@ -89,7 +90,7 @@ export function createApp(options?: {
   app.post(
     '/api/resend/inbound',
     express.raw({ type: 'application/json', limit: '1mb' }),
-    createResendInboundWebhookHandler(),
+    createResendInboundWebhookHandler(prisma),
   );
 
   app.use(express.json({ limit: '10mb' }));
@@ -109,6 +110,7 @@ export function createApp(options?: {
   app.use('/api/roles', rolesRouter);
   app.use('/api/permissions', permissionsRouter);
   app.use('/api/audit-log', auditLogRouter);
+  app.use('/api/inbound-emails', inboundEmailsRouter);
   app.use('/api/tickets', ticketsRouter);
   app.use('/api/venues', venuesRouter);
   app.use('/api/zones', zonesRouter);

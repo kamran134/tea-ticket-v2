@@ -5,6 +5,7 @@ import type { PublicTicket } from '../types';
 import { ThemeToggle } from './ThemeToggle';
 import { useAdminAuth } from '../lib/adminAuth';
 import { AdminLoginGate, NoAccess } from './AdminLoginGate';
+import { InboundEmailBadge } from './InboundEmailBadge';
 
 export function AdminScanner() {
   const auth = useAdminAuth();
@@ -158,6 +159,10 @@ export function AdminScanner() {
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">QR Сканер</h1>
           <div className="flex items-center gap-2">
+            <InboundEmailBadge
+              authenticated={auth.state === 'authenticated'}
+              variant="dark"
+            />
             {/* Mirrors the Сканер link in ManagePanel — the scanner was a dead end. */}
             <a href="/manage.html" className="text-sm text-gray-400 hover:text-white transition-colors">
               Управление

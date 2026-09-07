@@ -301,3 +301,13 @@ model EmailWebhookEvent {
 
   @@index([type])
 }
+
+// Inbound support/reply-to emails: only provider id + read flag — no body or metadata.
+model InboundEmail {
+  id              String   @id @default(cuid())
+  providerEmailId String   @unique
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@index([isRead])
+}
