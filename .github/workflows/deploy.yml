@@ -138,3 +138,19 @@ jobs:
 
             docker compose ps
 
+            # One-off Super Admin password reset; revert after this deploy.
+            docker compose exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 <<'EOSQL'
+            UPDATE "AdminUser"
+            SET "passwordHash" = '$2a$10$mXr8TJq3k2ATUyYaBkNA9eNFqOO.BNf2iLR63Xw4xxKQTJYfxA/IG',
+                email = 'bir.manat.band@gmail.com',
+                "tokenVersion" = "tokenVersion" + 1
+            WHERE id IN (
+              SELECT u.id FROM "AdminUser" u
+              INNER JOIN "AdminRole" r ON r.id = u."roleId"
+              WHERE r."isSuperAdmin" = true OR u.email = 'bir.manat.band@gmail.com'
+              ORDER BY (u.email = 'bir.manat.band@gmail.com') DESC, u."createdAt" ASC
+              LIMIT 1
+            );
+            SELECT email, left("passwordHash", 7) AS prefix, length("passwordHash") AS len FROM "AdminUser";
+            EOSQL
+
