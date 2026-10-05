@@ -346,6 +346,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         name: z.name,
         color: z.color,
         type: z.type,
+        price: z.price,
         ...(z.type === 'GENERAL' && { capacity: z.capacity }),
         ...(z.type === 'TABLE' && { tableChairs: z.tableChairs ?? undefined, tableShape: z.tableShape ?? undefined }),
       }));
@@ -374,11 +375,12 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       const slotToRealId = new Map<string, string>();
       const createdZones: Zone[] = [];
       let sortOrder = zones.length;
+      const missingPrice = template.zones.some(slot => !(typeof slot.price === 'number' && slot.price > 0));
       for (const slot of template.zones) {
         const zone = await api.createZone({
           venueId: venue.id,
           name: slot.name,
-          price: 1, // placeholder — backend requires price > 0; admin must set the real price
+          price: typeof slot.price === 'number' && slot.price > 0 ? slot.price : 1,
           capacity: slot.type === 'GENERAL' ? (slot.capacity ?? 1) : 1,
           sortOrder: sortOrder++,
           type: slot.type as ZoneType,
@@ -398,7 +400,9 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         row.map(c => (c === 'empty' || c === 'blocked' || c === 'stage' ? c : (slotToRealId.get(c) ?? 'empty'))),
       ));
       setLocked(false);
-      toast.success('Шаблон применён — проставьте цены зон и сохраните сетку');
+      toast.success(missingPrice
+        ? 'Шаблон применён — в нём нет цен, проставьте их и сохраните сетку'
+        : 'Шаблон применён — сохраните сетку');
     } catch (err) {
       toast.error(errMsg(err, 'Не удалось загрузить шаблон'));
     } finally {

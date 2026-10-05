@@ -11,6 +11,7 @@ const templateZoneSchema = z.object({
   name: z.string().min(1).max(200),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   type: z.enum(['GENERAL', 'SEATED', 'TABLE']),
+  price: z.number().positive(),
   capacity: z.number().int().positive().optional(),
   tableChairs: z.number().int().positive().optional(),
   tableShape: z.enum(['ROUND', 'RECT', 'SOFA']).optional(),

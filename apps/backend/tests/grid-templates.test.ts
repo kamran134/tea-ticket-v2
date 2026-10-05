@@ -40,9 +40,9 @@ describe('Grid templates', () => {
         ['slot-table', 'slot-table', 'slot-table', 'slot-table', 'empty', 'slot-general'],
       ],
       zones: [
-        { slotId: 'slot-seated', name: 'Seats', color: '#059669', type: 'SEATED' },
-        { slotId: 'slot-general', name: 'Standing', color: '#2563eb', type: 'GENERAL', capacity: 20 },
-        { slotId: 'slot-table', name: 'Tables', color: '#d97706', type: 'TABLE', tableChairs: 8, tableShape: 'ROUND' },
+        { slotId: 'slot-seated', name: 'Seats', color: '#059669', type: 'SEATED', price: 25 },
+        { slotId: 'slot-general', name: 'Standing', color: '#2563eb', type: 'GENERAL', capacity: 20, price: 15 },
+        { slotId: 'slot-table', name: 'Tables', color: '#d97706', type: 'TABLE', tableChairs: 8, tableShape: 'ROUND', price: 40 },
       ],
     };
 
@@ -63,6 +63,9 @@ describe('Grid templates', () => {
     expect(tableSlot.type).toBe('TABLE');
     expect(tableSlot.tableChairs).toBe(8);
     expect(tableSlot.tableShape).toBe('ROUND');
+    expect(tableSlot.price).toBe(40);
+    const seatedSlot = loaded.body.data.zones.find((z: { slotId: string }) => z.slotId === 'slot-seated');
+    expect(seatedSlot.price).toBe(25);
     expect(loaded.body.data.cells.flat().includes('stage')).toBe(true);
   });
 
@@ -75,7 +78,7 @@ describe('Grid templates', () => {
         rows: 1,
         cols: 1,
         cells: [['slot-t']],
-        zones: [{ slotId: 'slot-t', name: 'T', color: '#000000', type: 'TABLE', tableShape: 'ROUND' }],
+        zones: [{ slotId: 'slot-t', name: 'T', color: '#000000', type: 'TABLE', tableShape: 'ROUND', price: 10 }],
       });
     expect(res.status).toBe(400);
   });

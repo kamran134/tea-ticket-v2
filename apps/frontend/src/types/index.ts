@@ -17,6 +17,8 @@ export interface GridTemplateZoneSlot {
   name: string;
   color: string | null;
   type: ZoneType;
+  /** Omitted only on templates saved before prices were stored. */
+  price?: number;
   capacity?: number;
   tableChairs?: number;
   tableShape?: TableShape;
