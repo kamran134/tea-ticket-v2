@@ -2,10 +2,10 @@
 export const WHATSAPP_URL = '';
 export const PHONE_DISPLAY = '';
 export const PHONE_HREF = '';
-export const EMAIL = 'support@tea-ticket.com';
+export const EMAIL = 'support@stolits.art';
 export const INSTAGRAM = '';
 export const TIKTOK = '';
-export const SITE_URL = 'https://tea-ticket.com';
+export const SITE_URL = 'https://stolits.art';
 
 export function ridersUrl(lang: string): string {
   return `${SITE_URL}/${lang}/technical-rider`;

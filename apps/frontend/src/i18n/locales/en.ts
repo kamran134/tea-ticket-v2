@@ -35,7 +35,7 @@ const en = {
     tagline: 'Premium Baku cover band for corporate events, weddings and festivals.',
     contactTitle: 'Contacts',
     riders: 'Riders',
-    rights: 'BIR MANAT BAND',
+    rights: 'ООО «Stolic Art»',
     legal: 'All rights reserved.',
     documents: 'Documents',
   },
@@ -55,7 +55,7 @@ const en = {
     unavailable: 'This document is not available in the selected language. Showing another language version.',
   },
   afisha: {
-    title: 'StolitsArt Ticket',
+    title: 'Organization of cultural events in Baku and Azerbaijan',
     subtitle: 'Upcoming events',
     empty: 'No upcoming events yet',
   },

@@ -35,7 +35,7 @@ const az = {
     tagline: 'Korporativ tədbirlər, toy və festivallar üçün Bakının premium kover qrupu.',
     contactTitle: 'Əlaqə',
     riders: 'Riderlər',
-    rights: 'BIR MANAT BAND',
+    rights: 'ООО «Stolic Art»',
     legal: 'Bütün hüquqlar qorunur.',
     documents: 'Sənədlər',
   },
@@ -55,7 +55,7 @@ const az = {
     unavailable: 'Bu sənədin seçilmiş dildə tərcüməsi yoxdur. Başqa dildəki versiya göstərilir.',
   },
   afisha: {
-    title: 'StolitsArt Ticket',
+    title: 'Bakıda və Azərbaycanda mədəni tədbirlərin təşkili',
     subtitle: 'Yaxınlaşan tədbirlər',
     empty: 'Hələlik yaxınlaşan tədbir yoxdur',
   },

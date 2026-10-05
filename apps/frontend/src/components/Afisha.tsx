@@ -23,7 +23,7 @@ export function Afisha() {
       <div className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
-            <h1 className="inline-flex items-center justify-center gap-3 text-3xl font-bold text-emerald-800">
+            <h1 className="inline-flex items-center justify-center gap-3 text-xl sm:text-2xl font-bold text-emerald-800">
               <TicketMark className="h-8 w-8 shrink-0" />
               {t('afisha.title')}
             </h1>

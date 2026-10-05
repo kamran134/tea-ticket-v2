@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import brandLogo from '../assets/brand-logo.svg';
+import brandLogo from '../assets/brand-logo.png';
 import { changeLanguage } from '../i18n';
 import { LANGS, type Lang } from '../i18n/types';
 import { SITE_URL } from '../lib/site';
@@ -38,10 +38,10 @@ export function Header() {
         <a href={SITE_URL} target="_blank" rel="noreferrer" className="group block shrink-0 min-w-0">
           <img
             src={brandLogo}
-            alt="BIR MANAT BAND"
-            width={1419}
-            height={556}
-            className="h-9 sm:h-11 lg:h-[3.15rem] w-auto max-w-[min(42vw,11rem)] sm:max-w-none transition-opacity group-hover:opacity-80"
+            alt="StolitsA.rt"
+            width={240}
+            height={43}
+            className="h-auto w-[min(46vw,8.5rem)] sm:w-[10.5rem] lg:w-[11.5rem] transition-opacity group-hover:opacity-80"
           />
         </a>
 

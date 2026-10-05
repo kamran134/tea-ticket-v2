@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import brandLogo from '../assets/brand-logo.svg';
+import brandLogo from '../assets/brand-logo.png';
 import { LEGAL_PAGES } from '../legal/pages';
 import {
   WHATSAPP_URL,
@@ -22,10 +22,10 @@ export function Footer() {
           <a href={SITE_URL} target="_blank" rel="noreferrer">
             <img
               src={brandLogo}
-              alt="BIR MANAT BAND"
-              width={1419}
-              height={556}
-              className="h-[4.6rem] w-auto"
+              alt="StolitsA.rt"
+              width={240}
+              height={43}
+              className="h-auto w-[9.5rem] sm:w-[11rem]"
             />
           </a>
           <div className="mt-6 flex flex-col items-start gap-3">
@@ -104,7 +104,7 @@ export function Footer() {
       <div className="border-t border-[var(--footer-border)]">
         <div className="site-container py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-[12px] tracking-[0.18em] uppercase text-[var(--footer-muted)]">
           <p>
-            © {year} {t('footer.rights')}. {t('footer.legal')}
+            © {year} <span className="normal-case">{t('footer.rights')}</span>. {t('footer.legal')}
           </p>
           <p>Baku · AZ</p>
         </div>
