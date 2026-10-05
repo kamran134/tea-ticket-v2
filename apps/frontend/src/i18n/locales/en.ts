@@ -58,6 +58,9 @@ const en = {
     title: 'Organization of cultural events in Baku and Azerbaijan',
     subtitle: 'Upcoming events',
     empty: 'No upcoming events yet',
+    share: 'Share',
+    copyLink: 'Copy link',
+    linkCopied: 'Link copied',
   },
   register: {
     notFoundTitle: 'Event not found',

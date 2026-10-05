@@ -58,6 +58,9 @@ const az = {
     title: 'Bakıda və Azərbaycanda mədəni tədbirlərin təşkili',
     subtitle: 'Yaxınlaşan tədbirlər',
     empty: 'Hələlik yaxınlaşan tədbir yoxdur',
+    share: 'Paylaş',
+    copyLink: 'Linki kopyala',
+    linkCopied: 'Link kopyalandı',
   },
   register: {
     notFoundTitle: 'Tədbir tapılmadı',
