@@ -67,7 +67,9 @@ describe('about copy', () => {
       const copy = ABOUT_COPY[lang];
       expect(copy.intro.join(' ')).toContain('StolitsArt');
       expect(copy.activities).toHaveLength(4);
+      expect(copy.partners).toContain('Bir Manat Band');
       expect(copy.closing.join(' ')).toContain('StolitsArt Ticket');
+      expect(copy.legalTitle.length).toBeGreaterThan(0);
     }
   });
 });

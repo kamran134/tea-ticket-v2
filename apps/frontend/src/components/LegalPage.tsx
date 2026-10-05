@@ -86,20 +86,37 @@ function AboutContent({ lang }: { lang: Lang }) {
             </li>
           ))}
         </ol>
+        <p className="mt-6">{copy.partners}</p>
       </div>
       <div className="space-y-4">
         {copy.closing.map(paragraph => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
-      <dl className="space-y-6">
-        {ABOUT_FIELDS.map(field => (
-          <div key={field.labelKey}>
-            <dt className="text-sm text-gray-500">{t(field.labelKey)}</dt>
-            <dd className="mt-1 text-gray-800">{t(field.valueKey)}</dd>
-          </div>
-        ))}
-      </dl>
+      <div>
+        <p>{copy.cooperationTitle}</p>
+        <p className="mt-1">
+          <a href="mailto:support@stolits.art" className="text-emerald-700 hover:underline">
+            support@stolits.art
+          </a>
+        </p>
+        <p>
+          <a href="tel:+994557019229" className="text-emerald-700 hover:underline">
+            +994 55 701 92 29
+          </a>
+        </p>
+      </div>
+      <div className="border-t border-gray-200 pt-8">
+        <p className="font-semibold text-gray-800">{copy.legalTitle}</p>
+        <dl className="mt-6 space-y-6">
+          {ABOUT_FIELDS.map(field => (
+            <div key={field.labelKey}>
+              <dt className="text-sm text-gray-500">{t(field.labelKey)}</dt>
+              <dd className="mt-1 text-gray-800">{t(field.valueKey)}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }
