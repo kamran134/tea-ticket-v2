@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { translateApiError } from '../i18n/apiErrors';
 import { api } from '../services/api';
-import type { Venue, Zone, Seat, ZoneTable } from '../types';
+import type { PromoQuote, Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
 import {
   cartCount as countCart,
@@ -18,6 +18,7 @@ import {
 import { SeatPicker } from './SeatPicker';
 import { TablePicker } from './TablePicker';
 import { VenueGridMap } from './VenueGridMap';
+import { PromoCodeField } from './PromoCodeField';
 import { QuantityModal } from './QuantityModal';
 import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
@@ -25,6 +26,7 @@ import { PublicLayout } from './PublicLayout';
 import { FormattedDescription } from './FormattedDescription';
 import { localizedVenueDescription } from '../lib/venueDescription';
 import { EventPoster } from './EventPoster';
+import { SupportContact } from './SupportContact';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -57,6 +59,12 @@ export function RegisterForm({ slug }: Props) {
   const [quantityModalTable, setQuantityModalTable] = useState<{ zone: Zone; table: ZoneTable } | null>(null);
   const [gridMapOpen, setGridMapOpen] = useState(false);
   const [gridCartSnapshot, setGridCartSnapshot] = useState<CartLine[] | null>(null);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedCode, setAppliedCode] = useState<string | null>(null);
+  const [quote, setQuote] = useState<PromoQuote | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [quoteNonce, setQuoteNonce] = useState(0);
 
   useEffect(() => {
     document.title = t('titles.register');
@@ -110,6 +118,56 @@ export function RegisterForm({ slug }: Props) {
   }
   const cartCount = countCart(cart);
   const cartTotal = sumCart(cart);
+  const checkoutItems = useMemo(() => toCheckoutItems(cart), [cart]);
+  const payable = quote?.total ?? cartTotal;
+
+  const applyPromo = () => {
+    const code = promoInput.trim();
+    if (!code) return;
+    setAppliedCode(code);
+    setQuoteNonce(n => n + 1);
+  };
+
+  const clearPromo = () => {
+    setAppliedCode(null);
+    setQuote(null);
+    setPromoInput('');
+    setPromoError('');
+  };
+
+  useEffect(() => {
+    if (!appliedCode) return;
+    if (!venue || cart.length === 0) {
+      setQuote(null);
+      setPromoLoading(false);
+      if (cart.length === 0) {
+        setAppliedCode(null);
+        setPromoError('');
+      }
+      return;
+    }
+    const venueId = venue.id;
+    let cancelled = false;
+    setQuote(null);
+    setPromoLoading(true);
+    setPromoError('');
+    api.quotePromo({ venueId, code: appliedCode, items: checkoutItems })
+      .then(next => {
+        if (cancelled) return;
+        setQuote(next);
+        setPromoInput(next.code);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setQuote(null);
+        setAppliedCode(null);
+        setPromoError(translateApiError(err, 'register.promoInvalid'));
+      })
+      .finally(() => {
+        if (!cancelled) setPromoLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [appliedCode, cart.length, checkoutItems, quoteNonce, venue]);
   const gridCartCount = cart.filter(l => gridZoneIds.has(l.zoneId)).reduce((s, l) => s + l.quantity, 0);
 
   useEffect(() => {
@@ -195,7 +253,8 @@ export function RegisterForm({ slug }: Props) {
           const nextCart = pruneOccupiedSeats(cart, occupied);
           if (nextCart.length !== cart.length) {
             setCart(nextCart);
-            setError(t('errors.seatAlreadyBooked'));
+            const removed = cart.length - nextCart.length;
+            setError(t(removed > 1 ? 'errors.seatsAlreadyBooked' : 'errors.seatAlreadyBooked'));
             setLoading(false);
             return;
           }
@@ -203,13 +262,19 @@ export function RegisterForm({ slug }: Props) {
           // Backend still re-checks availability; continue with local cart.
         }
       }
+      const guestNames = namedGuests
+        ? guestNameInputs.map(g => g.trim())
+        : Array.from({ length: Math.max(0, cartCount - 1) }, (_, i) =>
+            t('register.guestPlaceholder', { number: i + 1 }),
+          );
       const result = await api.register({
         name: name.trim(),
         phone: (phone ?? '').trim(),
         email: email.trim(),
         venueId: venue.id,
         items,
-        ...(namedGuests && { guestNames: guestNameInputs.map(g => g.trim()) }),
+        ...(guestNames.length > 0 && { guestNames }),
+        ...(quote && appliedCode ? { promoCode: quote.code } : {}),
       });
       window.location.href = `/ticket?id=${result.id}&new=1`;
     } catch (err: unknown) {
@@ -227,6 +292,7 @@ export function RegisterForm({ slug }: Props) {
             <div className="text-4xl mb-2">🔍</div>
             <h1 className="text-xl font-semibold text-gray-700">{t('register.notFoundTitle')}</h1>
             <p className="text-gray-500 mt-1">{t('register.notFoundHint')}</p>
+            <SupportContact className="mt-4" />
             <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
           </div>
         </div>
@@ -237,8 +303,9 @@ export function RegisterForm({ slug }: Props) {
   if (!venue) {
     return (
       <PublicLayout>
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          {t('common.loading')}
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-4 text-center text-gray-400">
+          <p>{t('common.loading')}</p>
+          <SupportContact />
         </div>
       </PublicLayout>
     );
@@ -278,6 +345,7 @@ export function RegisterForm({ slug }: Props) {
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{error}</div>
           )}
+          <SupportContact className="mb-4" />
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {hasGridZones && (
@@ -317,6 +385,15 @@ export function RegisterForm({ slug }: Props) {
                 onClose={closeGridMap}
                 onCancel={cancelGridSelection}
                 quantityModalOpen={!!quantityModalZoneId || !!quantityModalTable}
+                promoInput={promoInput}
+                appliedCode={appliedCode}
+                promoShownCode={quote?.code ?? appliedCode}
+                promoError={promoError}
+                promoLoading={promoLoading}
+                onPromoChange={value => setPromoInput(value)}
+                onPromoApply={applyPromo}
+                onPromoClear={clearPromo}
+                quote={quote}
               />
             )}
 
@@ -462,9 +539,23 @@ export function RegisterForm({ slug }: Props) {
                     );
                   })}
                 </div>
-                <div data-testid="cart-total" className="flex justify-between items-center border-t border-gray-200 pt-2 font-semibold text-gray-800 text-sm">
-                  <span>{ticketsLabel(cartCount)}</span>
-                  <span>{formatPrice(cartTotal, currency)}</span>
+                <div data-testid="cart-total" className="border-t border-gray-200 pt-2 space-y-1 text-sm">
+                  {quote && (
+                    <>
+                      <div className="flex justify-between text-gray-500">
+                        <span>{t('register.promoSubtotal')}</span>
+                        <span>{formatPrice(quote.subtotal, currency)}</span>
+                      </div>
+                      <div data-testid="cart-discount" className="flex justify-between text-emerald-700">
+                        <span>{t('register.promoDiscount', { code: quote.code })}</span>
+                        <span>−{formatPrice(quote.discount, currency)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between items-center font-semibold text-gray-800">
+                    <span>{ticketsLabel(cartCount)}</span>
+                    <span>{formatPrice(payable, currency)}</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -511,6 +602,9 @@ export function RegisterForm({ slug }: Props) {
                 onChange={e => setEmail(e.target.value)}
                 required
               />
+              {!!email.trim() && !EMAIL_RE.test(email.trim()) && (
+                <p className="text-xs text-red-500 mt-1">{t('register.emailInvalid')}</p>
+              )}
             </div>
 
             {cartCount > 1 && (
@@ -547,12 +641,41 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             {cartTotal > 0 && (
-              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl">
+              <PromoCodeField
+                id="promo-code"
+                testId="promo-code"
+                applyTestId="promo-apply"
+                tone="form"
+                input={promoInput}
+                appliedCode={appliedCode}
+                shownCode={quote?.code ?? appliedCode}
+                loading={promoLoading}
+                error={promoError}
+                onChange={setPromoInput}
+                onApply={applyPromo}
+                onClear={clearPromo}
+              />
+            )}
+
+            {cartTotal > 0 && (
+              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+                {quote && (
+                  <>
+                    <div className="flex justify-between text-sm text-emerald-700">
+                      <span>{t('register.promoSubtotal')}</span>
+                      <span>{formatPrice(quote.subtotal, currency)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm text-emerald-700">
+                      <span>{t('register.promoDiscount', { code: quote.code })}</span>
+                      <span>−{formatPrice(quote.discount, currency)}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-emerald-700">
                     {ticketsLabel(cartCount)}
                   </span>
-                  <span className="text-2xl font-bold text-emerald-800">{formatPrice(cartTotal, currency)}</span>
+                  <span className="text-2xl font-bold text-emerald-800">{formatPrice(payable, currency)}</span>
                 </div>
               </div>
             )}
@@ -560,7 +683,7 @@ export function RegisterForm({ slug }: Props) {
             <button
               type="submit"
               data-testid="register-submit"
-              disabled={loading || !canSubmit}
+              disabled={loading || promoLoading || !canSubmit}
               className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
             >
               <span data-testid="cart-checkout">

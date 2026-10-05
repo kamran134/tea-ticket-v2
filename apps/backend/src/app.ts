@@ -12,6 +12,7 @@ import { ticketsRouter, setTicketsEmailProcessor } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
 import { zonesRouter } from './routes/zones';
 import { gridTemplatesRouter } from './routes/grid-templates';
+import { promoCodesRouter } from './routes/promo-codes';
 import { paymentsRouter } from './routes/payments';
 import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
@@ -118,6 +119,7 @@ export function createApp(options?: {
   app.use('/api/venues', venuesRouter);
   app.use('/api/zones', zonesRouter);
   app.use('/api/grid-templates', gridTemplatesRouter);
+  app.use('/api/promo-codes', promoCodesRouter);
   app.use('/api/payments', paymentsRouter(paymentService));
 
   // /api/test seeds and wipes data, so it is gated twice: the router itself 404s unless

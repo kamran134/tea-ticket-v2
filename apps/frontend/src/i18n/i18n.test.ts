@@ -3,6 +3,34 @@ import i18n, { changeLanguage } from './index';
 import { LANG_STORAGE_KEY, DEFAULT_LANG } from './types';
 import { formatEventDate, formatPrice } from './format';
 import { translateApiError } from './apiErrors';
+import { ApiError } from '../services/api';
+import ru from './locales/ru';
+import en from './locales/en';
+import az from './locales/az';
+
+function flatKeys(value: unknown, prefix = ''): string[] {
+  if (!value || typeof value !== 'object') return [prefix];
+  return Object.entries(value as Record<string, unknown>).flatMap(([key, child]) => {
+    const path = prefix ? `${prefix}.${key}` : key;
+    return flatKeys(child, path);
+  });
+}
+
+function withoutPluralSuffix(key: string): string {
+  return key.replace(/_(one|few|many|other)$/, '');
+}
+
+describe('locale parity', () => {
+  it('keeps the same phrases in Russian, English and Azerbaijani', () => {
+    const ruKeys = new Set(flatKeys(ru).map(withoutPluralSuffix));
+    const enKeys = new Set(flatKeys(en).map(withoutPluralSuffix));
+    const azKeys = new Set(flatKeys(az).map(withoutPluralSuffix));
+    expect([...enKeys].filter(key => !ruKeys.has(key))).toEqual([]);
+    expect([...ruKeys].filter(key => !enKeys.has(key))).toEqual([]);
+    expect([...azKeys].filter(key => !ruKeys.has(key))).toEqual([]);
+    expect([...ruKeys].filter(key => !azKeys.has(key))).toEqual([]);
+  });
+});
 
 describe('i18n initialization', () => {
   const storage = new Map<string, string>();
@@ -88,5 +116,32 @@ describe('translateApiError', () => {
     expect(translateApiError('Something weird', 'register.registerError')).toBe(
       'Ошибка при регистрации',
     );
+  });
+
+  it('maps buyer error codes to the situation that caused them', () => {
+    expect(translateApiError(new ApiError('INVALID_QUANTITY', 'Cannot register more than 50 tickets in one order'))).toBe(
+      'Проверьте количество билетов: от 1 до 50 за один заказ.',
+    );
+    expect(translateApiError(new ApiError('ZONE_CAPACITY_EXCEEDED', 'Not enough seats available in zone "Hall"'))).toBe(
+      'В этой зоне не хватает свободных мест.',
+    );
+    expect(translateApiError(new ApiError('SEAT_NOT_FOUND', 'One or more seats not found'))).toBe(
+      'Выбранное место больше недоступно. Выберите другое.',
+    );
+  });
+
+  it('prefers a known payment message over a generic validation code', () => {
+    expect(translateApiError(new ApiError('VALIDATION_ERROR', 'Ticket is not available for payment'))).toBe(
+      'Билет недоступен для оплаты.',
+    );
+    expect(translateApiError(new ApiError('INTERNAL_ERROR', 'Booking has expired'))).toBe(
+      'Время брони истекло. Оформите новую бронь на афише.',
+    );
+  });
+
+  it('pluralizes available seats', () => {
+    expect(i18n.t('register.seatsCount', { count: 1 })).toBe('1 место');
+    expect(i18n.t('register.seatsCount', { count: 2 })).toBe('2 места');
+    expect(i18n.t('register.seatsCount', { count: 5 })).toBe('5 мест');
   });
 });

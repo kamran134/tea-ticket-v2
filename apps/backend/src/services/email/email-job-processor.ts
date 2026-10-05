@@ -110,6 +110,7 @@ export function createEmailJobProcessor(
         .map(t => String(t.seat!.number));
       const table = tickets.find(t => t.table)?.table ?? null;
       const totalAmount = tickets.reduce((sum, t) => sum + t.price, 0);
+      const promoCode = tickets.find(t => t.promoCode)?.promoCode ?? null;
 
       const rendered = renderTicketConfirmedEmail({
         checkoutId: job.checkoutId,
@@ -123,6 +124,7 @@ export function createEmailJobProcessor(
         ticketCount: tickets.length,
         totalAmount,
         currency: tickets[0].venue.currency,
+        promoCode,
         supportEmail: config.replyTo,
       });
 

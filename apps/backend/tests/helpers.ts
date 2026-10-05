@@ -59,6 +59,7 @@ export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.paymentWebhookEvent.deleteMany();
   await prisma.payment.deleteMany();
   await prisma.ticket.deleteMany();
+  await prisma.promoCode.deleteMany();
   await prisma.seat.deleteMany();
   await prisma.zoneTable.deleteMany();
   await prisma.zone.deleteMany();

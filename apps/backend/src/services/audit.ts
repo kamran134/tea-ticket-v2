@@ -24,6 +24,9 @@ export const AuditActions = {
 
   VENUE_CREATE: 'events.create',
   VENUE_DELETE: 'events.delete',
+  PROMO_CREATE: 'promos.create',
+  PROMO_UPDATE: 'promos.update',
+  PROMO_DELETE: 'promos.delete',
   TICKET_STATUS: 'tickets.status',
   TICKET_DELETE: 'tickets.delete',
 } as const;

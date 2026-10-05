@@ -21,6 +21,9 @@ const ACTION_LABELS: Record<string, string> = {
   'roles.delete': 'Удалена роль',
   'events.create': 'Создано мероприятие',
   'events.delete': 'Удалено мероприятие',
+  'promos.create': 'Создан промокод',
+  'promos.update': 'Изменён промокод',
+  'promos.delete': 'Удалён промокод',
   'tickets.status': 'Изменён статус билета',
   'tickets.delete': 'Удалён билет',
 };

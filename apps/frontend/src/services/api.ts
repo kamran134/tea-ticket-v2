@@ -14,6 +14,9 @@ import type {
   GridTemplateSummary,
   GridTemplateZoneSlot,
   CartItem,
+  PromoCode,
+  PromoCodeInput,
+  PromoQuote,
   CreatePaymentResult,
   PaymentStatusResult,
   TicketEmailDelivery,
@@ -319,10 +322,54 @@ export const api = {
     venueId: string;
     items: CartItem[];
     guestNames?: string[];
+    promoCode?: string;
   }): Promise<RegisterResult> {
     return request('/api/tickets/register', {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  },
+
+  async quotePromo(payload: {
+    venueId: string;
+    code: string;
+    items: CartItem[];
+  }): Promise<PromoQuote> {
+    return request('/api/promo-codes/quote', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getPromoCodes(venueId: string | null): Promise<PromoCode[]> {
+    const query = venueId == null
+      ? 'scope=global'
+      : `venueId=${encodeURIComponent(venueId)}`;
+    return request(`/api/promo-codes?${query}`, {
+      headers: authHeaders(),
+    });
+  },
+
+  async createPromoCode(payload: PromoCodeInput): Promise<PromoCode> {
+    return request('/api/promo-codes', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async updatePromoCode(id: string, payload: Partial<PromoCodeInput>): Promise<PromoCode> {
+    return request(`/api/promo-codes/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deletePromoCode(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/promo-codes/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
     });
   },
 

@@ -21,10 +21,12 @@ import { RolesTab } from './admin/RolesTab';
 import { AuditTab } from './admin/AuditTab';
 import { ChangePasswordDialog } from './admin/ChangePasswordDialog';
 import { InboundEmailBadge } from './InboundEmailBadge';
+import { PromosTab } from './admin/PromosTab';
+import { PickerInput } from './PickerInput';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
 
-type Tab = 'venues' | 'gridmap' | 'tickets' | 'stats' | 'users' | 'roles' | 'audit';
+type Tab = 'venues' | 'gridmap' | 'tickets' | 'promos' | 'stats' | 'users' | 'roles' | 'audit';
 
 const AGE_RATING_OPTIONS = ['', '0+', '6+', '12+', '16+', '18+'] as const;
 
@@ -32,6 +34,7 @@ const TABS: { id: Tab; label: string; permission: PermissionCode }[] = [
   { id: 'venues', label: 'Мероприятия', permission: 'events.view' },
   { id: 'gridmap', label: 'Схема', permission: 'events.edit' },
   { id: 'tickets', label: 'Билеты', permission: 'tickets.view' },
+  { id: 'promos', label: 'Промокоды', permission: 'events.view' },
   { id: 'stats', label: 'Статистика', permission: 'stats.view' },
   { id: 'users', label: 'Пользователи', permission: 'users.view' },
   { id: 'roles', label: 'Роли', permission: 'roles.view' },
@@ -66,18 +69,54 @@ const EMAIL_STATUS_STYLE: Record<TicketEmailDeliveryStatus, { label: string; cla
   FAILED:     { label: 'Ошибка email',        className: 'text-red-700' },
 };
 
+function TicketAmount({ ticket, currency }: { ticket: Ticket; currency: string }) {
+  const discounted = (ticket.discountAmount ?? 0) > 0;
+  return (
+    <>
+      {discounted && (
+        <span className="line-through text-gray-300 mr-1">
+          {formatPrice(ticket.listPrice ?? ticket.price, currency)}
+        </span>
+      )}
+      {formatPrice(ticket.price, currency)}
+      {ticket.promoCode ? ` · ${ticket.promoCode}` : ''}
+    </>
+  );
+}
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-function toDateInputValue(iso: string): string {
-  const d = new Date(iso);
+const EVENT_DATE_HORIZON_YEARS = 5;
+const EVENT_SLOT_RANGE_ERROR = 'Нельзя выбрать прошедшую дату или время. Дата — не дальше 5 лет.';
+
+function formatLocalDate(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function toTimeInputValue(iso: string): string {
-  const d = new Date(iso);
+function formatLocalTime(d: Date): string {
   return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function eventDateBounds(now: Date): { min: string; max: string } {
+  const max = new Date(now.getFullYear() + EVENT_DATE_HORIZON_YEARS, now.getMonth(), now.getDate());
+  return { min: formatLocalDate(now), max: formatLocalDate(max) };
+}
+
+function isEventSlotAllowed(date: string, time: string, now = new Date()): boolean {
+  const { min, max } = eventDateBounds(now);
+  if (date < min || date > max) return false;
+  if (date === min && time < formatLocalTime(now)) return false;
+  return true;
+}
+
+function toDateInputValue(iso: string): string {
+  return formatLocalDate(new Date(iso));
+}
+
+function toTimeInputValue(iso: string): string {
+  return formatLocalTime(new Date(iso));
 }
 
 function combineDateAndTime(date: string, time: string): string {
@@ -108,26 +147,57 @@ function VenueDateTimeFields({
   className: string;
   required?: boolean;
 }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const { min: minDate, max: maxDate } = eventDateBounds(now);
+  const minTime = date === minDate ? formatLocalTime(now) : undefined;
+
+  useEffect(() => {
+    if (minTime && time && time < minTime) onTimeChange('');
+  }, [minTime, time, onTimeChange]);
+
+  const refreshNow = () => setNow(new Date());
+
+  const handleDateChange = (value: string) => {
+    if (value && (value < minDate || value > maxDate)) return;
+    onDateChange(value);
+  };
+
+  const handleTimeChange = (value: string) => {
+    if (minTime && value && value < minTime) return;
+    onTimeChange(value);
+  };
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <label className="block min-w-0">
         <span className="text-xs text-gray-500 mb-1 block">Дата</span>
-        <input
+        <PickerInput
           type="date"
           className={className}
           value={date}
-          onChange={e => onDateChange(e.target.value)}
+          min={minDate}
+          max={maxDate}
+          onFocus={refreshNow}
+          onChange={e => handleDateChange(e.target.value)}
           required={required}
         />
       </label>
       <label className="block min-w-0">
         <span className="text-xs text-gray-500 mb-1 block">Время</span>
-        <input
+        <PickerInput
           type="time"
           step="60"
           className={className}
           value={time}
-          onChange={e => onTimeChange(e.target.value)}
+          min={minTime}
+          onFocus={refreshNow}
+          onChange={e => handleTimeChange(e.target.value)}
           required={required}
         />
       </label>
@@ -219,6 +289,10 @@ export function ManagePanel() {
 
   const createVenue = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isEventSlotAllowed(newVenueDate, newVenueTime)) {
+      toast.error(EVENT_SLOT_RANGE_ERROR);
+      return;
+    }
     try {
       const venue = await api.createVenue({
         name: newVenueName.trim(),
@@ -257,6 +331,14 @@ export function ManagePanel() {
 
   const saveVenueEdit = async (id: string) => {
     if (!editVenueName.trim() || !editVenueDate || !editVenueTime) return;
+    const current = venues.find(v => v.id === id);
+    const unchangedSlot = current
+      && editVenueDate === toDateInputValue(current.date)
+      && editVenueTime === toTimeInputValue(current.date);
+    if (!unchangedSlot && !isEventSlotAllowed(editVenueDate, editVenueTime)) {
+      toast.error(EVENT_SLOT_RANGE_ERROR);
+      return;
+    }
     setSavingVenueEdit(true);
     try {
       const updated = await api.updateVenue(id, {
@@ -844,7 +926,7 @@ export function ManagePanel() {
                             {t.tableNumber != null && t.seatNumber != null
                               ? ` · ${t.tableNumber}/${t.seatNumber}`
                               : t.seatNumber != null ? ` · ${t.seatNumber}` : ''}
-                            {' · '}{formatPrice(t.price, ticketCurrency)}
+                            {' · '}<TicketAmount ticket={t} currency={ticketCurrency} />
                           </div>
                           {t.emailDelivery && (
                             <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[t.emailDelivery.status].className}`}>
@@ -914,6 +996,8 @@ export function ManagePanel() {
                 const primary = group.tickets[0];
                 const badge = STATUS_STYLE[primary.status];
                 const totalPrice = group.tickets.reduce((sum, t) => sum + t.price, 0);
+                const listPrice = group.tickets.reduce((sum, t) => sum + (t.listPrice ?? t.price), 0);
+                const groupPromo = group.tickets.find(t => t.promoCode)?.promoCode;
                 const zoneNames = [...new Set(group.tickets.map(t => t.zoneName))].join(', ');
                 const isExpanded = expandedGroups.has(group.key);
 
@@ -932,7 +1016,12 @@ export function ManagePanel() {
                           Групповой билет · {group.tickets.length} чел.
                         </div>
                         <div className="text-sm text-gray-500">
-                          {primary.phone}{primary.email && ` · ${primary.email}`} · {zoneNames} · {formatPrice(totalPrice, ticketCurrency)}
+                          {primary.phone}{primary.email && ` · ${primary.email}`} · {zoneNames} ·{' '}
+                          {listPrice > totalPrice && (
+                            <span className="line-through text-gray-300 mr-1">{formatPrice(listPrice, ticketCurrency)}</span>
+                          )}
+                          {formatPrice(totalPrice, ticketCurrency)}
+                          {groupPromo ? ` · ${groupPromo}` : ''}
                         </div>
                         {primary.emailDelivery && (
                           <div className={`text-xs mt-0.5 font-medium ${EMAIL_STATUS_STYLE[primary.emailDelivery.status].className}`}>
@@ -959,7 +1048,7 @@ export function ManagePanel() {
                                 {t.tableNumber != null && t.seatNumber != null
                                   ? ` · ${t.tableNumber}/${t.seatNumber}`
                                   : t.seatNumber != null ? ` · ${t.seatNumber}` : ''}
-                                {' · '}{formatPrice(t.price, ticketCurrency)}
+                                {' · '}<TicketAmount ticket={t} currency={ticketCurrency} />
                               </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
@@ -1046,6 +1135,15 @@ export function ManagePanel() {
         )}
 
         {/* STATS TAB */}
+        {tab === 'promos' && (
+          <PromosTab
+            venues={venues}
+            canEdit={canEditEvents}
+            canDelete={canDeleteEvents}
+            canManageGlobal={auth.admin?.isSuperAdmin ?? false}
+          />
+        )}
+
         {tab === 'stats' && <StatsTab venues={venues} />}
 
         {tab === 'users' && auth.can('users.view') && <UsersTab auth={auth} />}

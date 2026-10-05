@@ -18,6 +18,9 @@ import { AppError, ErrorCodes, fail, failApp, failZod, isPrismaErrorCode, regist
 import { logScope } from '../middleware/requestId';
 import { TICKET_PLACE_INCLUDE, eventSummary, withPlace } from '../services/ticket-dto';
 import { allocateFreeTableSeats, lockSeats } from '../services/tableSeats';
+import { cartItemSchema, planCartUnits } from '../services/cart-plan';
+import { assertDiscountApplies, lockUsablePromo } from '../services/promo';
+import { quoteListPrices } from '../services/promo-pricing';
 import { loadOwnedVenue } from '../services/venue-access';
 import type { Actor } from '../services/permissions';
 
@@ -245,13 +248,6 @@ ticketsRouter.get('/:id', async (req, res) => {
 // table (legacy TABLE), or a plain quantity (GENERAL). One ticket row is
 // created per person/seat, all sharing one groupId. Table chairs are real
 // Seat rows: the purchasable unit is the chair, not the table.
-const cartItemSchema = z.object({
-  zoneId: z.string().min(1),
-  seatIds: z.array(z.string().min(1)).max(50).optional(),
-  tableId: z.string().min(1).optional(),
-  quantity: z.number().int().min(1).max(50).optional(),
-});
-
 const registerSchema = z.object({
   name: z.string().min(1).max(200),
   phone: z.string().min(7).max(20),
@@ -259,19 +255,15 @@ const registerSchema = z.object({
   venueId: z.string().min(1),
   items: z.array(cartItemSchema).min(1).max(20),
   guestNames: z.array(z.string().max(200)).max(50).optional().default([]),
+  promoCode: z.string().trim().min(1).max(32).optional(),
 });
-
-// A hard ceiling on the resulting ticket count, independent of how the
-// per-item limits above combine (e.g. 20 items x 50 seats each) — one
-// checkout for this many tickets is always anomalous for this use case.
-const MAX_SLOTS_PER_ORDER = 50;
 
 ticketsRouter.post('/register', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return failZod(res, parsed.error, registerValidationCode(parsed.error));
   }
-  const { name, phone, email, venueId, items, guestNames } = parsed.data;
+  const { name, phone, email, venueId, items, guestNames, promoCode } = parsed.data;
   const activeStatuses: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
   const now = new Date();
 
@@ -299,44 +291,12 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       interface Slot { zoneId: string; zone: (typeof zones)[number]; seatId?: string; tableId?: string }
-      const slots: Slot[] = [];
-
-      for (const item of items) {
-        const zone = zoneById.get(item.zoneId)!;
-
-        if (item.seatIds && item.seatIds.length > 0) {
-          if (zone.type !== 'SEATED' && zone.type !== 'TABLE') {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" does not sell individual seats`, 400);
-          }
-          if (new Set(item.seatIds).size !== item.seatIds.length) {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, 'Duplicate seats selected', 400);
-          }
-          for (const seatId of item.seatIds) slots.push({ zoneId: zone.id, zone, seatId });
-        } else if (item.tableId) {
-          if (zone.type !== 'TABLE') {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" is not a table zone`, 400);
-          }
-          const qty = item.quantity ?? 0;
-          if (qty < 1) {
-            throw new AppError(ErrorCodes.INVALID_QUANTITY, 'quantity is required for table items', 400);
-          }
-          for (let i = 0; i < qty; i++) slots.push({ zoneId: zone.id, zone, tableId: item.tableId });
-        } else if (item.quantity) {
-          if (zone.type !== 'GENERAL') {
-            throw new AppError(ErrorCodes.VALIDATION_ERROR, `Zone "${zone.name}" requires seatIds or a tableId`, 400);
-          }
-          for (let i = 0; i < item.quantity; i++) slots.push({ zoneId: zone.id, zone });
-        } else {
-          throw new AppError(ErrorCodes.INVALID_QUANTITY, 'Each item needs seatIds, tableId+quantity, or quantity', 400);
-        }
-      }
-
-      if (slots.length === 0) {
-        throw new AppError(ErrorCodes.INVALID_QUANTITY, 'Cart is empty', 400);
-      }
-      if (slots.length > MAX_SLOTS_PER_ORDER) {
-        throw new AppError(ErrorCodes.INVALID_QUANTITY, `Cannot register more than ${MAX_SLOTS_PER_ORDER} tickets in one order`, 400);
-      }
+      const slots: Slot[] = planCartUnits(items, zoneById).map(unit => ({
+        zoneId: unit.zoneId,
+        zone: zoneById.get(unit.zoneId)!,
+        seatId: unit.seatId,
+        tableId: unit.tableId,
+      }));
 
       const claimedSeatIds = new Set<string>();
 
@@ -434,20 +394,35 @@ ticketsRouter.post('/register', async (req, res) => {
         name,
         ...Array.from({ length: slots.length - 1 }, (_, i) => guestNames[i]?.trim() || `Гость ${i + 1}`),
       ];
-      const ticketRows = slots.map((slot, i) => ({
-        name: names[i],
-        phone,
-        email,
-        venueId,
-        zoneId: slot.zoneId,
-        zoneName: slot.zone.name,
-        price: slot.zone.price,
-        status: 'BOOKED' as const,
-        bookedAt: now,
-        expiresAt,
-        seatId: slot.seatId,
-        tableId: slot.tableId,
-      }));
+      const listPrices = slots.map(slot => slot.zone.price);
+      const promo = promoCode ? await lockUsablePromo(tx, venueId, promoCode, now) : null;
+      const quoted = promo ? quoteListPrices(listPrices, promo.type, promo.value) : null;
+      if (quoted) assertDiscountApplies(quoted.discount);
+      const ticketRows = slots.map((slot, i) => {
+        const priced = quoted?.priced[i] ?? {
+          price: slot.zone.price,
+          listPrice: slot.zone.price,
+          discountAmount: 0,
+        };
+        return {
+          name: names[i],
+          phone,
+          email,
+          venueId,
+          zoneId: slot.zoneId,
+          zoneName: slot.zone.name,
+          price: priced.price,
+          listPrice: priced.listPrice,
+          discountAmount: priced.discountAmount,
+          promoCodeId: promo?.id ?? null,
+          promoCode: promo?.code ?? null,
+          status: 'BOOKED' as const,
+          bookedAt: now,
+          expiresAt,
+          seatId: slot.seatId,
+          tableId: slot.tableId,
+        };
+      });
 
       // groupId is a standalone identifier, not any member's own ticket id —
       // deleting one ticket (e.g. the buyer's) must never orphan the rest of
@@ -461,7 +436,15 @@ ticketsRouter.post('/register', async (req, res) => {
       }
 
       const totalPrice = ticketRows.reduce((sum, t) => sum + t.price, 0);
-      return { id: mainTicket.id, groupId, totalPrice, expiresAt: expiresAt.toISOString() };
+      const discount = ticketRows.reduce((sum, t) => sum + t.discountAmount, 0);
+      return {
+        id: mainTicket.id,
+        groupId,
+        totalPrice,
+        discount,
+        promoCode: promo?.code ?? null,
+        expiresAt: expiresAt.toISOString(),
+      };
     });
 
       logScope('tickets/register', 'checkout created', {

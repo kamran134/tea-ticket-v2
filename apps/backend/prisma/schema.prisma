@@ -42,6 +42,11 @@ enum TableShape {
   SOFA
 }
 
+enum PromoDiscountType {
+  PERCENT
+  FIXED
+}
+
 // ── Admin accounts, roles and permissions ────────────────────────────────────
 // Permission codes live in src/services/permissions.ts, not in a table: every
 // code is referenced literally by a route's requirePermission(), so the catalog
@@ -120,6 +125,7 @@ model Venue {
   createdBy      AdminUser? @relation(fields: [createdById], references: [id], onDelete: SetNull)
   zones          Zone[]
   tickets        Ticket[]
+  promoCodes     PromoCode[]
 
   @@index([createdById])
 }
@@ -195,7 +201,13 @@ model Ticket {
   venueId            String
   zoneId             String
   zoneName           String
+  // Payable amount. listPrice is the zone price at purchase; both equal price
+  // when no promo was applied. Older rows leave listPrice null.
   price              Float
+  listPrice          Float?
+  discountAmount     Float               @default(0)
+  promoCodeId        String?
+  promoCode          String?
   receiptLink        String?
   status             TicketStatus        @default(BOOKED)
   checkedIn          Boolean             @default(false)
@@ -215,12 +227,36 @@ model Ticket {
   zone               Zone                @relation(fields: [zoneId], references: [id])
   seat               Seat?               @relation(fields: [seatId], references: [id], onDelete: SetNull)
   table              ZoneTable?          @relation(fields: [tableId], references: [id])
+  promo              PromoCode?          @relation(fields: [promoCodeId], references: [id], onDelete: SetNull)
 
   @@index([groupId])
   @@index([status])
   @@index([venueId, status])
   @@index([expiresAt])
   @@index([seatId])
+  @@index([promoCodeId])
+}
+
+model PromoCode {
+  id        String            @id @default(cuid())
+  // Null means the code applies to every event. A venue-specific row with the
+  // same code wins for that event.
+  venueId   String?
+  code      String
+  type      PromoDiscountType
+  // PERCENT: 0 < value <= 100. FIXED: amount in the event currency.
+  value     Float
+  maxUses   Int?
+  active    Boolean           @default(true)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  venue     Venue?            @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  tickets   Ticket[]
+
+  @@unique([venueId, code])
+  @@index([venueId])
 }
 
 model Payment {

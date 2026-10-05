@@ -12,6 +12,7 @@ export interface TicketEmailTemplateData {
   ticketCount: number;
   totalAmount: number;
   currency: string;
+  promoCode?: string | null;
   supportEmail: string;
 }
 
@@ -85,6 +86,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     placesLabel: places ? escapeHtml(places.label) : null,
     placesValue: places ? escapeHtml(places.value) : null,
     ticketCount: String(data.ticketCount),
+    promo: data.promoCode ? escapeHtml(data.promoCode) : null,
     total: escapeHtml(total),
     ticketUrl: escapeHtml(data.ticketUrl),
     supportEmail: escapeHtml(data.supportEmail),
@@ -111,6 +113,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
           Zona / Зона: <strong>${e.zoneName}</strong><br>
           ${e.placesLabel ? `${e.placesLabel}: <strong>${e.placesValue}</strong><br>` : ''}
           Bilet sayı / Кол-во билетов: <strong>${e.ticketCount}</strong><br>
+          ${e.promo ? `Promo / Промокод: <strong>${e.promo}</strong><br>` : ''}
           Cəmi / Итого: <strong>${e.total}</strong>
         </td></tr>
         <tr><td align="center" style="padding:24px 28px 8px;">
@@ -147,6 +150,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     `Zona / Зона: ${data.zoneName}`,
     places ? `${places.label}: ${places.value}` : null,
     `Bilet sayı / Кол-во билетов: ${data.ticketCount}`,
+    data.promoCode ? `Promo / Промокод: ${data.promoCode}` : null,
     `Cəmi / Итого: ${total}`,
     '',
     `Bilet / Билет: ${data.ticketUrl}`,

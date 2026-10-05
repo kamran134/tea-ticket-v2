@@ -123,6 +123,9 @@ export interface Ticket {
   zoneId: string;
   zoneName: string;
   price: number;
+  listPrice?: number | null;
+  discountAmount?: number;
+  promoCode?: string | null;
   receiptLink: string | null;
   status: TicketStatus;
   checkedIn: boolean;
@@ -167,7 +170,46 @@ export interface RegisterResult {
   id: string;
   groupId: string | null;
   totalPrice: number;
+  discount?: number;
+  promoCode?: string | null;
   expiresAt?: string;
+}
+
+export type PromoDiscountType = 'PERCENT' | 'FIXED';
+
+export interface PromoCode {
+  id: string;
+  venueId: string | null;
+  code: string;
+  type: PromoDiscountType;
+  value: number;
+  maxUses: number | null;
+  usedCount: number;
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+}
+
+export interface PromoQuote {
+  code: string;
+  type: PromoDiscountType;
+  value: number;
+  subtotal: number;
+  discount: number;
+  total: number;
+  currency: string;
+}
+
+export interface PromoCodeInput {
+  venueId: string | null;
+  code: string;
+  type: PromoDiscountType;
+  value: number;
+  maxUses: number | null;
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
 }
 
 // What GET /api/tickets/:id and /group/:groupId actually return — phone/email

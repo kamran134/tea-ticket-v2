@@ -5,18 +5,20 @@ import { api } from '../services/api';
 import type { Venue } from '../types';
 import { EventShareActions } from './EventShareActions';
 import { PublicLayout } from './PublicLayout';
+import { SupportContact } from './SupportContact';
 import { TicketMark } from './TicketMark';
 
 export function Afisha() {
   const { t } = useTranslation();
   const [venues, setVenues] = useState<Venue[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     document.title = t('titles.afisha');
   }, [t]);
 
   useEffect(() => {
-    api.getVenues({ upcoming: true }).then(setVenues);
+    api.getVenues({ upcoming: true }).then(setVenues).catch(() => setLoadFailed(true));
   }, []);
 
   return (
@@ -31,7 +33,11 @@ export function Afisha() {
             <p className="text-gray-600 mt-2">{t('afisha.subtitle')}</p>
           </div>
 
-          {venues === null && (
+          {loadFailed && (
+            <div className="text-center text-gray-500 py-16">{t('common.unknownError')}</div>
+          )}
+
+          {venues === null && !loadFailed && (
             <div className="text-center text-gray-400 py-16">{t('common.loading')}</div>
           )}
 
@@ -73,6 +79,8 @@ export function Afisha() {
               ))}
             </div>
           )}
+
+          <SupportContact className="text-center mt-10" />
         </div>
       </div>
     </PublicLayout>

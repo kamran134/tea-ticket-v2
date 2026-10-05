@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../services/api';
-import type { Venue, Zone, Seat, ZoneTable } from '../types';
+import type { PromoQuote, Venue, Zone, Seat, ZoneTable } from '../types';
+import { PromoCodeField } from './PromoCodeField';
 import { formatPrice } from '../types';
 import { TableIcon, type Footprint } from './TableIcon';
 import { tableChairLayout } from './tableChairLayout';
@@ -16,6 +17,7 @@ import { SelectionPanel, type SelectionItem } from './seatmap/SelectionPanel';
 import { SeatTooltip } from './seatmap/SeatTooltip';
 import { useMapZoom } from './seatmap/useMapZoom';
 import { ThemeToggle } from './ThemeToggle';
+import { SupportContact } from './SupportContact';
 
 const DESKTOP_FIT_COLS = 45;
 const FLOOR_LINE = 'rgba(255,255,255,0.06)';
@@ -35,6 +37,15 @@ interface Props {
   onCancel: () => void;
   onOccupiedSeatIds?: (ids: string[]) => void;
   quantityModalOpen: boolean;
+  promoInput: string;
+  appliedCode: string | null;
+  promoShownCode: string | null;
+  promoError: string;
+  promoLoading: boolean;
+  onPromoChange: (value: string) => void;
+  onPromoApply: () => void;
+  onPromoClear: () => void;
+  quote: PromoQuote | null;
 }
 
 function neighborBorder(cells: string[][], r: number, c: number, id: string) {
@@ -52,6 +63,8 @@ export function VenueGridMap({
   venue, zones, currency, cartSeatIds, cartQuantityByZone, cartQuantityByTable,
   onZoneOpen, onSeatToggle, onTableOpen, onClearZone, onClose, onCancel,
   quantityModalOpen, onOccupiedSeatIds,
+  promoInput, appliedCode, promoShownCode, promoError, promoLoading,
+  onPromoChange, onPromoApply, onPromoClear, quote,
 }: Props) {
   const { t } = useTranslation();
   const layout = venue.gridLayout;
@@ -260,13 +273,46 @@ export function VenueGridMap({
   }, [zones, seatsByZone, tablesByZone, selectedSet, cartQuantityByZone, onSeatToggle, onClearZone, onZoneOpen, t]);
 
   const selectedTotal = selectionItems.reduce((s, i) => s + i.price, 0);
+  const pricedQuote = quote && Math.abs(quote.subtotal - selectedTotal) < 0.02 ? quote : null;
+  const payable = pricedQuote ? pricedQuote.total : selectedTotal;
   const selectedCount = cartSeatIds.length + Object.values(cartQuantityByZone).reduce((s, q) => s + q, 0);
   const countLabel = selectedCount > 0
     ? t('gridMap.selectedCount', { count: selectedCount })
     : t('gridMap.yourSelection');
   const continueLabel = selectedCount > 0
-    ? `${t('gridMap.buy')} · ${formatPrice(selectedTotal, currency)}`
+    ? `${t('gridMap.buy')} · ${formatPrice(payable, currency)}`
     : t('common.done');
+
+  const mapPromo = (id: string) => (
+    selectedTotal <= 0 ? null : (
+      <div className="space-y-2">
+        <PromoCodeField
+          id={id}
+          tone="map"
+          input={promoInput}
+          appliedCode={appliedCode}
+          shownCode={promoShownCode}
+          loading={promoLoading}
+          error={promoError}
+          onChange={onPromoChange}
+          onApply={onPromoApply}
+          onClear={onPromoClear}
+        />
+        {pricedQuote && (
+          <div className="space-y-0.5 text-xs">
+            <div className="flex justify-between seat-map-muted">
+              <span>{t('register.promoSubtotal')}</span>
+              <span className="line-through tabular-nums">{formatPrice(pricedQuote.subtotal, currency)}</span>
+            </div>
+            <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+              <span>{t('register.promoDiscount', { code: pricedQuote.code })}</span>
+              <span className="tabular-nums">−{formatPrice(pricedQuote.discount, currency)}</span>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  );
 
   const hasSelectable = useMemo(() => {
     if (loadingGrid || loadError) return true;
@@ -626,11 +672,12 @@ export function VenueGridMap({
     title: t('gridMap.yourSelection'),
     items: selectionItems,
     countLabel,
-    total: selectedTotal,
+    total: payable,
     currency,
     continueLabel,
     emptyHint: t('gridMap.emptyHint'),
     onContinue: onClose,
+    promo: mapPromo('promo-code-map'),
   };
 
   return (
@@ -667,6 +714,10 @@ export function VenueGridMap({
             </button>
           </div>
         </header>
+
+        <div className="shrink-0 px-4 py-2 border-b seat-map-hairline">
+          <SupportContact tone="map" />
+        </div>
 
         {occupiedNotice && (
           <div className="shrink-0 px-4 py-2 text-sm bg-amber-500/15 text-amber-900 dark:text-amber-100 border-b border-amber-500/20">
@@ -748,7 +799,8 @@ export function VenueGridMap({
               ))}
             </div>
           )}
-          <SelectionPanel compact {...selectionPanelProps} />
+          {mapPromo('promo-code-map-mobile')}
+          <SelectionPanel compact {...selectionPanelProps} promo={undefined} />
         </div>
       </div>
 

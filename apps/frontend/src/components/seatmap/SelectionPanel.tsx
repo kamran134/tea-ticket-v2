@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatPrice } from '../../types';
 
 export interface SelectionItem {
@@ -19,6 +20,7 @@ interface Props {
   continueLabel: string;
   emptyHint: string;
   onContinue: () => void;
+  promo?: ReactNode;
   compact?: boolean;
 }
 
@@ -32,6 +34,7 @@ export function SelectionPanel({
   continueLabel,
   emptyHint,
   onContinue,
+  promo,
   compact = false,
 }: Props) {
   if (compact) {
@@ -101,8 +104,9 @@ export function SelectionPanel({
           </div>
         )}
       </div>
-      <div className="pt-3 mt-2 border-t seat-map-hairline shrink-0">
-        <div className="flex justify-between items-baseline mb-3">
+      <div className="pt-3 mt-2 border-t seat-map-hairline shrink-0 space-y-3">
+        {promo}
+        <div className="flex justify-between items-baseline">
           <span className="text-sm seat-map-muted">{countLabel}</span>
           <span className="text-lg font-semibold tabular-nums">
             {formatPrice(total, currency)}

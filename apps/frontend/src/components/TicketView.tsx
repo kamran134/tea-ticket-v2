@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { QRCodeSVG } from 'qrcode.react';
-import { api } from '../services/api';
+import { api, ApiError } from '../services/api';
 import { toast } from '../services/toast';
 import { translateApiError } from '../i18n/apiErrors';
 import { formatEventDateTime } from '../i18n/format';
@@ -16,6 +16,7 @@ import type {
 import { formatPrice } from '../types';
 import { BackLink } from './BackLink';
 import { PublicLayout } from './PublicLayout';
+import { SupportContact } from './SupportContact';
 import { SaveLinkLeaveDialog } from './SaveLinkLeaveDialog';
 import {
   attachTicketLeaveGuard,
@@ -79,6 +80,7 @@ export function TicketView() {
   const [paying, setPaying] = useState(false);
   const [pollingPayment, setPollingPayment] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [holdCountdown, setHoldCountdown] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const allowLeaveRef = useRef(false);
@@ -179,8 +181,14 @@ export function TicketView() {
 
   useEffect(() => {
     if (!ticketId) return;
+    let cancelled = false;
+    setLoadError(null);
 
-    reloadTicket(ticketId).then(applyTicketData);
+    reloadTicket(ticketId).then(data => {
+      if (!cancelled) applyTicketData(data);
+    }).catch(err => {
+      if (!cancelled) setLoadError(err);
+    });
 
     const urlParams = new URLSearchParams(window.location.search);
     const paymentId = urlParams.get('paymentId');
@@ -197,7 +205,10 @@ export function TicketView() {
       toast.success(t('ticket.saveLink'));
     }
 
-    return () => stopPolling();
+    return () => {
+      cancelled = true;
+      stopPolling();
+    };
   }, [ticketId, applyTicketData, startPaymentPolling, stopPolling, t]);
 
   useEffect(() => {
@@ -334,12 +345,31 @@ export function TicketView() {
   if (!ticket) {
     const urlParams = new URLSearchParams(window.location.search);
     const hasReturnParams = urlParams.get('paymentId') && urlParams.get('returnToken');
+    const notFound = loadError instanceof ApiError && loadError.code === 'TICKET_NOT_FOUND';
+    const unresolved = !ticketId
+      || loadError != null
+      || Boolean(hasReturnParams && !urlParams.get('id') && !urlParams.get('checkoutId'));
     return (
       <PublicLayout>
-        <div className="flex-1 flex items-center justify-center text-gray-400">
-          {hasReturnParams && !urlParams.get('id') && !urlParams.get('checkoutId')
-            ? t('ticket.ticketResolveError')
-            : t('common.loading')}
+        <div className="flex-1 flex items-center justify-center p-4">
+          {notFound ? (
+            <div className="text-center max-w-md">
+              <div className="text-4xl mb-2">🔍</div>
+              <h1 className="text-xl font-semibold text-gray-700">{t('ticket.notFoundTitle')}</h1>
+              <p className="text-gray-500 mt-1">{t('ticket.notFoundHint')}</p>
+              <SupportContact className="mt-4" />
+              <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 text-center text-gray-400">
+              <p>
+                {unresolved
+                  ? (loadError != null ? t('common.unknownError') : t('ticket.ticketResolveError'))
+                  : t('common.loading')}
+              </p>
+              {unresolved && <SupportContact />}
+            </div>
+          )}
         </div>
         {leaveDialog}
       </PublicLayout>
@@ -348,6 +378,11 @@ export function TicketView() {
 
   const holdExpired = isHoldExpired(ticket);
   const displayStatus: TicketStatus = holdExpired ? 'EXPIRED' : ticket.status;
+  const pricedTickets = members.length > 0 ? members : [ticket];
+  const payTotal = pricedTickets.reduce((sum, item) => sum + item.price, 0);
+  const listTotal = pricedTickets.reduce((sum, item) => sum + (item.listPrice ?? item.price), 0);
+  const promoCode = pricedTickets.find(item => item.promoCode)?.promoCode ?? null;
+  const hasDiscount = listTotal - payTotal > 0.001;
   const showSaveLink =
     displayStatus === 'BOOKED' || displayStatus === 'PENDING' || displayStatus === 'CONFIRMED';
 
@@ -402,16 +437,27 @@ export function TicketView() {
               </div>
             )}
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between items-center">
-            <span className="text-sm text-gray-500">
-              {members.length > 1 ? `${t('common.total')} · ${t('common.people', { count: members.length })}` : t('common.cost')}
-            </span>
-            <span data-testid="ticket-total" className="text-xl font-bold text-emerald-700">
-              {formatPrice(
-                members.length > 1 ? members.reduce((sum, m) => sum + m.price, 0) : ticket.price,
-                currency,
-              )}
-            </span>
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+            {hasDiscount && (
+              <>
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>{t('ticket.promoSubtotal')}</span>
+                  <span className="line-through">{formatPrice(listTotal, currency)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-emerald-700">
+                  <span>{t('ticket.promoDiscount', { code: promoCode ?? '' })}</span>
+                  <span>−{formatPrice(listTotal - payTotal, currency)}</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-500">
+                {members.length > 1 ? `${t('common.total')} · ${t('common.people', { count: members.length })}` : t('common.cost')}
+              </span>
+              <span data-testid="ticket-total" className="text-xl font-bold text-emerald-700">
+                {formatPrice(payTotal, currency)}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -553,6 +599,8 @@ export function TicketView() {
             </p>
           </div>
         )}
+
+        <SupportContact className="text-center" />
 
         {members.length > 1 && (
           <div className="bg-white rounded-2xl shadow-lg p-6">

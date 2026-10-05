@@ -8,6 +8,8 @@ interface ZoneStat {
   confirmed: number;
   pending: number;
   booked: number;
+  confirmedRevenue: number;
+  pendingRevenue: number;
 }
 
 function useVenueStats(venueId: string) {
@@ -33,11 +35,15 @@ function useVenueStats(venueId: string) {
 function buildZoneStats(zones: Zone[], tickets: Ticket[]): ZoneStat[] {
   return zones.map(zone => {
     const zoneTickets = tickets.filter(t => t.zoneId === zone.id);
+    const sum = (status: Ticket['status']) =>
+      zoneTickets.filter(t => t.status === status).reduce((total, ticket) => total + ticket.price, 0);
     return {
       zone,
       confirmed: zoneTickets.filter(t => t.status === 'CONFIRMED').length,
       pending: zoneTickets.filter(t => t.status === 'PENDING').length,
       booked: zoneTickets.filter(t => t.status === 'BOOKED').length,
+      confirmedRevenue: sum('CONFIRMED'),
+      pendingRevenue: sum('PENDING'),
     };
   });
 }
@@ -59,8 +65,8 @@ export function StatsTab({ venues }: Props) {
     capacity: zones.reduce((s, z) => s + z.capacity, 0),
     confirmed: stats.reduce((s, z) => s + z.confirmed, 0),
     pending: stats.reduce((s, z) => s + z.pending, 0),
-    confirmedRevenue: stats.reduce((s, z) => s + z.confirmed * z.zone.price, 0),
-    pendingRevenue: stats.reduce((s, z) => s + z.pending * z.zone.price, 0),
+    confirmedRevenue: stats.reduce((s, z) => s + z.confirmedRevenue, 0),
+    pendingRevenue: stats.reduce((s, z) => s + z.pendingRevenue, 0),
   }), [stats, zones]);
 
   return (
@@ -108,7 +114,7 @@ export function StatsTab({ venues }: Props) {
           </div>
 
           <div className="space-y-3">
-            {stats.map(({ zone, confirmed, pending }) => {
+            {stats.map(({ zone, confirmed, pending, confirmedRevenue }) => {
               const confirmedPct = zone.capacity > 0 ? (confirmed / zone.capacity) * 100 : 0;
               const pendingPct = zone.capacity > 0 ? (pending / zone.capacity) * 100 : 0;
               const isFull = confirmedPct + pendingPct >= 100;
@@ -140,7 +146,7 @@ export function StatsTab({ venues }: Props) {
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                      {confirmed} подтв. · {formatPrice(confirmed * zone.price, currency)}
+                      {confirmed} подтв. · {formatPrice(confirmedRevenue, currency)}
                     </span>
                     <span className="flex items-center gap-1.5">
                       <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
