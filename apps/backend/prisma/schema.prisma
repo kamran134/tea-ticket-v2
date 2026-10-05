@@ -109,7 +109,10 @@ model Venue {
   currency       String     @default("₼")
   floorPlanImage String?
   posterImage    String?
+  // Russian text. Az/En are optional translations; the public page falls back to Russian.
   description    String?
+  descriptionAz  String?
+  descriptionEn  String?
   ageRating      String?
   gridLayout     Json?
   createdAt      DateTime   @default(now())

@@ -5,12 +5,16 @@ import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { generateVenueSlug, slugify } from '../utils/slug';
 import { useAdminAuth } from '../lib/adminAuth';
-import { descriptionForApi } from '../lib/descriptionHtml';
 import { StatsTab } from './StatsTab';
 import { GridMapEditor } from './GridMapEditor';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ThemeToggle } from './ThemeToggle';
-import { RichTextEditor } from './RichTextEditor';
+import {
+  VenueDescriptionFields,
+  emptyVenueDescriptions,
+  venueDescriptionsPayload,
+  type VenueDescriptions,
+} from './VenueDescriptionFields';
 import { AdminLoginGate, NoAccess } from './AdminLoginGate';
 import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
@@ -142,7 +146,7 @@ export function ManagePanel() {
   const [newVenueName, setNewVenueName] = useState('');
   const [newVenueDate, setNewVenueDate] = useState('');
   const [newVenueTime, setNewVenueTime] = useState('');
-  const [newVenueDescription, setNewVenueDescription] = useState('');
+  const [newVenueDescriptions, setNewVenueDescriptions] = useState<VenueDescriptions>(() => emptyVenueDescriptions());
   const [newVenueAgeRating, setNewVenueAgeRating] = useState('');
   const [newVenueSlug, setNewVenueSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
@@ -154,7 +158,7 @@ export function ManagePanel() {
   const [editVenueName, setEditVenueName] = useState('');
   const [editVenueDate, setEditVenueDate] = useState('');
   const [editVenueTime, setEditVenueTime] = useState('');
-  const [editVenueDescription, setEditVenueDescription] = useState('');
+  const [editVenueDescriptions, setEditVenueDescriptions] = useState<VenueDescriptions>(() => emptyVenueDescriptions());
   const [editVenueAgeRating, setEditVenueAgeRating] = useState('');
   const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
@@ -220,14 +224,14 @@ export function ManagePanel() {
         name: newVenueName.trim(),
         date: toIsoFromDateAndTime(newVenueDate, newVenueTime),
         slug: newVenueSlug || undefined,
-        description: descriptionForApi(newVenueDescription),
+        ...venueDescriptionsPayload(newVenueDescriptions),
         ageRating: newVenueAgeRating || null,
       });
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
       setNewVenueDate('');
       setNewVenueTime('');
-      setNewVenueDescription('');
+      setNewVenueDescriptions(emptyVenueDescriptions());
       setNewVenueAgeRating('');
       setNewVenueSlug('');
       setSlugManuallyEdited(false);
@@ -243,7 +247,11 @@ export function ManagePanel() {
     setEditVenueName(v.name);
     setEditVenueDate(toDateInputValue(v.date));
     setEditVenueTime(toTimeInputValue(v.date));
-    setEditVenueDescription(v.description ?? '');
+    setEditVenueDescriptions({
+      ru: v.description ?? '',
+      az: v.descriptionAz ?? '',
+      en: v.descriptionEn ?? '',
+    });
     setEditVenueAgeRating(v.ageRating ?? '');
   };
 
@@ -254,7 +262,7 @@ export function ManagePanel() {
       const updated = await api.updateVenue(id, {
         name: editVenueName.trim(),
         date: toIsoFromDateAndTime(editVenueDate, editVenueTime),
-        description: descriptionForApi(editVenueDescription),
+        ...venueDescriptionsPayload(editVenueDescriptions),
         ageRating: editVenueAgeRating || null,
       });
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
@@ -510,10 +518,9 @@ export function ManagePanel() {
                 className={DATE_TIME_INPUT_CLASS}
                 required
               />
-              <RichTextEditor
-                value={newVenueDescription}
-                onChange={setNewVenueDescription}
-                placeholder="Описание"
+              <VenueDescriptionFields
+                value={newVenueDescriptions}
+                onChange={setNewVenueDescriptions}
               />
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Возрастной ценз</label>
@@ -596,10 +603,9 @@ export function ManagePanel() {
                               className={DATE_TIME_INPUT_CLASS_COMPACT}
                               required
                             />
-                            <RichTextEditor
-                              value={editVenueDescription}
-                              onChange={setEditVenueDescription}
-                              placeholder="Описание"
+                            <VenueDescriptionFields
+                              value={editVenueDescriptions}
+                              onChange={setEditVenueDescriptions}
                               compact
                             />
                             <select

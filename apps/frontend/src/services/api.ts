@@ -228,6 +228,8 @@ export const api = {
     name?: string;
     date?: string;
     description?: string | null;
+    descriptionAz?: string | null;
+    descriptionEn?: string | null;
     ageRating?: string | null;
   }): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
@@ -388,9 +390,10 @@ export const api = {
     date: string;
     slug?: string;
     description?: string | null;
+    descriptionAz?: string | null;
+    descriptionEn?: string | null;
     ageRating?: string | null;
   }): Promise<Venue> {
-    const description = data.description?.trim();
     const ageRating = data.ageRating?.trim() || null;
     return request('/api/venues', {
       method: 'POST',
@@ -399,7 +402,9 @@ export const api = {
         name: data.name,
         date: data.date,
         ...(data.slug && { slug: data.slug }),
-        ...(description ? { description } : {}),
+        description: data.description ?? null,
+        descriptionAz: data.descriptionAz ?? null,
+        descriptionEn: data.descriptionEn ?? null,
         ...(ageRating ? { ageRating } : {}),
       }),
     });

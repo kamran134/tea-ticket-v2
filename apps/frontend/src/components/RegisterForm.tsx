@@ -23,6 +23,7 @@ import { BackLink } from './BackLink';
 import { TableSeatPicker } from './TableSeatPicker';
 import { PublicLayout } from './PublicLayout';
 import { FormattedDescription } from './FormattedDescription';
+import { localizedVenueDescription } from '../lib/venueDescription';
 import { EventPoster } from './EventPoster';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -32,7 +33,7 @@ interface Props {
 }
 
 export function RegisterForm({ slug }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [venueNotFound, setVenueNotFound] = useState(false);
   const [zones, setZones] = useState<Zone[]>([]);
@@ -269,7 +270,7 @@ export function RegisterForm({ slug }: Props) {
             minPrice={minPrice}
             hasPriceRange={hasPriceRange}
           />
-          <FormattedDescription html={venue.description ?? ''} className="text-sm text-gray-600 text-left" />
+          <FormattedDescription html={localizedVenueDescription(venue, i18n.language)} className="text-sm text-gray-600 text-left" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-lg p-6">

@@ -100,11 +100,15 @@ function normalizeAgeRating(value: string | null | undefined): string | null | u
   return value;
 }
 
+const descriptionSchema = z.string().max(DESCRIPTION_MAX).nullish();
+
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
   slug: z.string().min(1).max(100).optional(),
-  description: z.string().max(DESCRIPTION_MAX).nullish(),
+  description: descriptionSchema,
+  descriptionAz: descriptionSchema,
+  descriptionEn: descriptionSchema,
   ageRating: ageRatingSchema,
 });
 
@@ -126,6 +130,8 @@ venuesRouter.post('/', requireAuth, requirePermission('events.create'), async (r
         currency: CURRENCY,
         slug,
         description: normalizeDescription(parsed.data.description) ?? null,
+        descriptionAz: normalizeDescription(parsed.data.descriptionAz) ?? null,
+        descriptionEn: normalizeDescription(parsed.data.descriptionEn) ?? null,
         ageRating: normalizeAgeRating(parsed.data.ageRating) ?? null,
         createdById: actorOf(req).id,
       },
@@ -154,10 +160,12 @@ const patchVenueSchema = z.object({
   floorPlanImage: z.string().nullable().optional(),
   posterImage: z.string().nullable().optional(),
   slug: z.string().min(1).max(100).optional(),
-  description: z.string().max(DESCRIPTION_MAX).nullish(),
+  description: descriptionSchema,
+  descriptionAz: descriptionSchema,
+  descriptionEn: descriptionSchema,
   ageRating: ageRatingSchema,
 }).refine(d => Object.values(d).some(v => v !== undefined), {
-  message: 'Provide name, date, active, floorPlanImage, posterImage, slug, description, or ageRating',
+  message: 'Provide name, date, active, floorPlanImage, posterImage, slug, description, descriptionAz, descriptionEn, or ageRating',
 });
 
 venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async (req, res) => {
@@ -165,12 +173,14 @@ venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async 
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { slug, date, description, ageRating, ...rest } = parsed.data;
+  const { slug, date, description, descriptionAz, descriptionEn, ageRating, ...rest } = parsed.data;
   const normalizedSlug = slug !== undefined ? slugify(slug) : undefined;
   if (slug !== undefined && !normalizedSlug) {
     return res.status(400).json({ success: false, error: 'Invalid slug' });
   }
   const normalizedDescription = normalizeDescription(description);
+  const normalizedDescriptionAz = normalizeDescription(descriptionAz);
+  const normalizedDescriptionEn = normalizeDescription(descriptionEn);
   const normalizedAgeRating = normalizeAgeRating(ageRating);
   try {
     await loadOwnedVenue(req.params.id, actorOf(req));
@@ -181,6 +191,8 @@ venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async 
         ...(date !== undefined && { date: new Date(date) }),
         ...(normalizedSlug !== undefined && { slug: normalizedSlug }),
         ...(normalizedDescription !== undefined && { description: normalizedDescription }),
+        ...(normalizedDescriptionAz !== undefined && { descriptionAz: normalizedDescriptionAz }),
+        ...(normalizedDescriptionEn !== undefined && { descriptionEn: normalizedDescriptionEn }),
         ...(normalizedAgeRating !== undefined && { ageRating: normalizedAgeRating }),
       },
     });
