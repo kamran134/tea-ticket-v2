@@ -471,19 +471,28 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   };
 
   const saveAsTemplate = async () => {
-    if (!templateName.trim() || zones.length === 0) return;
+    const usedZoneIds = new Set(
+      cells.flat().filter(cell => cell !== 'empty' && cell !== 'blocked' && cell !== 'stage'),
+    );
+    const paintedZones = zones.filter(zone => usedZoneIds.has(zone.id));
+    if (!templateName.trim() || paintedZones.length === 0) {
+      if (templateName.trim() && paintedZones.length === 0) {
+        toast.error('На схеме нет зон — нечего сохранять');
+      }
+      return;
+    }
     setSavingTemplate(true);
     try {
-      const slotMap = new Map(zones.map((z, i) => [z.id, `slot-${i}`]));
-      const templateCells = cells.map(row => row.map(c => slotMap.get(c) ?? c));
-      const templateZones: GridTemplateZoneSlot[] = zones.map((z, i) => ({
+      const slotMap = new Map(paintedZones.map((zone, i) => [zone.id, `slot-${i}`]));
+      const templateCells = cells.map(row => row.map(cell => slotMap.get(cell) ?? cell));
+      const templateZones: GridTemplateZoneSlot[] = paintedZones.map((zone, i) => ({
         slotId: `slot-${i}`,
-        name: z.name,
-        color: z.color,
-        type: z.type,
-        price: z.price,
-        ...(z.type === 'GENERAL' && { capacity: z.capacity }),
-        ...(z.type === 'TABLE' && { tableChairs: z.tableChairs ?? undefined, tableShape: z.tableShape ?? undefined }),
+        name: zone.name,
+        color: zone.color,
+        type: zone.type,
+        price: zone.price,
+        ...(zone.type === 'GENERAL' && { capacity: zone.capacity }),
+        ...(zone.type === 'TABLE' && { tableChairs: zone.tableChairs ?? undefined, tableShape: zone.tableShape ?? undefined }),
       }));
       const created = await api.saveGridTemplate({
         name: templateName.trim(), rows, cols, cells: templateCells, zones: templateZones,
@@ -507,17 +516,23 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     setApplyingTemplateId(templateId);
     try {
       const template = await api.getGridTemplate(templateId);
+      const missingPrice = template.zones.some(slot => !(typeof slot.price === 'number' && slot.price > 0));
+      if (missingPrice) {
+        toast.error('В шаблоне нет цен зон. Сохраните схему заново с мероприятия, где цены уже указаны.');
+        return;
+      }
+      for (const zone of zones) {
+        await api.deleteZone(zone.id);
+      }
       const slotToRealId = new Map<string, string>();
       const createdZones: Zone[] = [];
-      let sortOrder = zones.length;
-      const missingPrice = template.zones.some(slot => !(typeof slot.price === 'number' && slot.price > 0));
-      for (const slot of template.zones) {
+      for (const [index, slot] of template.zones.entries()) {
         const zone = await api.createZone({
           venueId: venue.id,
           name: slot.name,
-          price: typeof slot.price === 'number' && slot.price > 0 ? slot.price : 1,
+          price: slot.price as number,
           capacity: slot.type === 'GENERAL' ? (slot.capacity ?? 1) : 1,
-          sortOrder: sortOrder++,
+          sortOrder: index,
           type: slot.type as ZoneType,
           color: slot.color,
           tableChairs: slot.type === 'TABLE' ? (slot.tableChairs ?? 4) : null,
@@ -526,20 +541,21 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         slotToRealId.set(slot.slotId, zone.id);
         createdZones.push(zone);
       }
-      setZones(prev => [...prev, ...createdZones]);
+      setZones(createdZones);
+      setActiveTool('block');
       setRows(template.rows);
       setCols(template.cols);
       setPendingRows(template.rows);
       setPendingCols(template.cols);
       setCells(template.cells.map(row =>
-        row.map(c => (c === 'empty' || c === 'blocked' || c === 'stage' ? c : (slotToRealId.get(c) ?? 'empty'))),
+        row.map(cell => (cell === 'empty' || cell === 'blocked' || cell === 'stage' ? cell : (slotToRealId.get(cell) ?? 'empty'))),
       ));
       setLocked(false);
       setTemplateMenuOpen(false);
-      toast.success(missingPrice
-        ? 'Шаблон применён — в нём нет цен, проставьте их и сохраните сетку'
-        : 'Шаблон применён — сохраните сетку');
+      toast.success('Шаблон загружен');
     } catch (err) {
+      const fresh = await api.getZones(venue.id).catch(() => null);
+      if (fresh) setZones(fresh);
       toast.error(errMsg(err, 'Не удалось загрузить шаблон'));
     } finally {
       setApplyingTemplateId(null);
