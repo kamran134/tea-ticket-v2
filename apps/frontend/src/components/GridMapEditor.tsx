@@ -3,7 +3,9 @@ import { api } from '../services/api';
 import type { Venue, Zone, ZoneType, TableShape, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
+import { useAdminAuth } from '../lib/adminAuth';
 import { TableIcon, tableFootprint, type Footprint } from './TableIcon';
+import { ConfirmDialog } from './ConfirmDialog';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
 import { GRID_LINE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, cellToGridArea } from './grid/gridGeometry';
 import { GridCanvas } from './grid/GridCanvas';
@@ -78,6 +80,8 @@ interface Props {
 }
 
 export function GridMapEditor({ venue, onVenueUpdated }: Props) {
+  const auth = useAdminAuth();
+  const canDeleteTemplates = auth.can('events.delete');
   const initial = venue.gridLayout;
   const currency = venue.currency;
 
@@ -122,6 +126,10 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   const [templateName, setTemplateName] = useState('');
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [applyingTemplateId, setApplyingTemplateId] = useState<string | null>(null);
+  const [templateMenuOpen, setTemplateMenuOpen] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState<GridTemplateSummary | null>(null);
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
 
   // Large grids are cramped inline — always offer a fullscreen view
   const [expanded, setExpanded] = useState(false);
@@ -172,6 +180,15 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   useEffect(() => {
     api.getGridTemplates().then(setTemplates).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!templateMenuOpen) return;
+    const onPointer = (e: MouseEvent) => {
+      if (!templateMenuRef.current?.contains(e.target as Node)) setTemplateMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    return () => document.removeEventListener('mousedown', onPointer);
+  }, [templateMenuOpen]);
 
   const applyGridSize = () => {
     const r = Math.max(1, Math.min(100, pendingRows));
@@ -400,6 +417,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
         row.map(c => (c === 'empty' || c === 'blocked' || c === 'stage' ? c : (slotToRealId.get(c) ?? 'empty'))),
       ));
       setLocked(false);
+      setTemplateMenuOpen(false);
       toast.success(missingPrice
         ? 'Шаблон применён — в нём нет цен, проставьте их и сохраните сетку'
         : 'Шаблон применён — сохраните сетку');
@@ -407,6 +425,23 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       toast.error(errMsg(err, 'Не удалось загрузить шаблон'));
     } finally {
       setApplyingTemplateId(null);
+    }
+  };
+
+  const removeTemplate = async () => {
+    if (!templateToDelete || deletingTemplateId) return;
+    const id = templateToDelete.id;
+    setDeletingTemplateId(id);
+    try {
+      await api.deleteGridTemplate(id);
+      setTemplates(prev => prev.filter(t => t.id !== id));
+      if (templates.length <= 1) setTemplateMenuOpen(false);
+      setTemplateToDelete(null);
+      toast.success('Шаблон удалён');
+    } catch (err) {
+      toast.error(errMsg(err, 'Не удалось удалить шаблон'));
+    } finally {
+      setDeletingTemplateId(null);
     }
   };
 
@@ -579,6 +614,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   );
 
   return (
+    <>
     <div className={expanded ? 'fixed inset-0 z-50 bg-white overflow-auto p-4 space-y-4' : 'space-y-4'}>
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -610,19 +646,41 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               >
                 Сохранить как шаблон
               </button>
-              <select
-                value=""
-                onChange={e => applyTemplate(e.target.value)}
-                disabled={applyingTemplateId !== null || templates.length === 0}
-                className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:opacity-40"
-              >
-                <option value="">
+              <div className="relative" ref={templateMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setTemplateMenuOpen(open => !open)}
+                  disabled={applyingTemplateId !== null || templates.length === 0}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white hover:bg-gray-50 transition-colors disabled:opacity-40"
+                >
                   {applyingTemplateId ? 'Применяю...' : templates.length === 0 ? 'Нет шаблонов' : 'Загрузить шаблон...'}
-                </option>
-                {templates.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} ({t.rows}×{t.cols}, {t.zoneCount} зон)</option>
-                ))}
-              </select>
+                </button>
+                {templateMenuOpen && templates.length > 0 && (
+                  <div className="absolute right-0 z-30 mt-1 w-80 max-h-72 overflow-auto bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                    {templates.map(t => (
+                      <div key={t.id} className="flex items-center gap-1 px-1.5">
+                        <button
+                          type="button"
+                          onClick={() => applyTemplate(t.id)}
+                          className="flex-1 min-w-0 text-left text-sm px-2 py-1.5 rounded-md hover:bg-gray-50 truncate"
+                        >
+                          {t.name} ({t.rows}×{t.cols}, {t.zoneCount} зон)
+                        </button>
+                        {canDeleteTemplates && (
+                          <button
+                            type="button"
+                            title="Удалить шаблон"
+                            onClick={() => setTemplateToDelete(t)}
+                            className="shrink-0 px-2 py-1 text-xs text-red-600 hover:text-red-700"
+                          >
+                            Удалить
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
           {locked ? (
@@ -1100,5 +1158,15 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
       )}
 
     </div>
+    {templateToDelete && (
+      <ConfirmDialog
+        title="Удалить шаблон"
+        message={`Шаблон «${templateToDelete.name}» будет удалён. Схемы уже созданных мероприятий не изменятся.`}
+        confirmLabel={deletingTemplateId ? 'Удаление...' : 'Удалить'}
+        onConfirm={removeTemplate}
+        onCancel={() => { if (!deletingTemplateId) setTemplateToDelete(null); }}
+      />
+    )}
+    </>
   );
 }
