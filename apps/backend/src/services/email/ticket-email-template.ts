@@ -60,19 +60,12 @@ function formatPrice(amount: number, currency: string): string {
   return `${formatted} ${currency}`;
 }
 
-function placesLine(data: TicketEmailTemplateData): { az: string; ru: string } | null {
+function placesLine(data: TicketEmailTemplateData): { label: string; value: string } | null {
   if (data.tableLabel) {
-    return {
-      az: `Masa: ${data.tableLabel}`,
-      ru: `Стол: ${data.tableLabel}`,
-    };
+    return { label: 'Masa / Стол', value: data.tableLabel };
   }
   if (data.seatLabels.length > 0) {
-    const seats = data.seatLabels.join(', ');
-    return {
-      az: `Yerlər: ${seats}`,
-      ru: `Места: ${seats}`,
-    };
+    return { label: 'Yerlər / Места', value: data.seatLabels.join(', ') };
   }
   return null;
 }
@@ -89,8 +82,8 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     zoneName: escapeHtml(data.zoneName),
     dateAz: escapeHtml(dates.az),
     dateRu: escapeHtml(dates.ru),
-    placesAz: places ? escapeHtml(places.az) : null,
-    placesRu: places ? escapeHtml(places.ru) : null,
+    placesLabel: places ? escapeHtml(places.label) : null,
+    placesValue: places ? escapeHtml(places.value) : null,
     ticketCount: String(data.ticketCount),
     total: escapeHtml(total),
     ticketUrl: escapeHtml(data.ticketUrl),
@@ -116,7 +109,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
         <tr><td style="padding:16px 28px 0;font-size:15px;line-height:1.6;">
           Alıcı / Покупатель: <strong>${e.buyerName}</strong><br>
           Zona / Зона: <strong>${e.zoneName}</strong><br>
-          ${e.placesAz ? `${e.placesAz}<br>${e.placesRu}<br>` : ''}
+          ${e.placesLabel ? `${e.placesLabel}: <strong>${e.placesValue}</strong><br>` : ''}
           Bilet sayı / Кол-во билетов: <strong>${e.ticketCount}</strong><br>
           Cəmi / Итого: <strong>${e.total}</strong>
         </td></tr>
@@ -152,8 +145,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     '',
     `Alıcı / Покупатель: ${data.buyerName}`,
     `Zona / Зона: ${data.zoneName}`,
-    places ? places.az : null,
-    places ? places.ru : null,
+    places ? `${places.label}: ${places.value}` : null,
     `Bilet sayı / Кол-во билетов: ${data.ticketCount}`,
     `Cəmi / Итого: ${total}`,
     '',
