@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import { formatEventDateTime } from '../i18n/format';
 import { formatPrice, type Currency } from '../types';
+import { EventShareActions } from './EventShareActions';
 
 interface Props {
   name: string;
+  slug: string;
   date: string;
   posterImage: string | null;
   ageRating: string | null;
@@ -20,6 +22,7 @@ interface Props {
  */
 export function EventPoster({
   name,
+  slug,
   date,
   posterImage,
   ageRating,
@@ -73,6 +76,7 @@ export function EventPoster({
           </p>
         )}
       </div>
+      <EventShareActions name={name} slug={slug} />
     </div>
   );
 }

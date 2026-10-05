@@ -263,6 +263,7 @@ export function RegisterForm({ slug }: Props) {
         <div className="mb-6 space-y-4">
           <EventPoster
             name={venue.name}
+            slug={venue.slug}
             date={venue.date}
             posterImage={venue.posterImage}
             ageRating={venue.ageRating}

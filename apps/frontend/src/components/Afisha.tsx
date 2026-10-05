@@ -2,65 +2,10 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { formatEventDate } from '../i18n/format';
 import { api } from '../services/api';
-import { toast } from '../services/toast';
 import type { Venue } from '../types';
+import { EventShareActions } from './EventShareActions';
 import { PublicLayout } from './PublicLayout';
 import { TicketMark } from './TicketMark';
-
-function eventUrl(slug: string): string {
-  return `${window.location.origin}/e/${slug}`;
-}
-
-function EventCardActions({ name, slug }: { name: string; slug: string }) {
-  const { t } = useTranslation();
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(eventUrl(slug));
-      toast.success(t('afisha.linkCopied'));
-    } catch {
-      toast.error(t('common.unknownError'));
-    }
-  };
-
-  const share = async () => {
-    const url = eventUrl(slug);
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: name, url });
-        return;
-      } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-      }
-    }
-    await copyLink();
-  };
-
-  return (
-    <div className="absolute top-2.5 left-2.5 z-10 max-w-[calc(100%-1.25rem)]">
-      <div className="relative">
-        <div aria-hidden className="absolute -inset-1.5 rounded-full bg-black/35 blur-md" />
-        <div className="keep-white relative flex items-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur-md">
-          <button
-            type="button"
-            onClick={share}
-            className="px-2.5 py-1 text-[11px] sm:text-xs leading-none rounded-full hover:bg-white/15 transition-colors"
-          >
-            {t('afisha.share')}
-          </button>
-          <span aria-hidden className="w-px h-3 bg-white/30" />
-          <button
-            type="button"
-            onClick={copyLink}
-            className="px-2.5 py-1 text-[11px] sm:text-xs leading-none rounded-full hover:bg-white/15 transition-colors"
-          >
-            {t('afisha.copyLink')}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function Afisha() {
   const { t } = useTranslation();
@@ -118,7 +63,7 @@ export function Afisha() {
                         </div>
                       )}
                     </a>
-                    <EventCardActions name={v.name} slug={v.slug} />
+                    <EventShareActions name={v.name} slug={v.slug} />
                   </div>
                   <a href={`/e/${v.slug}`} className="block p-4">
                     <h2 data-testid="event-open" className="font-semibold text-gray-800 text-lg">{v.name}</h2>
