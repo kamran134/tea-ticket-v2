@@ -25,6 +25,7 @@ const ACTION_LABELS: Record<string, string> = {
   'promos.update': 'Изменён промокод',
   'promos.delete': 'Удалён промокод',
   'tickets.status': 'Изменён статус билета',
+  'tickets.refund': 'Возврат оплаты',
   'tickets.delete': 'Удалён билет',
 };
 

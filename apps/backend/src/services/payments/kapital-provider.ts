@@ -1,6 +1,12 @@
 import type { PaymentProvider } from './payment-provider';
 import { assertAmountFormat, assertCurrency, formatAmount } from './decimal';
-import type { CreatePaymentInput, CreatePaymentResult, ProviderPaymentState, ProviderPaymentStatus } from './types';
+import type {
+  CreatePaymentInput,
+  CreatePaymentResult,
+  ProviderPaymentState,
+  ProviderPaymentStatus,
+  RefundPaymentResult,
+} from './types';
 import { describePmoResultCode, isPmoApproval } from './pmo-decline-codes';
 
 /**
@@ -70,6 +76,13 @@ interface KapitalErrorBody {
   errorDescription?: string;
 }
 
+interface KapitalExecTranResponse {
+  tran?: {
+    approvalCode?: string;
+    pmoResultCode?: string;
+  };
+}
+
 export class KapitalProvider implements PaymentProvider {
   readonly name = 'kapital';
   readonly supportsWebhooks = false;
@@ -132,8 +145,61 @@ export class KapitalProvider implements PaymentProvider {
     };
   }
 
-  // cancelPayment / refundPayment intentionally not implemented in this iteration —
-  // see TZ-KAPITAL-TXPG.md §A9.
+  /**
+   * Refund captured funds on an Order_SMS payment. A group checkout is refunded
+   * ticket by ticket by passing a smaller `amount` — the same call, not a
+   * different operation.
+   *
+   * Docs, "Execute Transaction" / "Refund" (Geri Ödəniş):
+   *   POST /order/{id}/exec-tran
+   *   { "tran": { "phase": "Single", "type": "Refund", "amount": "..." } }
+   *   https://pg.kapitalbank.az/docs
+   *   https://brawny-airport-7ca.notion.site/Kapital-bank-E-commerce-API-Documentation-6dd6a228c40644e3bef034bca7845e3c
+   *
+   * voidKind Full/Partial is a reversal of an authorisation (Order_DMS / preauth),
+   * and the partial form is documented as one-shot. We capture immediately
+   * (KAPITAL_ORDER_TYPE=Order_SMS, TZ-KAPITAL-TXPG.md A9), so the documented
+   * refund is `type: "Refund"`. The bank accepts further Refund calls until the
+   * refunded total equals the order; only then does order.status become Refunded.
+   *
+   * Amount stays N.NNNN. Create-order was verified to accept that shape
+   * (TZ A2.5); this uses the same amount field. Auth is the terminal Basic
+   * header, same as GET /order/{id} — the order password is not sent.
+   */
+  async refundPayment(providerPaymentId: string, amount: string): Promise<RefundPaymentResult> {
+    assertAmountFormat(amount);
+
+    const json = await this.request<KapitalExecTranResponse>(
+      'POST',
+      `/order/${encodeURIComponent(providerPaymentId)}/exec-tran`,
+      {
+        tran: {
+          phase: 'Single',
+          type: 'Refund',
+          amount,
+        },
+      },
+    );
+
+    const tran = json.tran;
+    const code = tran?.pmoResultCode;
+    // A known decline means the bank did not move the money. A missing code on
+    // HTTP 200 (no errorCode — request() already rejected those) is still a
+    // completed call: rejecting it here would let the operator retry and refund
+    // twice. '2' Approved Partial is the expected code for a partial amount.
+    if (code && !isPmoApproval(code)) {
+      const description = describePmoResultCode(code) ?? code;
+      throw new KapitalApiError(code, description, 200);
+    }
+    if (code && describePmoResultCode(code) === null) {
+      console.warn(`[kapital] undocumented pmoResultCode on refund of order ${providerPaymentId}: ${code}`);
+    }
+
+    return {
+      approvalCode: tran?.approvalCode ?? null,
+      pmoResultCode: code ?? null,
+    };
+  }
 
   /**
    * The docs show the redirect as `{{order.hppUrl}}/flex?id=...`, but the API actually
@@ -162,8 +228,12 @@ export class KapitalProvider implements PaymentProvider {
       case 'Preparing':
         return 'CREATED';
       case 'FullyPaid':
-      case 'Refunded': // refunds are out of scope, see TZ-KAPITAL-TXPG.md A9
       case 'Closed': // order closed after payment
+      case 'Refunded':
+        // Refunded means the accounted refund equals the payment. A partial
+        // refund leaves the order FullyPaid. Either way our payment row stays
+        // SUCCEEDED: invalidated tickets are Ticket.status REFUNDED, and a later
+        // poll must not reopen or cancel the payment.
         return 'SUCCEEDED';
       case 'Declined':
       case 'Rejected':

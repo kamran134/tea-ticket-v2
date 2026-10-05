@@ -9,7 +9,7 @@ import { actorOf, requireAuth, requirePermission } from '../middleware/auth';
 import { AuditActions, recordAudit } from '../services/audit';
 import { resolveUploadPath } from '../services/storage';
 import { prisma } from '../db';
-import { getBookingHoldMs } from '../services/payments/payment-service';
+import { getBookingHoldMs, PaymentError, PaymentService } from '../services/payments/payment-service';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { enqueueTicketConfirmedEmail, kickEmailJobProcessing } from '../services/email';
 import type { EmailJobProcessor } from '../services/email';
@@ -25,10 +25,15 @@ import { loadOwnedVenue } from '../services/venue-access';
 import type { Actor } from '../services/permissions';
 
 let emailJobProcessor: EmailJobProcessor | null = null;
+let paymentService: PaymentService | null = null;
 
 /** Optional post-response kick; set from createApp when available. */
 export function setTicketsEmailProcessor(processor: EmailJobProcessor): void {
   emailJobProcessor = processor;
+}
+
+export function setTicketsPaymentService(service: PaymentService): void {
+  paymentService = service;
 }
 
 function kickEmailJobs(): void {
@@ -680,6 +685,68 @@ ticketsRouter.delete('/:id', requireAuth, requirePermission('tickets.delete'), a
   } catch (err) {
     if (err instanceof AppError) return failApp(res, err);
     return res.status(500).json({ success: false, error: 'Failed to delete ticket' });
+  }
+});
+
+// POST /api/tickets/:id/refund
+// :id is any ticket of the checkout. ticketIds lists who to refund — one person
+// from a group is a partial refund of that card payment.
+const refundSchema = z.object({
+  ticketIds: z.array(z.string().min(1)).min(1).max(50),
+});
+
+ticketsRouter.post('/:id/refund', requireAuth, requirePermission('tickets.refund'), async (req, res) => {
+  const parsed = refundSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return failZod(res, parsed.error);
+  }
+
+  try {
+    const anchor = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+    if (!anchor) {
+      return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Билет не найден');
+    }
+    await assertTicketVenueAccess(anchor, actorOf(req));
+
+    const checkoutId = anchor.groupId ?? anchor.id;
+    const uniqueIds = [...new Set(parsed.data.ticketIds)];
+    const targets = await prisma.ticket.findMany({ where: { id: { in: uniqueIds } } });
+    if (targets.length !== uniqueIds.length) {
+      return fail(res, 404, ErrorCodes.TICKET_NOT_FOUND, 'Билет не найден');
+    }
+    for (const ticket of targets) {
+      if ((ticket.groupId ?? ticket.id) !== checkoutId) {
+        return fail(res, 400, ErrorCodes.VALIDATION_ERROR, 'Билеты должны быть из одного заказа');
+      }
+      await assertTicketVenueAccess(ticket, actorOf(req));
+    }
+
+    if (!paymentService) {
+      return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Платежи не настроены');
+    }
+
+    const result = await paymentService.refundTickets(uniqueIds);
+    await recordAudit({
+      action: AuditActions.TICKET_REFUND,
+      actor: actorOf(req),
+      req,
+      resource: 'ticket',
+      resourceId: anchor.id,
+      metadata: {
+        ticketIds: result.ticketIds,
+        amount: result.amount,
+        partial: result.partial,
+        venueId: anchor.venueId,
+      },
+    });
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof PaymentError) {
+      return fail(res, err.status, err.code, err.message);
+    }
+    if (err instanceof AppError) return failApp(res, err);
+    console.error('[refund] error:', err);
+    return fail(res, 500, ErrorCodes.INTERNAL_ERROR, 'Не удалось оформить возврат');
   }
 });
 

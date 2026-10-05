@@ -48,8 +48,8 @@ describe('can()', () => {
 });
 
 describe('permission catalog', () => {
-  it('has 18 codes and every code is resource.action', () => {
-    expect(PERMISSION_CODES).toHaveLength(18);
+  it('has 19 codes and every code is resource.action', () => {
+    expect(PERMISSION_CODES).toHaveLength(19);
     for (const code of PERMISSION_CODES) {
       expect(code).toMatch(/^[a-z]+\.[a-z]+$/);
     }
@@ -92,6 +92,7 @@ describe('system role presets', () => {
     const manager = actor(SYSTEM_ROLES.find(r => r.slug === 'manager')!.permissions);
     expect(can(manager, 'tickets.edit')).toBe(true);
     expect(can(manager, 'tickets.checkin')).toBe(true);
+    expect(can(manager, 'tickets.refund')).toBe(false);
     expect(can(manager, 'tickets.delete')).toBe(false);
     expect(can(manager, 'events.delete')).toBe(false);
     expect(can(manager, 'users.view')).toBe(false);
@@ -101,6 +102,7 @@ describe('system role presets', () => {
     const admin = actor(SYSTEM_ROLES.find(r => r.slug === 'admin')!.permissions);
     expect(can(admin, 'events.delete')).toBe(true);
     expect(can(admin, 'tickets.delete')).toBe(true);
+    expect(can(admin, 'tickets.refund')).toBe(true);
     expect(can(admin, 'users.view')).toBe(true);
     expect(can(admin, 'users.create')).toBe(false);
     expect(can(admin, 'users.delete')).toBe(false);

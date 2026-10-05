@@ -220,6 +220,38 @@ describe('KapitalProvider', () => {
     expect(provider.supportsWebhooks).toBe(false);
     expect(provider.verifyAndParseWebhook).toBeUndefined();
   });
+
+  it('refunds with the documented exec-tran Refund body, including a partial amount', async () => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse(200, { tran: { approvalCode: '963348', pmoResultCode: '2' } }),
+    );
+
+    const provider = newProvider();
+    const result = await provider.refundPayment('265863', '10.0000');
+
+    expect(result.pmoResultCode).toBe('2');
+    expect(result.approvalCode).toBe('963348');
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://txpgtst.kapitalbank.az/api/order/265863/exec-tran');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(
+      `Basic ${Buffer.from('TerminalSys/kapital:kapital123').toString('base64')}`,
+    );
+    expect(JSON.parse(init.body)).toEqual({
+      tran: { phase: 'Single', type: 'Refund', amount: '10.0000' },
+    });
+    expect(init.body).not.toContain('voidKind');
+    expect(url).not.toContain('password');
+  });
+
+  it('treats a declined refund pmoResultCode as a bank error', async () => {
+    fetchMock.mockResolvedValueOnce(
+      fakeResponse(200, { tran: { pmoResultCode: '67' } }),
+    );
+
+    const provider = newProvider();
+    await expect(provider.refundPayment('265863', '10.0000')).rejects.toBeInstanceOf(KapitalApiError);
+  });
 });
 
 describe('loadKapitalConfig', () => {

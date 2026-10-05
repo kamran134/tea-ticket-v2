@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   // No tickets.create: tickets are created by buyers through the public route.
   'tickets.view': { resource: 'tickets', label: 'Просмотр билетов' },
   'tickets.edit': { resource: 'tickets', label: 'Подтверждение и отклонение билетов' },
+  'tickets.refund': { resource: 'tickets', label: 'Возврат оплаты по билету' },
   'tickets.delete': { resource: 'tickets', label: 'Удаление билетов' },
   'tickets.checkin': { resource: 'tickets', label: 'Отметка о приходе (сканер)' },
 
@@ -115,6 +116,7 @@ export const SYSTEM_ROLES: {
       'events.delete',
       'tickets.view',
       'tickets.edit',
+      'tickets.refund',
       'tickets.delete',
       'tickets.checkin',
       'stats.view',

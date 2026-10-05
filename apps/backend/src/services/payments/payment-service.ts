@@ -575,6 +575,154 @@ export class PaymentService {
     return true;
   }
 
+  /**
+   * Refund the paid amount of the given tickets. They must belong to one
+   * checkout that has a succeeded card payment. A subset of a group is a
+   * partial refund: the bank is called once with the sum of those ticket
+   * prices (Kapital `type: "Refund"`), and only those tickets become REFUNDED.
+   * The row lock on the payment serialises two refunds of the same order so
+   * the second sees the first's status and does not charge the card twice.
+   */
+  async refundTickets(ticketIds: string[]): Promise<{
+    amount: string;
+    partial: boolean;
+    ticketIds: string[];
+  }> {
+    const uniqueIds = [...new Set(ticketIds)].sort();
+    if (uniqueIds.length === 0) {
+      throw new PaymentError(400, 'Не выбраны билеты для возврата', ErrorCodes.VALIDATION_ERROR);
+    }
+
+    const tickets = await this.deps.prisma.ticket.findMany({
+      where: { id: { in: uniqueIds } },
+    });
+    if (tickets.length !== uniqueIds.length) {
+      throw new PaymentError(404, 'Билет не найден', ErrorCodes.TICKET_NOT_FOUND);
+    }
+
+    const checkoutIds = new Set(tickets.map(t => t.groupId ?? t.id));
+    if (checkoutIds.size !== 1) {
+      throw new PaymentError(400, 'Билеты должны быть из одного заказа', ErrorCodes.VALIDATION_ERROR);
+    }
+    const checkoutId = [...checkoutIds][0];
+
+    const payment = await this.deps.prisma.payment.findFirst({
+      where: {
+        checkoutId,
+        status: 'SUCCEEDED',
+        providerPaymentId: { not: null },
+      },
+      orderBy: { paidAt: 'desc' },
+    });
+    if (!payment?.providerPaymentId) {
+      throw new PaymentError(
+        409,
+        'По этому билету нет успешной оплаты картой — вернуть деньги нельзя',
+        ErrorCodes.REFUND_NOT_AVAILABLE,
+      );
+    }
+    if (!this.deps.provider.refundPayment) {
+      throw new PaymentError(
+        501,
+        'Платёжный провайдер не умеет возвращать деньги',
+        ErrorCodes.REFUND_NOT_AVAILABLE,
+      );
+    }
+
+    const refundAmount = sumAmounts(tickets.map(t => t.price));
+    const providerPaymentId = payment.providerPaymentId;
+    const refundPayment = this.deps.provider.refundPayment.bind(this.deps.provider);
+
+    return this.deps.prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Payment" WHERE id = ${payment.id} FOR UPDATE`;
+      if (uniqueIds.length === 1) {
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id = ${uniqueIds[0]} FOR UPDATE`;
+      } else {
+        await tx.$queryRaw`SELECT id FROM "Ticket" WHERE id IN (${Prisma.join(uniqueIds)}) FOR UPDATE`;
+      }
+
+      const locked = await tx.payment.findUniqueOrThrow({ where: { id: payment.id } });
+      const fresh = await tx.ticket.findMany({ where: { id: { in: uniqueIds } } });
+      if (fresh.length !== uniqueIds.length) {
+        throw new PaymentError(404, 'Билет не найден', ErrorCodes.TICKET_NOT_FOUND);
+      }
+
+      for (const ticket of fresh) {
+        if ((ticket.groupId ?? ticket.id) !== checkoutId) {
+          throw new PaymentError(400, 'Билеты должны быть из одного заказа', ErrorCodes.VALIDATION_ERROR);
+        }
+        if (ticket.checkedIn) {
+          throw new PaymentError(
+            409,
+            'По этому билету уже прошли — возврат недоступен',
+            ErrorCodes.TICKET_ALREADY_CHECKED_IN,
+          );
+        }
+        if (ticket.status !== 'CONFIRMED') {
+          throw new PaymentError(
+            409,
+            'Вернуть можно только подтверждённый билет, по которому ещё не прошли',
+            ErrorCodes.REFUND_NOT_ALLOWED,
+          );
+        }
+      }
+
+      const already = new Prisma.Decimal(locked.refundedAmount ?? 0);
+      const adding = new Prisma.Decimal(refundAmount);
+      const next = already.add(adding);
+      if (next.greaterThan(new Prisma.Decimal(locked.amount))) {
+        throw new PaymentError(
+          409,
+          'Сумма возврата больше остатка оплаты',
+          ErrorCodes.REFUND_EXCEEDS_PAYMENT,
+        );
+      }
+
+      let approvalCode: string | null = null;
+      let pmoResultCode: string | null = null;
+      if (adding.greaterThan(0)) {
+        try {
+          const result = await refundPayment(providerPaymentId, refundAmount);
+          approvalCode = result.approvalCode;
+          pmoResultCode = result.pmoResultCode;
+        } catch (err) {
+          if (err instanceof PaymentError) throw err;
+          const detail = err instanceof Error ? err.message : 'Refund failed';
+          console.error(`[refund] provider rejected payment ${payment.id}: ${detail}`);
+          throw new PaymentError(502, 'Банк отклонил возврат', ErrorCodes.REFUND_FAILED);
+        }
+      }
+
+      await tx.ticket.updateMany({
+        where: { id: { in: uniqueIds } },
+        data: { status: 'REFUNDED' },
+      });
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: { refundedAmount: next },
+      });
+
+      const orderTickets = await tx.ticket.findMany({
+        where: { OR: [{ id: checkoutId }, { groupId: checkoutId }] },
+        select: { status: true },
+      });
+      const partial = orderTickets.some(t => t.status === 'CONFIRMED');
+
+      await tx.paymentRefund.create({
+        data: {
+          paymentId: payment.id,
+          amount: refundAmount,
+          ticketIds: uniqueIds,
+          approvalCode,
+          pmoResultCode,
+          partial,
+        },
+      });
+
+      return { amount: refundAmount, partial, ticketIds: uniqueIds };
+    }, { timeout: 20_000 });
+  }
+
   private async getCheckoutTickets(checkoutId: string) {
     return this.deps.prisma.ticket.findMany({
       where: {

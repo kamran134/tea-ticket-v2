@@ -439,6 +439,17 @@ export const api = {
     });
   },
 
+  async refundTickets(
+    id: string,
+    ticketIds: string[],
+  ): Promise<{ amount: string; partial: boolean; ticketIds: string[] }> {
+    return request(`/api/tickets/${encodeURIComponent(id)}/refund`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ ticketIds }),
+    });
+  },
+
   async createVenue(data: {
     name: string;
     date: string;

@@ -33,6 +33,11 @@ export interface ProviderPaymentState {
   failureCode: string | null;
 }
 
+export interface RefundPaymentResult {
+  approvalCode: string | null;
+  pmoResultCode: string | null;
+}
+
 export interface WebhookEvent {
   providerEventId: string;
   providerPaymentId: string;

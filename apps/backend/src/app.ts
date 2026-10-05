@@ -8,7 +8,7 @@ import { authRouter } from './routes/auth';
 import { adminUsersRouter } from './routes/admin-users';
 import { permissionsRouter, rolesRouter } from './routes/roles';
 import { auditLogRouter } from './routes/audit-log';
-import { ticketsRouter, setTicketsEmailProcessor } from './routes/tickets';
+import { ticketsRouter, setTicketsEmailProcessor, setTicketsPaymentService } from './routes/tickets';
 import { venuesRouter } from './routes/venues';
 import { zonesRouter } from './routes/zones';
 import { gridTemplatesRouter } from './routes/grid-templates';
@@ -64,6 +64,7 @@ export function createApp(options?: {
     sender: options?.emailSender,
   });
   setTicketsEmailProcessor(emailRuntime.processor);
+  setTicketsPaymentService(paymentService);
 
   const app = express();
   const UPLOADS_DIR = process.env.UPLOADS_DIR ?? '/app/uploads';

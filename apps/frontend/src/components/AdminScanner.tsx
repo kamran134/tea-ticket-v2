@@ -232,7 +232,11 @@ export function AdminScanner() {
             {allCheckedIn ? (
               <div className="text-center text-red-400 text-sm font-bold py-1">⚠ Уже вошли</div>
             ) : remainingToCheckIn === 0 ? (
-              <div className="text-center text-amber-400 text-sm font-medium py-1">Билет не подтверждён</div>
+              <div className="text-center text-amber-400 text-sm font-medium py-1">
+                {(isGroup ? members : [ticket]).every(m => m.status === 'REFUNDED')
+                  ? 'Деньги возвращены, билет недействителен'
+                  : 'Билет не подтверждён'}
+              </div>
             ) : (
               <>
                 {isGroup && (

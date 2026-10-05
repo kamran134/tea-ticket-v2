@@ -28,6 +28,7 @@ export const AuditActions = {
   PROMO_UPDATE: 'promos.update',
   PROMO_DELETE: 'promos.delete',
   TICKET_STATUS: 'tickets.status',
+  TICKET_REFUND: 'tickets.refund',
   TICKET_DELETE: 'tickets.delete',
 } as const;
 

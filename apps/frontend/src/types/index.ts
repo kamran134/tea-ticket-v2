@@ -1,4 +1,4 @@
-export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED';
+export type TicketStatus = 'BOOKED' | 'PENDING' | 'CONFIRMED' | 'REJECTED' | 'EXPIRED' | 'REFUNDED';
 
 export type Currency = '₼';
 

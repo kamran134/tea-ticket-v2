@@ -3,6 +3,7 @@ import type {
   CreatePaymentInput,
   CreatePaymentResult,
   ProviderPaymentState,
+  RefundPaymentResult,
   WebhookEvent,
 } from './types';
 
@@ -25,5 +26,9 @@ export interface PaymentProvider {
 
   cancelPayment?(providerPaymentId: string): Promise<void>;
 
-  refundPayment?(providerPaymentId: string, amount: string): Promise<void>;
+  /**
+   * Return captured funds. `amount` is N.NNNN and may be less than the original
+   * order — that is how a group checkout is refunded ticket by ticket.
+   */
+  refundPayment?(providerPaymentId: string, amount: string): Promise<RefundPaymentResult>;
 }

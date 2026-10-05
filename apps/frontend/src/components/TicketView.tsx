@@ -57,6 +57,7 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
   CONFIRMED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
   EXPIRED: 'bg-gray-100 text-gray-700',
+  REFUNDED: 'bg-purple-100 text-purple-800',
 };
 
 const EMAIL_STATUS_COLORS: Record<TicketEmailDeliveryStatus, string> = {
@@ -105,6 +106,7 @@ export function TicketView() {
     CONFIRMED: t('ticket.statusConfirmed'),
     REJECTED: t('ticket.statusRejected'),
     EXPIRED: t('ticket.statusExpired'),
+    REFUNDED: t('ticket.statusRefunded'),
   }), [t]);
 
   const emailStatusLabels = useMemo(() => ({
@@ -376,6 +378,8 @@ export function TicketView() {
     );
   }
 
+  const roster = members.length > 0 ? members : [ticket];
+  const groupStillValid = roster.some(m => m.status === 'CONFIRMED');
   const holdExpired = isHoldExpired(ticket);
   const displayStatus: TicketStatus = holdExpired ? 'EXPIRED' : ticket.status;
   const pricedTickets = members.length > 0 ? members : [ticket];
@@ -579,10 +583,16 @@ export function TicketView() {
           </div>
         )}
 
-        {ticket.status === 'CONFIRMED' && (
+        {groupStillValid && (
           <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-col items-center gap-3">
-            <div className="text-2xl">✅</div>
-            <h2 className="font-semibold text-green-800">{t('ticket.confirmed')}</h2>
+            {ticket.status === 'REFUNDED' ? (
+              <p className="text-sm text-purple-800 text-center">{t('ticket.refundedHintGroup')}</p>
+            ) : (
+              <>
+                <div className="text-2xl">✅</div>
+                <h2 className="font-semibold text-green-800">{t('ticket.confirmed')}</h2>
+              </>
+            )}
             <div data-testid="ticket-qr" className="p-3 bg-white keep-white rounded-xl">
               <QRCodeSVG value={ticket.groupId ?? ticket.id} size={200} />
             </div>
@@ -596,6 +606,16 @@ export function TicketView() {
             <h2 className="font-semibold text-red-800">{t('ticket.rejected')}</h2>
             <p className="text-sm text-red-600 mt-1">
               {t('ticket.rejectedHint')}
+            </p>
+          </div>
+        )}
+
+        {ticket.status === 'REFUNDED' && !groupStillValid && (
+          <div className="bg-purple-50 border border-purple-200 rounded-2xl p-6 text-center">
+            <div className="text-4xl mb-2">↩</div>
+            <h2 className="font-semibold text-purple-900">{t('ticket.refunded')}</h2>
+            <p className="text-sm text-purple-700 mt-1">
+              {t('ticket.refundedHint')}
             </p>
           </div>
         )}
@@ -622,10 +642,18 @@ export function TicketView() {
                   </div>
                   <span
                     className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${
-                      m.checkedIn ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      m.status === 'REFUNDED'
+                        ? 'bg-purple-100 text-purple-700'
+                        : m.checkedIn
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-gray-100 text-gray-500'
                     }`}
                   >
-                    {m.checkedIn ? t('ticket.checkedIn') : t('ticket.waiting')}
+                    {m.status === 'REFUNDED'
+                      ? t('ticket.refundedMember')
+                      : m.checkedIn
+                        ? t('ticket.checkedIn')
+                        : t('ticket.waiting')}
                   </span>
                 </div>
               ))}

@@ -22,6 +22,7 @@ import { AuditTab } from './admin/AuditTab';
 import { ChangePasswordDialog } from './admin/ChangePasswordDialog';
 import { InboundEmailBadge } from './InboundEmailBadge';
 import { PromosTab } from './admin/PromosTab';
+import { RefundDialog } from './admin/RefundDialog';
 import { PickerInput } from './PickerInput';
 
 type PendingConfirm = { title: string; message: string; onConfirm: () => void };
@@ -47,6 +48,7 @@ const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
   { value: 'BOOKED', label: 'Новые' },
   { value: 'PENDING', label: 'Ожидают' },
   { value: 'CONFIRMED', label: 'Подтверждены' },
+  { value: 'REFUNDED', label: 'Возвращены' },
   { value: 'REJECTED', label: 'Отклонены' },
   { value: 'EXPIRED', label: 'Истекли' },
 ];
@@ -55,6 +57,7 @@ const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> =
   BOOKED:    { label: 'Забронирован', className: 'bg-blue-100 text-blue-700' },
   PENDING:   { label: 'Ожидает',      className: 'bg-amber-100 text-amber-700' },
   CONFIRMED: { label: 'Подтверждён',  className: 'bg-green-100 text-green-700' },
+  REFUNDED:  { label: 'Возвращён',    className: 'bg-purple-100 text-purple-700' },
   REJECTED:  { label: 'Отклонён',     className: 'bg-red-100 text-red-600' },
   EXPIRED:   { label: 'Истёк',        className: 'bg-gray-100 text-gray-600' },
 };
@@ -68,6 +71,16 @@ const EMAIL_STATUS_STYLE: Record<TicketEmailDeliveryStatus, { label: string; cla
   COMPLAINED: { label: 'Email — жалоба',      className: 'text-red-700' },
   FAILED:     { label: 'Ошибка email',        className: 'text-red-700' },
 };
+
+function refundableTickets(tickets: Ticket[]): Ticket[] {
+  return tickets.filter(t => t.status === 'CONFIRMED' && !t.checkedIn);
+}
+
+function groupBadge(tickets: Ticket[]): { label: string; className: string } {
+  const first = tickets[0]?.status;
+  if (first && tickets.every(t => t.status === first)) return STATUS_STYLE[first];
+  return { label: 'Разные статусы', className: 'bg-gray-100 text-gray-600' };
+}
 
 function TicketAmount({ ticket, currency }: { ticket: Ticket; currency: string }) {
   const discounted = (ticket.discountAmount ?? 0) > 0;
@@ -241,6 +254,7 @@ export function ManagePanel() {
   const [filterVenueId, setFilterVenueId] = useState('');
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [refundTickets, setRefundTickets] = useState<Ticket[] | null>(null);
 
   // Confirm dialog
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
@@ -497,6 +511,7 @@ export function ManagePanel() {
     BOOKED: allTickets.filter(t => t.status === 'BOOKED').length,
     PENDING: allTickets.filter(t => t.status === 'PENDING').length,
     CONFIRMED: allTickets.filter(t => t.status === 'CONFIRMED').length,
+    REFUNDED: allTickets.filter(t => t.status === 'REFUNDED').length,
     REJECTED: allTickets.filter(t => t.status === 'REJECTED').length,
     EXPIRED: allTickets.filter(t => t.status === 'EXPIRED').length,
   }), [allTickets]);
@@ -533,6 +548,7 @@ export function ManagePanel() {
   const canEditEvents = auth.can('events.edit');
   const canDeleteEvents = auth.can('events.delete');
   const canEditTickets = auth.can('tickets.edit');
+  const canRefundTickets = auth.can('tickets.refund');
   const canDeleteTickets = auth.can('tickets.delete');
   const canCheckin = auth.can('tickets.checkin');
 
@@ -976,6 +992,15 @@ export function ManagePanel() {
                             </button>
                           </>
                         )}
+                        {canRefundTickets && refundableTickets([t]).length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setRefundTickets([t])}
+                            className="flex-1 py-2 bg-purple-700 text-white rounded-xl font-semibold hover:bg-purple-800 transition-colors text-sm"
+                          >
+                            Вернуть деньги
+                          </button>
+                        )}
                         {canDeleteTickets && (
                         <button
                           onClick={() => deleteTicket(t)}
@@ -994,7 +1019,7 @@ export function ManagePanel() {
                 // cascade to every member on the backend, so members share one
                 // status badge and one confirm/reject action.
                 const primary = group.tickets[0];
-                const badge = STATUS_STYLE[primary.status];
+                const badge = groupBadge(group.tickets);
                 const totalPrice = group.tickets.reduce((sum, t) => sum + t.price, 0);
                 const listPrice = group.tickets.reduce((sum, t) => sum + (t.listPrice ?? t.price), 0);
                 const groupPromo = group.tickets.find(t => t.promoCode)?.promoCode;
@@ -1052,6 +1077,9 @@ export function ManagePanel() {
                               </div>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[t.status].className}`}>
+                                {STATUS_STYLE[t.status].label}
+                              </span>
                               {t.receiptLink && (
                                 <button
                                   type="button"
@@ -1098,6 +1126,15 @@ export function ManagePanel() {
                           Отклонить группу
                         </button>
                       </div>
+                    )}
+                    {canRefundTickets && refundableTickets(group.tickets).length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setRefundTickets(group.tickets)}
+                        className="w-full py-2 bg-purple-700 text-white rounded-xl font-semibold hover:bg-purple-800 transition-colors text-sm"
+                      >
+                        Вернуть деньги
+                      </button>
                     )}
                   </div>
                 );
@@ -1155,6 +1192,15 @@ export function ManagePanel() {
 
       {showPasswordDialog && (
         <ChangePasswordDialog onClose={() => setShowPasswordDialog(false)} />
+      )}
+
+      {refundTickets && (
+        <RefundDialog
+          tickets={refundTickets}
+          currency={ticketCurrency}
+          onClose={() => setRefundTickets(null)}
+          onRefunded={loadTickets}
+        />
       )}
 
       {pendingConfirm && (

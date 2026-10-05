@@ -10,7 +10,7 @@ export interface PaymentProviderConfig {
 }
 
 export function loadPaymentProviderConfig(): PaymentProviderConfig {
-  const provider = (process.env.PAYMENT_PROVIDER ?? 'mock') as 'mock' | 'kapital';
+  const provider = (process.env.PAYMENT_PROVIDER ?? 'kapital') as 'mock' | 'kapital';
   if (provider !== 'mock' && provider !== 'kapital') {
     throw new Error(`Unknown PAYMENT_PROVIDER: ${provider}`);
   }

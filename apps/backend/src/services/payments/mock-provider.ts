@@ -6,8 +6,10 @@ import type {
   CreatePaymentResult,
   ProviderPaymentState,
   ProviderPaymentStatus,
+  RefundPaymentResult,
   WebhookEvent,
 } from './types';
+import { Decimal } from '@prisma/client/runtime/library';
 import { assertAmountFormat, assertCurrency } from './decimal';
 
 interface MockSession {
@@ -22,6 +24,7 @@ interface MockSession {
   paidAt: string | null;
   failureCode: string | null;
   token: string;
+  refundedAmount: string;
 }
 
 export class MockPaymentProvider implements PaymentProvider {
@@ -55,6 +58,7 @@ export class MockPaymentProvider implements PaymentProvider {
       paidAt: null,
       failureCode: null,
       token,
+      refundedAmount: '0.0000',
     };
 
     this.sessions.set(providerPaymentId, session);
@@ -106,6 +110,28 @@ export class MockPaymentProvider implements PaymentProvider {
       failureCode: payload.failureCode ?? null,
       rawPayload: payload,
     };
+  }
+
+  refundPayment(providerPaymentId: string, amount: string): Promise<RefundPaymentResult> {
+    assertAmountFormat(amount);
+    const session = this.sessions.get(providerPaymentId);
+    // Sessions live only in this process. After a restart the payment row is
+    // still in the database, and the caller has already checked the remaining
+    // amount there — refusing here would make every local refund fail.
+    if (!session) {
+      return Promise.resolve({ approvalCode: 'MOCK', pmoResultCode: '1' });
+    }
+    const next = new Decimal(session.refundedAmount).add(amount);
+    if (next.greaterThan(session.amount)) {
+      throw new Error('Refund exceeds the paid amount');
+    }
+    session.refundedAmount = next.toFixed(4);
+    return Promise.resolve({
+      approvalCode: 'MOCK',
+      // '2' is "Approved Partial" in the Kapital PmoDecline table; a refund of
+      // the whole remaining amount is a plain approval.
+      pmoResultCode: next.equals(session.amount) ? '1' : '2',
+    });
   }
 
   getPaymentStatus(providerPaymentId: string): Promise<ProviderPaymentState> {

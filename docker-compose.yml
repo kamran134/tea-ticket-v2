@@ -40,16 +40,16 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN}
       UPLOADS_DIR: /app/uploads
       PORT: 3000
-      # mock — self-contained hosted page, no external calls; kapital — Kapital Bank TXPG
-      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-mock}
+      # kapital — Kapital Bank TXPG. mock remains only for the automated test suite.
+      PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-kapital}
       PAYMENT_HOLD_MINUTES: ${PAYMENT_HOLD_MINUTES:-15}
       PUBLIC_APP_URL: ${PUBLIC_APP_URL:-https://tea-ticket.com}
       PUBLIC_FRONTEND_URL: ${PUBLIC_FRONTEND_URL:-https://tea-ticket.com}
       PAYMENT_WEBHOOK_BASE_URL: ${PAYMENT_WEBHOOK_BASE_URL:-http://backend:3000}
       MOCK_WEBHOOK_SECRET: ${MOCK_WEBHOOK_SECRET:-dev-mock-webhook-secret}
-      KAPITAL_API_BASE_URL: ${KAPITAL_API_BASE_URL:-}
-      KAPITAL_USERNAME: ${KAPITAL_USERNAME:-}
-      KAPITAL_PASSWORD: ${KAPITAL_PASSWORD:-}
+      KAPITAL_API_BASE_URL: ${KAPITAL_API_BASE_URL:-https://txpgtst.kapitalbank.az/api}
+      KAPITAL_USERNAME: ${KAPITAL_USERNAME:-TerminalSys/kapital}
+      KAPITAL_PASSWORD: ${KAPITAL_PASSWORD:-kapital123}
       EMAIL_ENABLED: ${EMAIL_ENABLED:-false}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_WEBHOOK_SECRET: ${RESEND_WEBHOOK_SECRET:-}
