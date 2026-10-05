@@ -17,6 +17,7 @@ import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { createResendInboundWebhookHandler } from './routes/resend-inbound';
 import { inboundEmailsRouter } from './routes/inbound-emails';
+import { eventPreviewRouter } from './routes/event-preview';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { testRouter } from './routes/test';
 import { isTestMode } from './errors';
@@ -104,6 +105,8 @@ export function createApp(options?: {
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
+
+  app.use('/e', eventPreviewRouter);
 
   app.use('/api/auth', authRouter);
   app.use('/api/admin-users', adminUsersRouter);
