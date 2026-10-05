@@ -106,14 +106,14 @@ export function TicketView() {
   }), [t]);
 
   const emailStatusLabels = useMemo(() => ({
-    PENDING: t('ticket.emailPending'),
+    PENDING: t('ticket.emailPending', { email: emailDelivery?.recipient ?? '' }),
     PROCESSING: t('ticket.emailProcessing'),
     ACCEPTED: t('ticket.emailAccepted'),
-    DELIVERED: t('ticket.emailDelivered'),
+    DELIVERED: t('ticket.emailDelivered', { email: emailDelivery?.recipient ?? '' }),
     BOUNCED: t('ticket.emailBounced'),
     COMPLAINED: t('ticket.emailComplained'),
     FAILED: t('ticket.emailFailed'),
-  }), [t]);
+  }), [t, emailDelivery?.recipient]);
 
   useEffect(() => {
     document.title = t('titles.ticket');

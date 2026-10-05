@@ -40,6 +40,7 @@ const ACTIVE_TICKET_STATUSES: PrismaTicketStatus[] = ['BOOKED', 'PENDING', 'CONF
 
 async function getTicketEmailDelivery(checkoutId: string): Promise<{
   status: EmailJobStatus;
+  recipient: string;
   acceptedAt: string | null;
   deliveredAt: string | null;
 } | null> {
@@ -52,6 +53,7 @@ async function getTicketEmailDelivery(checkoutId: string): Promise<{
     },
     select: {
       status: true,
+      recipient: true,
       acceptedAt: true,
       deliveredAt: true,
     },
@@ -59,6 +61,7 @@ async function getTicketEmailDelivery(checkoutId: string): Promise<{
   if (!job) return null;
   return {
     status: job.status,
+    recipient: job.recipient,
     acceptedAt: job.acceptedAt?.toISOString() ?? null,
     deliveredAt: job.deliveredAt?.toISOString() ?? null,
   };
@@ -66,11 +69,13 @@ async function getTicketEmailDelivery(checkoutId: string): Promise<{
 
 function toEmailDeliveryDto(job: {
   status: EmailJobStatus;
+  recipient: string;
   acceptedAt: Date | null;
   deliveredAt: Date | null;
 }) {
   return {
     status: job.status,
+    recipient: job.recipient,
     acceptedAt: job.acceptedAt?.toISOString() ?? null,
     deliveredAt: job.deliveredAt?.toISOString() ?? null,
   };
@@ -124,6 +129,7 @@ ticketsRouter.get('/', requireAuth, requirePermission('tickets.view'), async (re
             select: {
               checkoutId: true,
               status: true,
+              recipient: true,
               acceptedAt: true,
               deliveredAt: true,
             },

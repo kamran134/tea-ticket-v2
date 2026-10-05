@@ -109,6 +109,7 @@ export type TicketEmailDeliveryStatus =
 
 export interface TicketEmailDelivery {
   status: TicketEmailDeliveryStatus;
+  recipient: string;
   acceptedAt: string | null;
   deliveredAt: string | null;
 }
