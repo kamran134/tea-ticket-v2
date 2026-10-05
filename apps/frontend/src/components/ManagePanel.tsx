@@ -620,17 +620,20 @@ export function ManagePanel() {
                                 </option>
                               ))}
                             </select>
-                            <div className="flex gap-3">
+                            <div className="flex gap-2 pt-1">
                               <button
+                                type="button"
                                 onClick={() => saveVenueEdit(v.id)}
                                 disabled={savingVenueEdit}
-                                className="text-xs text-emerald-700 hover:underline disabled:opacity-50"
+                                className="flex-1 py-2 px-3 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
                               >
                                 Сохранить
                               </button>
                               <button
+                                type="button"
                                 onClick={() => setEditingVenueId(null)}
-                                className="text-xs text-gray-400 hover:text-gray-600"
+                                disabled={savingVenueEdit}
+                                className="flex-1 py-2 px-3 rounded-lg text-sm font-semibold border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
                               >
                                 Отмена
                               </button>
