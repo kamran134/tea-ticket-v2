@@ -19,7 +19,7 @@ export function Footer() {
     <footer className="site-footer border-t border-[var(--footer-border)] mt-12 md:mt-32">
       <div className="site-container py-10 md:py-16 grid gap-10 md:gap-12 md:grid-cols-4">
         <div className="md:col-span-2">
-          <a href={SITE_URL} target="_blank" rel="noreferrer">
+          <a href={SITE_URL}>
             <img
               src={brandLogo}
               alt="StolitsA.rt"

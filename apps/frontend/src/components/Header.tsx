@@ -35,7 +35,7 @@ export function Header() {
       }`}
     >
       <div className="site-container flex h-[72px] sm:h-[86px] items-center justify-between gap-3">
-        <a href={SITE_URL} target="_blank" rel="noreferrer" className="group block shrink-0 min-w-0">
+        <a href={SITE_URL} className="group block shrink-0 min-w-0">
           <img
             src={brandLogo}
             alt="StolitsA.rt"
