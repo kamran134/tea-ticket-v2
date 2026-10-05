@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { AppError, ErrorCodes, fail, failApp } from '../errors';
 import { expireStaleBookings } from '../services/booking-expiry';
 import { syncSeatsForZoneTables, toSeatDto } from '../services/tableSeats';
+import { resolveZoneTableNumbers } from '../services/tableNumbers';
 import { normalizeDescription } from '../lib/sanitizeDescription';
 
 const upload = multer({
@@ -246,6 +247,15 @@ const gridLayoutSchema = z.object({
   rows: z.number().int().min(1).max(100),
   cols: z.number().int().min(1).max(100),
   cells: z.array(z.array(z.string())),
+  // Optional so a client that only moves the grid keeps auto-numbering.
+  // When present, each entry is the venue number of the table whose
+  // top-left cell is (row, col).
+  tableNumbers: z.array(z.object({
+    zoneId: z.string().min(1).max(64),
+    row: z.number().int().min(0).max(99),
+    col: z.number().int().min(0).max(99),
+    number: z.number().int().min(1).max(9999),
+  })).max(5000).optional(),
 });
 
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
@@ -262,7 +272,7 @@ venuesRouter.put('/:id/grid-layout', requireAuth, requirePermission('events.edit
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: parsed.error.issues[0].message });
   }
-  const { rows, cols, cells } = parsed.data;
+  const { rows, cols, cells, tableNumbers: tableNumberInputs = [] } = parsed.data;
   const venueId = req.params.id;
 
   if (cells.length !== rows || cells.some(row => row.length !== cols)) {
@@ -335,6 +345,16 @@ venuesRouter.put('/:id/grid-layout', requireAuth, requirePermission('events.edit
       return res.status(400).json({
         success: false,
         error: `Zone "${zone.name}": tables must be painted as solid rectangles`,
+      });
+    }
+  }
+
+  for (const entry of tableNumberInputs) {
+    const zone = zoneById.get(entry.zoneId);
+    if (!zone || zone.type !== 'TABLE') {
+      return res.status(400).json({
+        success: false,
+        error: 'Номер указан для зоны, которой нет на схеме',
       });
     }
   }
@@ -435,6 +455,24 @@ venuesRouter.put('/:id/grid-layout', requireAuth, requirePermission('events.edit
           await tx.zoneTable.deleteMany({ where: { id: { in: toRemove.map(t => t.id) } } });
         }
 
+        const resolvedNumbers = resolveZoneTableNumbers({
+          zoneName: zone.name,
+          chairCount,
+          blobs: desiredBlobs,
+          keptNumberByAnchor: new Map(toKeep.map(t => [`${t.row}-${t.col}`, t.number])),
+          // Off-grid tables (legacy bulk generator) are not part of this diff
+          // but still own their number inside the zone.
+          reserved: allZoneTables
+            .filter(t => t.row === null || t.col === null)
+            .map(t => ({ number: t.number, chairCount: t.chairCount })),
+          // Removed tables free their number for an explicit assignment, but
+          // a table the admin did not number still continues past the old max.
+          numberFloor: allZoneTables.map(t => t.number),
+          assignments: tableNumberInputs
+            .filter(entry => entry.zoneId === zoneId)
+            .map(({ row, col, number }) => ({ row, col, number })),
+        });
+
         for (const table of toKeep) {
           const blob = desiredByAnchor.get(`${table.row}-${table.col}`)!;
           if (
@@ -448,22 +486,45 @@ venuesRouter.put('/:id/grid-layout', requireAuth, requirePermission('events.edit
           }
         }
 
+        // Unique (zoneId, number) forbids writing the final numbers in place
+        // when two tables swap or one takes a number the other still holds.
+        const toRenumber = toKeep.filter(t => resolvedNumbers.get(`${t.row}-${t.col}`) !== t.number);
+        if (toRenumber.length > 0) {
+          for (let i = 0; i < toRenumber.length; i++) {
+            await tx.zoneTable.update({
+              where: { id: toRenumber[i].id },
+              data: { number: -(i + 1) },
+            });
+          }
+          for (const table of toRenumber) {
+            await tx.zoneTable.update({
+              where: { id: table.id },
+              data: { number: resolvedNumbers.get(`${table.row}-${table.col}`)! },
+            });
+          }
+        }
+
         const toAdd = desiredBlobs
           .filter(b => !existingByAnchor.has(`${b.row}-${b.col}`))
           .sort((a, b) => a.row - b.row || a.col - b.col);
 
         if (toAdd.length > 0) {
-          let counter = allZoneTables.reduce((m, t) => Math.max(m, t.number), 0) + 1;
           await tx.zoneTable.createMany({
             data: toAdd.map(b => ({
-              zoneId, number: counter++, chairCount, shape,
-              row: b.row, col: b.col, rows: b.rows, cols: b.cols,
+              zoneId,
+              number: resolvedNumbers.get(`${b.row}-${b.col}`)!,
+              chairCount,
+              shape,
+              row: b.row,
+              col: b.col,
+              rows: b.rows,
+              cols: b.cols,
             })),
           });
         }
 
         await tx.zone.update({ where: { id: zoneId }, data: { capacity: desiredBlobs.length * chairCount } });
-        await syncSeatsForZoneTables(tx, zoneId);
+        await syncSeatsForZoneTables(tx, zoneId, { renumber: toRenumber.length > 0 });
       }
 
       const venue = await tx.venue.update({

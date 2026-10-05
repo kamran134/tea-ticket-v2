@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { api } from '../services/api';
-import type { Venue, Zone, ZoneType, TableShape, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
+import type { Venue, Zone, ZoneTable, ZoneType, TableShape, GridLayout, GridCellState, GridTemplateSummary, GridTemplateZoneSlot } from '../types';
 import { formatPrice } from '../types';
 import { toast } from '../services/toast';
 import { useAdminAuth } from '../lib/adminAuth';
@@ -9,6 +9,14 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { ZONE_COLORS, zoneColor } from './grid/zoneColors';
 import { GRID_LINE, sameZoneNeighbor, connectedComponents, isSolidRectangle, boxToGridArea, cellToGridArea } from './grid/gridGeometry';
 import { GridCanvas } from './grid/GridCanvas';
+import {
+  MAX_TABLE_NUMBER,
+  MIN_TABLE_NUMBER,
+  reconcileTableNumbers,
+  sameTableNumberDraft,
+  tableNumberKey,
+  type TableNumberDraft,
+} from './grid/tableNumbers';
 
 type Tool = 'block' | 'erase' | string;
 
@@ -30,6 +38,21 @@ function countCellsByZone(cells: GridCellState[]): Record<string, number> {
 
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback;
+}
+
+function draftFromTables(tables: ZoneTable[]): { draft: TableNumberDraft; reserved: Record<string, number[]> } {
+  const numbers: Record<string, number> = {};
+  const floor: Record<string, number> = {};
+  const reserved: Record<string, number[]> = {};
+  for (const table of tables) {
+    if (table.row == null || table.col == null) {
+      (reserved[table.zoneId] ??= []).push(table.number);
+    } else {
+      numbers[tableNumberKey(table.zoneId, table.row, table.col)] = table.number;
+    }
+    floor[table.zoneId] = Math.max(floor[table.zoneId] ?? 0, table.number);
+  }
+  return { draft: { numbers, floor }, reserved };
 }
 
 // Tables occupy a rectangular footprint (not a single cell) — placing/removing
@@ -72,6 +95,64 @@ function removeConnectedBlob(cells: GridCellState[][], totalRows: number, totalC
     }
   }
   return next;
+}
+
+function TableNumberControl({
+  number,
+  locked,
+  editing,
+  draft,
+  onDraft,
+  onStart,
+  onCommit,
+  onCancel,
+}: {
+  number: number;
+  locked: boolean;
+  editing: boolean;
+  draft: string;
+  onDraft: (value: string) => void;
+  onStart: () => void;
+  onCommit: () => void;
+  onCancel: () => void;
+}) {
+  if (locked) return null;
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        inputMode="numeric"
+        aria-label="Номер стола"
+        value={draft}
+        onChange={e => onDraft(e.target.value)}
+        onMouseDown={e => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
+        onKeyDown={e => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            onCommit();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        onBlur={onCommit}
+        className="absolute left-1/2 top-1/2 z-10 w-12 -translate-x-1/2 -translate-y-1/2 pointer-events-auto rounded-md border border-amber-800 bg-white text-center text-sm font-bold text-amber-950 shadow outline-none"
+      />
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label={`Номер стола ${number}. Нажмите, чтобы изменить`}
+      title="Изменить номер стола"
+      onMouseDown={e => { e.stopPropagation(); e.preventDefault(); }}
+      onClick={e => { e.stopPropagation(); onStart(); }}
+      className="absolute left-1/2 top-1/2 z-10 flex h-7 min-w-7 -translate-x-1/2 -translate-y-1/2 pointer-events-auto items-center justify-center rounded-md border border-amber-900/30 bg-white/95 px-1 text-xs font-bold text-amber-950 shadow-sm hover:ring-2 hover:ring-amber-800/50"
+    >
+      {number}
+    </button>
+  );
 }
 
 interface Props {
@@ -139,6 +220,19 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   // render (including every mouseenter while drag-painting).
   const zoneById = useMemo(() => new Map(zones.map((z, i) => [z.id, { zone: z, index: i }])), [zones]);
 
+  // Table numbers are the venue's own numbering. `floor` is the highest
+  // number issued in a zone and only grows, so deleting a table does not
+  // hand its number to the next one painted.
+  const [numberDraft, setNumberDraft] = useState<TableNumberDraft>({ numbers: {}, floor: {} });
+  const [reservedNumbers, setReservedNumbers] = useState<Record<string, number[]>>({});
+  const [numbersReady, setNumbersReady] = useState(false);
+  const [numbersError, setNumbersError] = useState(false);
+  const [editingTableKey, setEditingTableKey] = useState<string | null>(null);
+  const [editingTableValue, setEditingTableValue] = useState('');
+  const ignoreNumberBlur = useRef(false);
+  const numberDraftRef = useRef(numberDraft);
+  numberDraftRef.current = numberDraft;
+
   // Drawing
   const isDrawing = useRef(false);
   const drawValue = useRef<GridCellState>('blocked');
@@ -176,6 +270,30 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
   }, [venue.id]);
 
   useEffect(() => loadZones(), [loadZones]);
+
+  const loadTableNumbers = useCallback(() => {
+    let cancelled = false;
+    setNumbersReady(false);
+    setNumbersError(false);
+    setEditingTableKey(null);
+    api.getGridData(venue.id)
+      .then(({ tables }) => {
+        if (cancelled) return;
+        const { draft, reserved } = draftFromTables(tables);
+        setReservedNumbers(reserved);
+        setNumberDraft(draft);
+        numberDraftRef.current = draft;
+        setNumbersReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNumbersError(true);
+        toast.error('Не удалось загрузить номера столов');
+      });
+    return () => { cancelled = true; };
+  }, [venue.id]);
+
+  useEffect(() => loadTableNumbers(), [loadTableNumbers]);
 
   useEffect(() => {
     api.getGridTemplates().then(setTemplates).catch(() => {});
@@ -469,6 +587,23 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     return counts;
   }, [tableBoxes]);
 
+  // Wait until zones are known: before that every painted table looks missing
+  // and reconcile would replace saved numbers with fresh ones.
+  useEffect(() => {
+    if (!numbersReady || zonesLoading || zonesError) return;
+    const anchors = tableBoxes.map(({ zoneId, box }) => ({
+      zoneId,
+      row: box.minRow,
+      col: box.minCol,
+    }));
+    setNumberDraft(prev => {
+      const next = reconcileTableNumbers(anchors, prev, reservedNumbers);
+      const resolved = sameTableNumberDraft(prev, next) ? prev : next;
+      numberDraftRef.current = resolved;
+      return resolved;
+    });
+  }, [tableBoxes, numbersReady, zonesLoading, zonesError, reservedNumbers]);
+
   // Mirrors the backend's own solidity check (see gridGeometry.ts) — the
   // current stamp/erase-whole-blob interaction never actually produces a
   // non-rectangular table, so this should never fire today. It's here so a
@@ -497,6 +632,61 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     return { total, details };
   }, [cells, zones, tableCountByZone]);
 
+  const startTableNumberEdit = (key: string, number: number) => {
+    if (locked || !numbersReady) return;
+    ignoreNumberBlur.current = false;
+    setEditingTableKey(key);
+    setEditingTableValue(String(number));
+  };
+
+  const cancelTableNumberEdit = () => {
+    ignoreNumberBlur.current = true;
+    setEditingTableKey(null);
+  };
+
+  const commitTableNumber = (key: string, zoneId: string) => {
+    if (ignoreNumberBlur.current) {
+      ignoreNumberBlur.current = false;
+      return;
+    }
+    const current = numberDraft.numbers[key];
+    if (current == null) {
+      ignoreNumberBlur.current = true;
+      setEditingTableKey(null);
+      return;
+    }
+    const raw = editingTableValue.trim();
+    ignoreNumberBlur.current = true;
+    setEditingTableKey(null);
+    if (raw === String(current)) return;
+    if (!/^\d+$/.test(raw)) {
+      toast.error(`Номер стола — целое число от ${MIN_TABLE_NUMBER} до ${MAX_TABLE_NUMBER}`);
+      return;
+    }
+
+    const number = Number(raw);
+    if (!Number.isInteger(number) || number < MIN_TABLE_NUMBER || number > MAX_TABLE_NUMBER) {
+      toast.error(`Номер стола — целое число от ${MIN_TABLE_NUMBER} до ${MAX_TABLE_NUMBER}`);
+      return;
+    }
+    const takenInZone = Object.entries(numberDraft.numbers).some(
+      ([otherKey, value]) => otherKey !== key && otherKey.startsWith(`${zoneId}:`) && value === number,
+    );
+    const takenOffGrid = (reservedNumbers[zoneId] ?? []).includes(number);
+    if (takenInZone || takenOffGrid) {
+      toast.error(`Номер ${number} уже занят в этой зоне`);
+      return;
+    }
+    setNumberDraft(prev => {
+      const next = {
+        numbers: { ...prev.numbers, [key]: number },
+        floor: { ...prev.floor, [zoneId]: Math.max(prev.floor[zoneId] ?? 0, number) },
+      };
+      numberDraftRef.current = next;
+      return next;
+    });
+  };
+
   const save = async () => {
     if (nonSolidTableZoneNames.length > 0) {
       toast.error(`Стол должен быть сплошным прямоугольником: ${nonSolidTableZoneNames.join(', ')}`);
@@ -504,7 +694,17 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
     }
     setSaving(true);
     try {
-      const layout: GridLayout = { rows, cols, cells };
+      const layout: GridLayout & {
+        tableNumbers?: { zoneId: string; row: number; col: number; number: number }[];
+      } = { rows, cols, cells };
+      if (numbersReady) {
+        const draft = numberDraftRef.current;
+        layout.tableNumbers = tableBoxes.flatMap(({ zoneId, box }) => {
+          const number = draft.numbers[tableNumberKey(zoneId, box.minRow, box.minCol)];
+          if (number == null) return [];
+          return [{ zoneId, row: box.minRow, col: box.minCol, number }];
+        });
+      }
       const { venue: updatedVenue, zones: updatedZones } = await api.saveGridLayout(venue.id, layout);
       onVenueUpdated(updatedVenue);
       setZones(updatedZones);
@@ -1004,6 +1204,25 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
 
       {/* Grid canvas — same fixed-size, scrollable canvas the buyer sees, so
           the admin is always editing exactly the picture that gets sold */}
+      {tableBoxes.length > 0 && (
+        <p className="text-sm text-gray-500">
+          {locked
+            ? 'Номера на столах совпадают с заведением. Разблокируйте схему, чтобы изменить их.'
+            : 'Нажмите на номер стола, чтобы указать его как в заведении. Гости увидят этот номер на схеме и в билете.'}
+          {numbersError && (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={() => { loadTableNumbers(); }}
+                className="underline hover:text-gray-700"
+              >
+                Повторить загрузку номеров
+              </button>
+            </>
+          )}
+        </p>
+      )}
       <GridCanvas
         // Taken from cells, not the rows/cols inputs, so the track count can
         // never disagree with the cells actually rendered into it
@@ -1087,22 +1306,39 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           </div>
         ))}
 
-        {/* Table icons — one per connected footprint, not per cell */}
-        {tableBoxes.map(({ zoneId, box }, i) => {
+        {/* Table icons — one per connected footprint, not per cell.
+            The number is the venue's own table number, editable in place. */}
+        {tableBoxes.map(({ zoneId, box }) => {
           const zone = zones.find(z => z.id === zoneId);
           if (!zone) return null;
           const footprint: Footprint = { rows: box.maxRow - box.minRow + 1, cols: box.maxCol - box.minCol + 1 };
+          const key = tableNumberKey(zoneId, box.minRow, box.minCol);
+          const number = numberDraft.numbers[key];
+          const editing = editingTableKey === key;
           return (
             <div
-              key={`${zoneId}-${i}`}
-              className="pointer-events-none p-0.5"
+              key={key}
+              className="relative pointer-events-none p-0.5"
               style={{ ...boxToGridArea(box), overflow: 'hidden' }}
             >
               <TableIcon
                 shape={zone.tableShape ?? 'ROUND'}
                 chairs={zone.tableChairs ?? 1}
                 footprint={footprint}
+                label={locked && number != null ? String(number) : undefined}
               />
+              {number != null && (
+                <TableNumberControl
+                  number={number}
+                  locked={locked || !numbersReady}
+                  editing={editing}
+                  draft={editingTableValue}
+                  onDraft={setEditingTableValue}
+                  onStart={() => startTableNumberEdit(key, number)}
+                  onCommit={() => commitTableNumber(key, zoneId)}
+                  onCancel={cancelTableNumberEdit}
+                />
+              )}
             </div>
           );
         })}

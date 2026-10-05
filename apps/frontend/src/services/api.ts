@@ -457,7 +457,9 @@ export const api = {
     return request(`/api/venues/${encodeURIComponent(venueId)}/grid-data`);
   },
 
-  async saveGridLayout(venueId: string, layout: GridLayout): Promise<{ venue: Venue; zones: Zone[] }> {
+  async saveGridLayout(venueId: string, layout: GridLayout & {
+    tableNumbers?: { zoneId: string; row: number; col: number; number: number }[];
+  }): Promise<{ venue: Venue; zones: Zone[] }> {
     return request(`/api/venues/${encodeURIComponent(venueId)}/grid-layout`, {
       method: 'PUT',
       headers: authHeaders(),

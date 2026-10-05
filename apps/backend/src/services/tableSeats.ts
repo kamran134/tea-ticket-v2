@@ -98,7 +98,31 @@ export async function syncTableSeats(tx: TableSeatTx, table: ZoneTable): Promise
   }
 }
 
-export async function syncSeatsForZoneTables(tx: TableSeatTx, zoneId: string): Promise<void> {
+/**
+ * Seat.number is unique per zone and encodes the table number, so renaming
+ * two tables (or swapping them) cannot update seats in place: the target
+ * number is still held by the other table. Park every table seat on a
+ * negative number first, then let syncTableSeats write the final ones.
+ */
+async function parkTableSeatNumbers(tx: TableSeatTx, zoneId: string): Promise<void> {
+  await tx.$executeRaw`
+    UPDATE "Seat" AS s
+    SET number = -ranked.rn
+    FROM (
+      SELECT id, ROW_NUMBER() OVER (ORDER BY id)::int AS rn
+      FROM "Seat"
+      WHERE "zoneId" = ${zoneId} AND "tableId" IS NOT NULL
+    ) AS ranked
+    WHERE s.id = ranked.id
+  `;
+}
+
+export async function syncSeatsForZoneTables(
+  tx: TableSeatTx,
+  zoneId: string,
+  options?: { renumber?: boolean },
+): Promise<void> {
+  if (options?.renumber) await parkTableSeatNumbers(tx, zoneId);
   const tables = await tx.zoneTable.findMany({ where: { zoneId } });
   for (const table of tables) {
     await syncTableSeats(tx, table);
