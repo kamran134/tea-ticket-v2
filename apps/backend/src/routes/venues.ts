@@ -210,6 +210,37 @@ venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async 
   }
 });
 
+venuesRouter.delete('/:id', requireAuth, requirePermission('events.delete'), async (req, res) => {
+  try {
+    const venue = await prisma.venue.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, name: true, slug: true, createdById: true },
+    });
+    if (!venue) {
+      return res.status(404).json({ success: false, error: 'Venue not found' });
+    }
+    assertVenueAccess(actorOf(req), venue.createdById);
+    const deletedTickets = await prisma.$transaction(async (tx) => {
+      const tickets = await tx.ticket.deleteMany({ where: { venueId: venue.id } });
+      await tx.venue.delete({ where: { id: venue.id } });
+      return tickets.count;
+    });
+    await recordAudit({
+      action: AuditActions.VENUE_DELETE,
+      actor: actorOf(req),
+      req,
+      resource: 'venue',
+      resourceId: venue.id,
+      metadata: { name: venue.name, slug: venue.slug, tickets: deletedTickets },
+    });
+    return res.json({ success: true, data: { deleted: true } });
+  } catch (err) {
+    if (err instanceof AppError) return failApp(res, err);
+    console.error('[venues.delete]', err);
+    return res.status(500).json({ success: false, error: 'Failed to delete venue' });
+  }
+});
+
 // PUT /api/venues/:id/grid-layout
 const gridLayoutSchema = z.object({
   rows: z.number().int().min(1).max(100),

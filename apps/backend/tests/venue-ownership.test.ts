@@ -202,4 +202,29 @@ describe('Venue ownership', () => {
       .send({ name: 'Adopted' })
       .expect(200);
   });
+
+  it('deletes an event and its tickets, and refuses a manager', async () => {
+    await seedSystemRoles(prisma);
+    const manager = await seedAdminUser(prisma, {
+      email: 'a@test.local',
+      password: TEST_ADMIN_PASSWORD,
+      roleSlug: 'manager',
+    });
+    const superAdmin = await seedSuperAdmin(prisma);
+    const venue = await createVenue(superAdmin.token, 'To delete');
+    const zone = await request(app)
+      .post('/api/zones')
+      .set(auth(superAdmin.token))
+      .send({ venueId: venue.id, name: 'Hall', price: 25, capacity: 10 })
+      .expect(201);
+    await registerTicket(app, venue.id, zone.body.data.id);
+
+    const denied = await request(app).delete(`/api/venues/${venue.id}`).set(auth(manager.token));
+    expectError(denied, 403, ErrorCodes.FORBIDDEN);
+
+    await request(app).delete(`/api/venues/${venue.id}`).set(auth(superAdmin.token)).expect(200);
+    expect(await prisma.venue.findUnique({ where: { id: venue.id } })).toBeNull();
+    expect(await prisma.ticket.count({ where: { venueId: venue.id } })).toBe(0);
+    expect(await prisma.zone.count({ where: { venueId: venue.id } })).toBe(0);
+  });
 });

@@ -307,6 +307,25 @@ export function ManagePanel() {
     }
   };
 
+  const deleteVenue = (venue: Venue) => {
+    requestConfirm(
+      'Удалить мероприятие?',
+      `«${venue.name}» и все его билеты будут удалены безвозвратно.`,
+      async () => {
+        try {
+          await api.deleteVenue(venue.id);
+          setVenues(list => list.filter(item => item.id !== venue.id));
+          if (selectedVenueId === venue.id) setSelectedVenueId('');
+          if (editingVenueId === venue.id) setEditingVenueId(null);
+          if (filterVenueId === venue.id) setFilterVenueId('');
+          toast.success('Мероприятие удалено');
+        } catch (err) {
+          toast.error(errMsg(err));
+        }
+      },
+    );
+  };
+
   const uploadPoster = async (id: string, file: File) => {
     setUploadingPosterId(id);
     try {
@@ -430,6 +449,7 @@ export function ManagePanel() {
 
   const canCreateEvents = auth.can('events.create');
   const canEditEvents = auth.can('events.edit');
+  const canDeleteEvents = auth.can('events.delete');
   const canEditTickets = auth.can('tickets.edit');
   const canDeleteTickets = auth.can('tickets.delete');
   const canCheckin = auth.can('tickets.checkin');
@@ -737,6 +757,14 @@ export function ManagePanel() {
                         {v.active ? 'Скрыть' : 'Активировать'}
                       </button>
                         </>
+                      )}
+                      {canDeleteEvents && (
+                        <button
+                          onClick={() => deleteVenue(v)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Удалить
+                        </button>
                       )}
                     </div>
                   </div>

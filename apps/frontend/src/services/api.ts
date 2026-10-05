@@ -216,6 +216,13 @@ export const api = {
     });
   },
 
+  async deleteVenue(id: string): Promise<{ deleted: boolean }> {
+    return request(`/api/venues/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: authHeaders(),
+    });
+  },
+
   async toggleVenue(id: string, active: boolean): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
       method: 'PATCH',
