@@ -76,7 +76,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
   const total = formatPrice(data.totalAmount, data.currency);
 
   const e = {
-    brand: escapeHtml('StolitsArt Ticket'),
+    brand: escapeHtml('StolitsArt'),
     eventName: escapeHtml(data.eventName),
     buyerName: escapeHtml(data.buyerName),
     zoneName: escapeHtml(data.zoneName),
@@ -90,7 +90,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
     supportEmail: escapeHtml(data.supportEmail),
   };
 
-  const subject = `StolitsArt Ticket — Bilet təsdiqləndi / Билет подтверждён · ${data.eventName}`;
+  const subject = `StolitsArt — Bilet təsdiqləndi / Билет подтверждён · ${data.eventName}`;
 
   const html = `<!DOCTYPE html>
 <html lang="az">
@@ -136,7 +136,7 @@ export function renderTicketConfirmedEmail(data: TicketEmailTemplateData): Rende
 </html>`;
 
   const text = [
-    'StolitsArt Ticket',
+    'StolitsArt',
     'Bilet təsdiqləndi / Билет подтверждён',
     '',
     data.eventName,
