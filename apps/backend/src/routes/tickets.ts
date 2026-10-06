@@ -6,6 +6,7 @@ import {
 } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { actorOf, requireAuth, requirePermission } from '../middleware/auth';
+import { registerRateLimit } from '../middleware/register-rate-limit';
 import { AuditActions, recordAudit } from '../services/audit';
 import { resolveUploadPath } from '../services/storage';
 import { prisma } from '../db';
@@ -263,7 +264,7 @@ const registerSchema = z.object({
   promoCode: z.string().trim().min(1).max(32).optional(),
 });
 
-ticketsRouter.post('/register', async (req, res) => {
+ticketsRouter.post('/register', registerRateLimit, async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     return failZod(res, parsed.error, registerValidationCode(parsed.error));

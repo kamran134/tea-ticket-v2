@@ -20,6 +20,7 @@ const API_ERROR_KEYS: Record<string, string> = {
   PROMO_EXPIRED: 'errors.promoExpired',
   PROMO_NOT_STARTED: 'errors.promoNotStarted',
   PROMO_EXHAUSTED: 'errors.promoExhausted',
+  RATE_LIMITED: 'errors.rateLimited',
   'Booking has expired': 'errors.bookingExpired',
   'Ticket is not available for payment': 'errors.ticketNotPayable',
   'Checkout is not in payable state': 'errors.checkoutNotPayable',

@@ -249,6 +249,7 @@ const en = {
     promoExpired: 'This promo code has expired.',
     promoNotStarted: 'This promo code is not active yet.',
     promoExhausted: 'This promo code has no uses left.',
+    rateLimited: 'Too many bookings from this network. Please try again later.',
   },
 } as const;
 

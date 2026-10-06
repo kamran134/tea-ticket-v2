@@ -20,6 +20,9 @@ Thumbs.db
 .vscode/
 .idea/
 
+# Local assistant permissions — may contain hostnames and SSH history
+.claude/settings.local.json
+
 # Playwright
 test-results/
 playwright-report/

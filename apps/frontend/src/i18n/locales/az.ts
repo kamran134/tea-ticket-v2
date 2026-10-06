@@ -253,6 +253,7 @@ const az = {
     promoExpired: 'Promo kodun müddəti bitib.',
     promoNotStarted: 'Promo kod hələ aktiv deyil.',
     promoExhausted: 'Promo kodun istifadə limiti bitib.',
+    rateLimited: 'Bu şəbəkədən çox sayda rezervasiya var. Bir az sonra yenidən cəhd edin.',
   },
 } as const;
 
