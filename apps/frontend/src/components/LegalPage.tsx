@@ -101,8 +101,8 @@ function AboutContent({ lang }: { lang: Lang }) {
           </a>
         </p>
         <p>
-          <a href="tel:+994557019229" className="text-emerald-700 hover:underline">
-            +994 55 701 92 29
+          <a href="tel:+994104759537" className="text-emerald-700 hover:underline">
+            +994 10 475 95 37
           </a>
         </p>
       </div>
