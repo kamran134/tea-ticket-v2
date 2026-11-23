@@ -1,0 +1,127 @@
+name: Build and Deploy (BirManatBand)
+
+on:
+  push:
+    branches: [bmb-tickets]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_TAG: bmb
+
+# One deploy at a time; a newer push waits instead of cancelling a running deploy.
+concurrency:
+  group: deploy-bmb-tickets
+  cancel-in-progress: false
+
+jobs:
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/backend
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=sha,prefix=${{ env.IMAGE_TAG }}-
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./apps/backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}/frontend
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=sha,prefix=${{ env.IMAGE_TAG }}-
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: ./apps/frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64
+
+  deploy:
+    name: Deploy to tickets.birmanat.band
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.BMB_SSH_HOST }}
+          username: ${{ secrets.BMB_SSH_USERNAME }}
+          key: ${{ secrets.BMB_SSH_KEY }}
+          port: ${{ secrets.BMB_SSH_PORT }}
+          source: "docker-compose.yml"
+          target: ${{ secrets.BMB_DEPLOY_PATH }}
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BMB_SSH_HOST }}
+          username: ${{ secrets.BMB_SSH_USERNAME }}
+          key: ${{ secrets.BMB_SSH_KEY }}
+          port: ${{ secrets.BMB_SSH_PORT }}
+          script: |
+            cd ${{ secrets.BMB_DEPLOY_PATH }}
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            export GITHUB_REPOSITORY='${{ github.repository }}'
+            # compose defaults to the :latest tag; pin it to the tag this workflow pushes.
+            export BACKEND_TAG='${{ env.IMAGE_TAG }}'
+            export FRONTEND_TAG='${{ env.IMAGE_TAG }}'
+
+            # All app config (DB, JWT, bank tokens, Resend, Telegram, UPLOADS_PATH...)
+            # comes from the .env file already present in BMB_DEPLOY_PATH on the server.
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -af
+
+            docker compose ps
