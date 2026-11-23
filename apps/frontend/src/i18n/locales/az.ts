@@ -36,7 +36,7 @@ const az = {
     tagline: 'Korporativ tədbirlər, toy və festivallar üçün Bakının premium kover qrupu.',
     contactTitle: 'Əlaqə',
     riders: 'Riderlər',
-    rights: 'ООО «Stolic Art»',
+    rights: 'Bir Manat Band',
     legal: 'Bütün hüquqlar qorunur.',
     documents: 'Sənədlər',
   },

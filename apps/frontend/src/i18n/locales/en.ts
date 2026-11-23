@@ -36,7 +36,7 @@ const en = {
     tagline: 'Premium Baku cover band for corporate events, weddings and festivals.',
     contactTitle: 'Contacts',
     riders: 'Riders',
-    rights: 'ООО «Stolic Art»',
+    rights: 'Bir Manat Band',
     legal: 'All rights reserved.',
     documents: 'Documents',
   },

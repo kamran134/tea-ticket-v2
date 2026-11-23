@@ -36,7 +36,7 @@ const ru = {
     tagline: 'Премиальная кавер-группа Баку для корпоративов, свадеб и фестивалей.',
     contactTitle: 'Контакты',
     riders: 'Райдеры',
-    rights: 'ООО «Stolic Art»',
+    rights: 'Bir Manat Band',
     legal: 'Все права защищены.',
     documents: 'Документы',
   },
