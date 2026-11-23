@@ -15,12 +15,12 @@ const en = {
     contactHint: 'Need help? Email us:',
   },
   titles: {
-    afisha: 'StolitsArt Ticket — Events',
-    register: 'StolitsArt Ticket — Registration',
-    ticket: 'StolitsArt Ticket — My ticket',
-    privacyPolicy: 'StolitsArt Ticket — Privacy Policy',
-    terms: 'StolitsArt Ticket — User Agreement',
-    refundPolicy: 'StolitsArt Ticket — Ticket Refund Policy',
+    afisha: 'Tickets Bir Manat — Events',
+    register: 'Tickets Bir Manat — Registration',
+    ticket: 'Tickets Bir Manat — My ticket',
+    privacyPolicy: 'Tickets Bir Manat — Privacy Policy',
+    terms: 'Tickets Bir Manat — User Agreement',
+    refundPolicy: 'Tickets Bir Manat — Ticket Refund Policy',
     about: 'StolitsArt Ticket — About us',
   },
   header: {

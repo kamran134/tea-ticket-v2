@@ -4,7 +4,7 @@ The personal data operator is Stolic Art LLC.
 
 1. What data we collect
 
-When you buy a ticket on StolitsArt Ticket, we receive:
+When you buy a ticket on Bir Manat Band, we receive:
 the buyer's name and phone number;
 email address;
 guest names, if you choose to provide them;

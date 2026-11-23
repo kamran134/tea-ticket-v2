@@ -15,12 +15,12 @@ const az = {
     contactHint: 'Kömək lazımdır? Bizə yazın:',
   },
   titles: {
-    afisha: 'StolitsArt Ticket — Afisha',
-    register: 'StolitsArt Ticket — Qeydiyyat',
-    ticket: 'StolitsArt Ticket — Biletim',
-    privacyPolicy: 'StolitsArt Ticket — Məxfilik Siyasəti',
-    terms: 'StolitsArt Ticket — İstifadəçi Sazişi',
-    refundPolicy: 'StolitsArt Ticket — Biletlərin Qaytarılması Şərtləri',
+    afisha: 'Tickets Bir Manat — Afisha',
+    register: 'Tickets Bir Manat — Qeydiyyat',
+    ticket: 'Tickets Bir Manat — Biletim',
+    privacyPolicy: 'Tickets Bir Manat — Məxfilik Siyasəti',
+    terms: 'Tickets Bir Manat — İstifadəçi Sazişi',
+    refundPolicy: 'Tickets Bir Manat — Biletlərin Qaytarılması Şərtləri',
     about: 'StolitsArt Ticket — Haqqımızda',
   },
   header: {

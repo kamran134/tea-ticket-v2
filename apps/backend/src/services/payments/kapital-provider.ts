@@ -103,7 +103,7 @@ export class KapitalProvider implements PaymentProvider {
         amount: input.amount,
         currency: input.currency,
         language: this.config.language,
-        title: 'StolitsArt Ticket',
+        title: 'Bir Manat Band',
         description: input.description,
         hppRedirectUrl: input.returnUrl,
       },

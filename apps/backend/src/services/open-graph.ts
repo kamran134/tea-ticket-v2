@@ -1,7 +1,7 @@
 import type { Venue } from '@prisma/client';
 
 export const DEFAULT_PUBLIC_ORIGIN = 'https://stolits.art';
-export const SITE_NAME = 'StolitsArt Ticket';
+export const SITE_NAME = 'Tickets Bir Manat';
 export const DEFAULT_OG_IMAGE_PATH = '/og-image.jpg';
 
 const OG_DESCRIPTION_MAX = 200;
@@ -67,7 +67,7 @@ export function buildEventOgDescription(venue: Pick<Venue, 'name' | 'date' | 'de
   const plain = venue.description ? stripHtmlToPlainText(venue.description) : '';
   if (plain) return truncateForOg(plain);
   const dateLabel = formatEventDateRu(venue.date);
-  return truncateForOg(`${venue.name}. ${dateLabel}. Билеты на StolitsArt Ticket.`);
+  return truncateForOg(`${venue.name}. ${dateLabel}. Билеты на Bir Manat Band.`);
 }
 
 export function buildEventOgTitle(venue: Pick<Venue, 'name' | 'date'>): string {

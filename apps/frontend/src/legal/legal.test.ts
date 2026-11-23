@@ -45,14 +45,14 @@ describe('legalPageByPath', () => {
 });
 
 describe('legal document texts', () => {
-  it('has a StolitsArt Ticket version for every document and language', () => {
+  it('has a Bir Manat Band version for every document and language', () => {
     for (const id of LEGAL_DOCUMENT_IDS) {
       for (const lang of ['ru', 'az', 'en'] as const) {
         const text = LEGAL_TEXTS[id][lang].trim();
         expect(text.length, `${id}.${lang}`).toBeGreaterThan(200);
-        expect(text, `${id}.${lang}`).toMatch(/StolitsArt Ticket|tea-ticket\.com/i);
+        expect(text, `${id}.${lang}`).toMatch(/Bir Manat Band|tea-ticket\.com/i);
         expect(text, `${id}.${lang}`).not.toMatch(/Tea Ticket/i);
-        expect(text, `${id}.${lang}`).not.toMatch(/Stolitsa Art|stolits\.art/i);
+        expect(text, `${id}.${lang}`).not.toMatch(/StolitsArt|stolits\.art/i);
       }
     }
     expect(LEGAL_TEXTS['privacy-policy'].ru).toContain('Политика конфиденциальности');

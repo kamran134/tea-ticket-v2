@@ -15,12 +15,12 @@ const ru = {
     contactHint: 'Нужна помощь? Напишите нам:',
   },
   titles: {
-    afisha: 'StolitsArt Ticket — Афиша',
-    register: 'StolitsArt Ticket — Регистрация',
-    ticket: 'StolitsArt Ticket — Мой билет',
-    privacyPolicy: 'StolitsArt Ticket — Политика конфиденциальности',
-    terms: 'StolitsArt Ticket — Пользовательское соглашение',
-    refundPolicy: 'StolitsArt Ticket — Условия возврата билетов',
+    afisha: 'Tickets Bir Manat — Афиша',
+    register: 'Tickets Bir Manat — Регистрация',
+    ticket: 'Tickets Bir Manat — Мой билет',
+    privacyPolicy: 'Tickets Bir Manat — Политика конфиденциальности',
+    terms: 'Tickets Bir Manat — Пользовательское соглашение',
+    refundPolicy: 'Tickets Bir Manat — Условия возврата билетов',
     about: 'StolitsArt Ticket — О нас',
   },
   header: {
