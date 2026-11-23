@@ -56,7 +56,7 @@ const en = {
     unavailable: 'This document is not available in the selected language. Showing another language version.',
   },
   afisha: {
-    title: 'Organization of cultural events in Baku and Azerbaijan',
+    title: 'Concert schedule',
     subtitle: 'Upcoming events',
     empty: 'No upcoming events yet',
     share: 'Share',

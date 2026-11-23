@@ -1,119 +1,153 @@
 import type { Lang } from '../i18n/types';
 
-export interface AboutActivity {
-  title: string;
-  body: string;
+export const BAND_WEBSITE_URL = 'https://birmanat.band/';
+
+export interface AboutSection {
+  heading: string;
+  paragraphs: string[];
+  list?: string[];
 }
 
 export interface AboutCopy {
+  title: string;
   intro: string[];
-  whatWeDo: string;
-  activities: AboutActivity[];
-  partners: string;
-  closing: string[];
-  cooperationTitle: string;
+  sections: AboutSection[];
+  bookingTitle: string;
   legalTitle: string;
 }
 
 const ru: AboutCopy = {
+  title: 'BIR MANAT BAND — живая музыка, которая объединяет!',
   intro: [
-    'StolitsArt — агентство по организации культурных и концертных мероприятий в Баку. С 2022 года мы создаём и проводим театральные постановки, концертные программы, литературные и творческие вечера, городские праздники и другие культурные события.',
-    'Мы занимаемся организацией мероприятия целиком: от разработки концепции и сценария до подбора артистов, площадки, технического оснащения, оформления, продвижения и проведения события.',
+    'BIR MANAT BAND — кавер-группа из Баку, объединяющая разные музыкальные направления, культуры и поколения.',
+    'Мы исполняем лучшие хиты русской, зарубежной, азербайджанской и турецкой музыки, наполняя каждое выступление энергией живого звука и атмосферой настоящего праздника.',
+    'Наш репертуар охватывает самые разные жанры: от легендарных рок-композиций до современных поп-хитов и танцевальной музыки. Мы подбираем программу так, чтобы каждый гость мероприятия мог услышать знакомые и любимые песни.',
+    'Для нас музыка — это не просто исполнение песен. Это эмоции, общение и особая атмосфера, которая объединяет людей. Наша задача — сделать каждое выступление ярким событием, которое захочется вспоминать.',
   ],
-  whatWeDo: 'Чем конкретно мы занимаемся:',
-  activities: [
+  sections: [
     {
-      title: 'Театр и спектакли',
-      body: 'От камерных постановок до масштабных шоу — как на самых престижных площадках города, так и под открытым небом. Тематические, стилизованные интерактивные спектакли.',
+      heading: 'Живая музыка для ваших мероприятий',
+      paragraphs: ['BIR MANAT BAND выступает на мероприятиях различных форматов:'],
+      list: [
+        'Свадьбы и частные торжества',
+        'Корпоративные мероприятия и вечеринки',
+        'Фестивали и концерты',
+        'Бары, рестораны и клубы',
+        'Частные вечеринки и специальные события',
+      ],
     },
     {
-      title: 'Литературные и творческие вечера',
-      body: 'Поэзия, проза, музыка, встречи с авторами. Салонные вечера в стиле 19 века.',
+      heading: 'Профессиональные музыканты и собственное оборудование',
+      paragraphs: [
+        'В составе BIR MANAT BAND — опытные музыканты, объединённые любовью к живой музыке и качественному сценическому исполнению.',
+        'Мы уделяем особое внимание звучанию, слаженности коллектива и энергетике выступления.',
+        'Одно из наших важных преимуществ — собственное профессиональное звуковое и сценическое оборудование. Это позволяет нам самостоятельно обеспечивать техническую сторону выступления, адаптироваться под формат мероприятия и особенности площадки.',
+      ],
     },
     {
-      title: 'Концертные программы',
-      body: 'Классика, джаз, этно, рок, современные проекты. Фестивали искусств.',
+      heading: 'Музыка без границ',
+      paragraphs: [
+        'BIR MANAT BAND объединяет музыку разных стран и культур. Благодаря разнообразному репертуару мы можем создать программу как для русскоязычной аудитории, так и для гостей, предпочитающих азербайджанскую, турецкую и международную музыку.',
+        'Мы базируемся в Баку и открыты для выступлений по всему Азербайджану и за его пределами.',
+      ],
     },
     {
-      title: 'Культурные события',
-      body: 'Балы, городские праздники, детские спектакли. Все, что делает город ярче.',
+      heading: 'Давайте сделаем ваше мероприятие незабываемым!',
+      paragraphs: [
+        'Пригласите BIR MANAT BAND на своё мероприятие и подарите гостям атмосферу живой музыки, ярких эмоций и отличного настроения.',
+      ],
     },
   ],
-  partners:
-    'StolitsArt сотрудничает с музыкальными коллективами и артистами разных жанров, среди которых Bir Manat Band, Gr3y Band, Sadnos и другие исполнители.',
-  closing: [
-    'А теперь мы открываем и онлайн-кассу — чтобы вам было еще удобнее, мы запустили StolitsArt Ticket — нашу собственную платформу продажи билетов. Больше не нужно искать по разным сайтам. Все лучшие события от нашей команды и партнеров — теперь в одном месте, 24/7.',
-    'Билеты на самые интересные события города — в один клик. Удобный сайт, понятные билеты, вежливый сервис. Выбирайте место, оплачивайте онлайн и приходите наслаждаться искусством.',
-  ],
-  cooperationTitle: 'По вопросам сотрудничества:',
+  bookingTitle: 'Бронирование и сотрудничество:',
   legalTitle: 'Правовая информация',
 };
 
 const az: AboutCopy = {
+  title: 'BIR MANAT BAND — canlı musiqi, unudulmaz anlar!',
   intro: [
-    'StolitsArt — Bakıda mədəni və konsert tədbirlərinin təşkili üzrə agentlikdir. 2022-ci ildən teatr quruluşları, konsert proqramları, ədəbi və yaradıcı axşamlar, şəhər bayramları və digər mədəni tədbirlər yaradır və keçiririk.',
-    'Tədbiri bütövlükdə təşkil edirik: konsepsiya və ssenarinin hazırlanmasından artistlərin, məkanın və texniki təchizatın seçilməsinə, tərtibata, təbliğata və tədbirin keçirilməsinə qədər.',
+    'BIR MANAT BAND — Bakı şəhərində fəaliyyət göstərən, müxtəlif musiqi üslublarını və mədəniyyətləri bir araya gətirən canlı musiqi qrupudur.',
+    'Biz rus, beynəlxalq, Azərbaycan və türk musiqisinin sevilən hitlərini özünəməxsus enerji və canlı ifa ilə təqdim edirik. Repertuarımızda əfsanəvi rok mahnılarından müasir pop hitlərinə və rəqs musiqilərinə qədər geniş seçim var.',
+    'Bizim üçün musiqi sadəcə ifa deyil. Musiqi insanları bir araya gətirən, tədbirə xüsusi ab-hava və unudulmaz emosiyalar bəxş edən enerjidir. Məqsədimiz hər çıxışımızı qonaqların uzun müddət xatırlayacağı bir təcrübəyə çevirməkdir.',
   ],
-  whatWeDo: 'Konkret olaraq nə ilə məşğul oluruq:',
-  activities: [
+  sections: [
     {
-      title: 'Teatr və tamaşalar',
-      body: 'Kamera quruluşlarından irimiqyaslı şoulara qədər — həm şəhərin ən nüfuzlu səhnələrində, həm də açıq səma altında. Tematik, stilizə olunmuş interaktiv tamaşalar.',
+      heading: 'Tədbirləriniz üçün canlı musiqi',
+      paragraphs: ['BIR MANAT BAND müxtəlif formatlı tədbirlərdə çıxış edir:'],
+      list: [
+        'Toylar və özəl tədbirlər',
+        'Korporativ tədbirlər və şirkət gecələri',
+        'Festivallar və konsertlər',
+        'Barlar, restoranlar və klublar',
+        'Özəl partilər və digər xüsusi tədbirlər',
+      ],
     },
     {
-      title: 'Ədəbi və yaradıcı axşamlar',
-      body: 'Poeziya, nəsr, musiqi, müəlliflərlə görüşlər. XIX əsr üslubunda salon axşamları.',
+      heading: 'Peşəkar musiqiçilər və öz avadanlığımız',
+      paragraphs: [
+        'Qrupumuz təcrübəli musiqiçilərdən ibarətdir. Biz canlı ifanın keyfiyyətinə, musiqi uyğunluğuna və səhnə performansına xüsusi diqqət yetiririk.',
+        'Öz peşəkar səs və səhnə avadanlıqlarımız tədbirin formatına və məkanın xüsusiyyətlərinə uyğunlaşmağa, musiqi proqramını və texniki təminatı birlikdə təşkil etməyə imkan verir.',
+      ],
     },
     {
-      title: 'Konsert proqramları',
-      body: 'Klassika, caz, etno, rok, müasir layihələr. İncəsənət festivalları.',
+      heading: 'Musiqi sərhəd tanımır',
+      paragraphs: [
+        'Azərbaycan, türk, rus və beynəlxalq musiqi repertuarını bir araya gətirərək müxtəlif zövqlərə malik auditoriya üçün çıxış edirik. Bakıda fəaliyyət göstəririk və Azərbaycan daxilində, eləcə də xaricdə keçirilən tədbirlərdə iştirak etməyə açığıq.',
+      ],
     },
     {
-      title: 'Mədəni tədbirlər',
-      body: 'Ballar, şəhər bayramları, uşaq tamaşaları. Şəhəri daha parlaq edən hər şey.',
+      heading: 'Tədbirinizi birlikdə unudulmaz edək!',
+      paragraphs: [
+        'BIR MANAT BAND-ı tədbirinizə dəvət edin və qonaqlarınıza canlı musiqinin enerjisini yaşadın.',
+      ],
     },
   ],
-  partners:
-    'StolitsArt müxtəlif janrlı musiqi kollektivləri və artistlərlə əməkdaşlıq edir, onların sırasında Bir Manat Band, Gr3y Band, Sadnos və digər ifaçılar var.',
-  closing: [
-    'İndi isə onlayn kassa da açırıq — sizə daha rahat olsun deyə StolitsArt Ticket-i, öz bilet satış platformamızı işə saldıq. Artıq müxtəlif saytlarda axtarmaq lazım deyil. Komandamızın və tərəfdaşlarımızın ən yaxşı tədbirləri — indi bir yerdə, 24/7.',
-    'Şəhərin ən maraqlı tədbirlərinə biletlər — bir kliklə. Rahat sayt, anlaşılan biletlər, nəzakətli xidmət. Yerinizi seçin, onlayn ödəyin və sənətdən zövq almağa gəlin.',
-  ],
-  cooperationTitle: 'Əməkdaşlıq məsələləri üzrə:',
+  bookingTitle: 'Sifariş və əməkdaşlıq üçün:',
   legalTitle: 'Hüquqi məlumat',
 };
 
 const en: AboutCopy = {
+  title: 'BIR MANAT BAND — Live Music That Brings People Together!',
   intro: [
-    'StolitsArt is an agency organising cultural and concert events in Baku. Since 2022 we have been creating and staging theatre productions, concert programmes, literary and creative evenings, city celebrations and other cultural events.',
-    'We organise the event in full: from developing the concept and script to selecting the artists, the venue and the technical equipment, and on to the design, promotion and running of the event.',
+    'BIR MANAT BAND is a live cover band based in Baku, Azerbaijan, bringing together different musical styles, cultures and generations.',
+    'We perform popular hits from Russian, international, Azerbaijani and Turkish music, combining energetic live performances with a vibrant atmosphere for every event.',
+    'Our repertoire covers a wide range of genres, from iconic rock anthems to modern pop hits and dance classics. We shape our music program to create an engaging experience for audiences of different ages and musical tastes.',
+    'For us, music is more than just performing songs. It is about emotion, connection and creating an atmosphere that brings people together. Our goal is to make every performance a memorable part of your event.',
   ],
-  whatWeDo: 'What we do:',
-  activities: [
+  sections: [
     {
-      title: 'Theatre and performances',
-      body: 'From intimate productions to large-scale shows — on the city’s most prestigious stages and under the open sky. Thematic, stylised interactive performances.',
+      heading: 'Live Music for Your Events',
+      paragraphs: ['BIR MANAT BAND performs at a variety of events:'],
+      list: [
+        'Weddings and private celebrations',
+        'Corporate events and parties',
+        'Festivals and concerts',
+        'Bars, restaurants and clubs',
+        'Private parties and special occasions',
+      ],
     },
     {
-      title: 'Literary and creative evenings',
-      body: 'Poetry, prose, music, meetings with authors. Salon evenings in the style of the 19th century.',
+      heading: 'Professional Musicians and Our Own Equipment',
+      paragraphs: [
+        'BIR MANAT BAND brings together experienced musicians who share a passion for live music and quality performances.',
+        'We pay close attention to sound quality, musical coordination and stage presence.',
+        'One of our key advantages is that we provide our own professional sound and stage equipment. This allows us to take care of the technical side of the performance and adapt to the format and requirements of each venue.',
+      ],
     },
     {
-      title: 'Concert programmes',
-      body: 'Classical, jazz, ethno, rock, contemporary projects. Arts festivals.',
+      heading: 'Music Without Borders',
+      paragraphs: [
+        'Our repertoire brings together music from Azerbaijan, Turkey, Russia and around the world, allowing us to connect with audiences from different backgrounds.',
+        'Based in Baku, we are available for events throughout Azerbaijan and internationally.',
+      ],
     },
     {
-      title: 'Cultural events',
-      body: 'Balls, city celebrations, children’s performances. Everything that makes the city brighter.',
+      heading: "Let's Make Your Event Unforgettable!",
+      paragraphs: [
+        'Invite BIR MANAT BAND to your event and give your guests the energy of live music, memorable moments and a great atmosphere.',
+      ],
     },
   ],
-  partners:
-    'StolitsArt collaborates with musical groups and artists across different genres, including Bir Manat Band, Gr3y Band, Sadnos and other performers.',
-  closing: [
-    'And now we are opening an online box office too — to make things easier, we launched StolitsArt Ticket, our own ticketing platform. No more searching across different sites. The best events from our team and partners are now in one place, 24/7.',
-    'Tickets to the city’s most interesting events — in one click. A clear website, straightforward tickets, considerate service. Choose your seat, pay online and come enjoy the art.',
-  ],
-  cooperationTitle: 'For cooperation enquiries:',
+  bookingTitle: 'Bookings and inquiries:',
   legalTitle: 'Legal information',
 };
 

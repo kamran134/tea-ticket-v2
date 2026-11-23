@@ -38,10 +38,10 @@ export function Header() {
         <a href={SITE_URL} className="group block shrink-0 min-w-0">
           <img
             src={brandLogo}
-            alt="StolitsA.rt"
-            width={240}
-            height={43}
-            className="h-auto w-[min(46vw,8.5rem)] sm:w-[10.5rem] lg:w-[11.5rem] transition-opacity group-hover:opacity-80"
+            alt="BIR MANAT BAND"
+            width={977}
+            height={383}
+            className="h-11 sm:h-12 lg:h-[3.25rem] w-auto transition-opacity group-hover:opacity-80"
           />
         </a>
 

@@ -62,14 +62,14 @@ describe('legal document texts', () => {
 });
 
 describe('about copy', () => {
-  it('has StolitsArt description in every language', () => {
+  it('describes BIR MANAT BAND with sections in every language', () => {
     for (const lang of ['ru', 'az', 'en'] as const) {
       const copy = ABOUT_COPY[lang];
-      expect(copy.intro.join(' ')).toContain('StolitsArt');
-      expect(copy.activities).toHaveLength(4);
-      expect(copy.partners).toContain('Bir Manat Band');
-      expect(copy.closing.join(' ')).toContain('StolitsArt Ticket');
-      expect(copy.legalTitle.length).toBeGreaterThan(0);
+      expect(copy.title).toContain('BIR MANAT BAND');
+      expect(copy.intro.join(' ')).toContain('BIR MANAT BAND');
+      expect(copy.sections.length).toBeGreaterThan(0);
+      expect(copy.sections.some(section => section.list?.length)).toBe(true);
+      expect(copy.bookingTitle.length).toBeGreaterThan(0);
     }
   });
 });

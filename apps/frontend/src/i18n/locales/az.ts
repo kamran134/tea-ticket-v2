@@ -56,7 +56,7 @@ const az = {
     unavailable: 'Bu sənədin seçilmiş dildə tərcüməsi yoxdur. Başqa dildəki versiya göstərilir.',
   },
   afisha: {
-    title: 'Bakıda və Azərbaycanda mədəni tədbirlərin təşkili',
+    title: 'Konsertlərin cədvəli',
     subtitle: 'Yaxınlaşan tədbirlər',
     empty: 'Hələlik yaxınlaşan tədbir yoxdur',
     share: 'Paylaş',

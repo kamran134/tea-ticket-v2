@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ABOUT_COPY } from '../legal/about';
+import { ABOUT_COPY, BAND_WEBSITE_URL } from '../legal/about';
 import { LegalDocument } from '../legal/LegalDocument';
 import { isLegalDocumentId, LEGAL_TEXTS, type LegalPageDef } from '../legal/pages';
 import { resolveLegalText } from '../legal/resolve';
+import { EMAIL, PHONE_DISPLAY, PHONE_HREF } from '../lib/site';
 import { isLang, type Lang } from '../i18n/types';
 import { BackLink } from './BackLink';
 import { PublicLayout } from './PublicLayout';
@@ -67,42 +68,48 @@ function AboutContent({ lang }: { lang: Lang }) {
   return (
     <div className="space-y-10 text-[15px] leading-relaxed text-gray-700">
       <h1 className="text-2xl sm:text-3xl font-bold text-emerald-800 tracking-tight text-center">
-        {t('legal.about')}
+        {copy.title}
       </h1>
       <div className="space-y-4">
         {copy.intro.map(paragraph => (
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
-      <div>
-        <p className="font-semibold text-gray-800">{copy.whatWeDo}</p>
-        <ol className="mt-4 space-y-4">
-          {copy.activities.map((item, index) => (
-            <li key={item.title}>
-              <p className="font-semibold text-gray-800">
-                {index + 1}. {item.title}.
-              </p>
-              <p className="mt-1">{item.body}</p>
-            </li>
+      {copy.sections.map(section => (
+        <section key={section.heading} className="space-y-4">
+          <h2 className="text-lg font-semibold text-gray-800">{section.heading}</h2>
+          {section.paragraphs.map(paragraph => (
+            <p key={paragraph}>{paragraph}</p>
           ))}
-        </ol>
-        <p className="mt-6">{copy.partners}</p>
-      </div>
-      <div className="space-y-4">
-        {copy.closing.map(paragraph => (
-          <p key={paragraph}>{paragraph}</p>
-        ))}
-      </div>
+          {section.list && (
+            <ul className="list-disc pl-6 space-y-1">
+              {section.list.map(item => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
       <div>
-        <p>{copy.cooperationTitle}</p>
+        <p className="font-semibold text-gray-800">{copy.bookingTitle}</p>
         <p className="mt-1">
-          <a href="mailto:support@stolits.art" className="text-emerald-700 hover:underline">
-            support@stolits.art
+          <a href={`mailto:${EMAIL}`} className="text-emerald-700 hover:underline">
+            {EMAIL}
           </a>
         </p>
         <p>
-          <a href="tel:+994104759537" className="text-emerald-700 hover:underline">
-            +994 10 475 95 37
+          <a href={PHONE_HREF} className="text-emerald-700 hover:underline">
+            {PHONE_DISPLAY}
+          </a>
+        </p>
+        <p>
+          <a
+            href={BAND_WEBSITE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="text-emerald-700 hover:underline"
+          >
+            birmanat.band
           </a>
         </p>
       </div>

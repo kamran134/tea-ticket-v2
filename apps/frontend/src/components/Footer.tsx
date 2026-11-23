@@ -22,10 +22,10 @@ export function Footer() {
           <a href={SITE_URL}>
             <img
               src={brandLogo}
-              alt="StolitsA.rt"
-              width={240}
-              height={43}
-              className="h-auto w-[9.5rem] sm:w-[11rem]"
+              alt="BIR MANAT BAND"
+              width={977}
+              height={383}
+              className="h-12 sm:h-14 w-auto"
             />
           </a>
           <div className="mt-6 flex flex-col items-start gap-3">
