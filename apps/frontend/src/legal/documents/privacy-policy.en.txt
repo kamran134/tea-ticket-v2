@@ -4,7 +4,7 @@ The personal data operator is Fərdi sahibkar ANDREEV ALEKSEI.
 
 1. What data we collect
 
-When you buy a ticket on Bir Manat Band, we receive:
+When you buy a ticket, Fərdi sahibkar ANDREEV ALEKSEI receives:
 the buyer's name and phone number;
 email address;
 guest names, if you choose to provide them;

@@ -4,7 +4,7 @@ Fərdi məlumatların operatoru — Fərdi sahibkar ANDREEV ALEKSEI.
 
 1. Hansı məlumatları toplayırıq
 
-Bir Manat Band saytında bilet alarkən bizə daxil olur:
+Bilet alarkən Fərdi sahibkar ANDREEV ALEKSEI aşağıdakı məlumatları əldə edir:
 alıcının adı və telefonu;
 e-poçt ünvanı;
 qonaqların adları, əgər onları qeyd etmisinizsə;
