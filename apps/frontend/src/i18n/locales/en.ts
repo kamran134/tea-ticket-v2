@@ -36,7 +36,7 @@ const en = {
     tagline: 'Premium Baku cover band for corporate events, weddings and festivals.',
     contactTitle: 'Contacts',
     riders: 'Riders',
-    rights: 'Bir Manat Band',
+    rights: 'Fərdi sahibkar ANDREEV ALEKSEI',
     legal: 'All rights reserved.',
     documents: 'Documents',
   },

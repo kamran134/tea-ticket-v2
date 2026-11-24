@@ -36,7 +36,7 @@ const ru = {
     tagline: 'Премиальная кавер-группа Баку для корпоративов, свадеб и фестивалей.',
     contactTitle: 'Контакты',
     riders: 'Райдеры',
-    rights: 'Bir Manat Band',
+    rights: 'Fərdi sahibkar ANDREEV ALEKSEI',
     legal: 'Все права защищены.',
     documents: 'Документы',
   },
