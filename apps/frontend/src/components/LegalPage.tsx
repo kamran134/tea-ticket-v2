@@ -10,10 +10,8 @@ import { BackLink } from './BackLink';
 import { PublicLayout } from './PublicLayout';
 
 const ABOUT_FIELDS = [
-  { labelKey: 'legal.companyName', valueKey: 'legal.companyNameValue' },
+  { labelKey: 'legal.entityName', valueKey: 'legal.entityNameValue' },
   { labelKey: 'legal.voen', valueKey: 'legal.voenValue' },
-  { labelKey: 'legal.registrationNumber', valueKey: 'legal.registrationNumberValue' },
-  { labelKey: 'legal.address', valueKey: 'legal.addressValue' },
 ] as const;
 
 export function LegalPage({ page }: { page: LegalPageDef }) {
