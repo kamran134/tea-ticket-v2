@@ -21,7 +21,7 @@ const en = {
     privacyPolicy: 'Tickets Bir Manat — Privacy Policy',
     terms: 'Tickets Bir Manat — User Agreement',
     refundPolicy: 'Tickets Bir Manat — Ticket Refund Policy',
-    about: 'StolitsArt Ticket — About us',
+    about: 'Tickets Bir Manat — About us',
   },
   header: {
     events: 'Our events',

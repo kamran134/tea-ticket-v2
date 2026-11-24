@@ -21,7 +21,7 @@ const az = {
     privacyPolicy: 'Tickets Bir Manat — Məxfilik Siyasəti',
     terms: 'Tickets Bir Manat — İstifadəçi Sazişi',
     refundPolicy: 'Tickets Bir Manat — Biletlərin Qaytarılması Şərtləri',
-    about: 'StolitsArt Ticket — Haqqımızda',
+    about: 'Tickets Bir Manat — Haqqımızda',
   },
   header: {
     events: 'Tədbirlərimiz',

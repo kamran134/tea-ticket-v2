@@ -1,6 +1,6 @@
 import type { Venue } from '@prisma/client';
 
-export const DEFAULT_PUBLIC_ORIGIN = 'https://stolits.art';
+export const DEFAULT_PUBLIC_ORIGIN = 'https://tickets.birmanat.band';
 export const SITE_NAME = 'Tickets Bir Manat';
 export const DEFAULT_OG_IMAGE_PATH = '/og-image.jpg';
 

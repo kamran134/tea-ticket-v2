@@ -42,10 +42,10 @@ describe('open-graph helpers', () => {
         description: 'Warm evening',
         posterImage: '/uploads/posters/x/poster.jpg',
       },
-      'https://stolits.art',
+      'https://tickets.birmanat.band',
     );
-    expect(meta.pageUrl).toBe('https://stolits.art/e/tea-night');
-    expect(meta.imageUrl).toBe('https://stolits.art/uploads/posters/x/poster.jpg');
+    expect(meta.pageUrl).toBe('https://tickets.birmanat.band/e/tea-night');
+    expect(meta.imageUrl).toBe('https://tickets.birmanat.band/uploads/posters/x/poster.jpg');
     expect(meta.title).toContain('Tea night');
   });
 
@@ -53,8 +53,8 @@ describe('open-graph helpers', () => {
     const html = renderOpenGraphHtml({
       title: '<Evil>',
       description: 'a & b',
-      imageUrl: 'https://stolits.art/og-image.jpg',
-      pageUrl: 'https://stolits.art/e/x',
+      imageUrl: 'https://tickets.birmanat.band/og-image.jpg',
+      pageUrl: 'https://tickets.birmanat.band/e/x',
       imageAlt: '<Evil>',
     });
     expect(html).toContain('content="&lt;Evil&gt;"');
@@ -97,14 +97,14 @@ describe('GET /e/:slug preview HTML', () => {
 
     const res = await request(app)
       .get('/e/preview-event')
-      .set('Host', 'stolits.art')
+      .set('Host', 'tickets.birmanat.band')
       .set('X-Forwarded-Proto', 'https')
       .expect(200);
 
     expect(res.headers['content-type']).toMatch(/text\/html/);
     expect(res.text).toContain('property="og:title" content="Preview Event');
-    expect(res.text).toContain('property="og:image" content="https://stolits.art/uploads/posters/test/poster.jpg"');
-    expect(res.text).toContain('property="og:url" content="https://stolits.art/e/preview-event"');
+    expect(res.text).toContain('property="og:image" content="https://tickets.birmanat.band/uploads/posters/test/poster.jpg"');
+    expect(res.text).toContain('property="og:url" content="https://tickets.birmanat.band/e/preview-event"');
     expect(res.text).toContain('Описание события');
     expect(res.text).not.toContain('<strong>');
   });

@@ -21,7 +21,7 @@ const ru = {
     privacyPolicy: 'Tickets Bir Manat — Политика конфиденциальности',
     terms: 'Tickets Bir Manat — Пользовательское соглашение',
     refundPolicy: 'Tickets Bir Manat — Условия возврата билетов',
-    about: 'StolitsArt Ticket — О нас',
+    about: 'Tickets Bir Manat — О нас',
   },
   header: {
     events: 'Наши мероприятия',
