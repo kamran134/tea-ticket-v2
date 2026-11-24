@@ -741,7 +741,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           type="text"
           value={editZoneName}
           onChange={e => setEditZoneName(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           autoFocus
         />
       </div>
@@ -751,7 +751,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           type="number"
           value={editZonePrice}
           onChange={e => setEditZonePrice(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+          className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           min="0"
         />
       </div>
@@ -762,7 +762,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             type="number"
             value={editZoneCapacity}
             onChange={e => setEditZoneCapacity(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             min="1"
           />
         </div>
@@ -775,7 +775,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               type="number"
               value={editZoneTableChairs}
               onChange={e => setEditZoneTableChairs(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
               min="1"
             />
           </div>
@@ -784,7 +784,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             <select
               value={editZoneTableShape}
               onChange={e => setEditZoneTableShape(e.target.value as TableShape)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
             >
               <option value="ROUND">Круглый</option>
               <option value="RECT">Прямоугольный</option>
@@ -814,7 +814,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           type="button"
           onClick={() => saveZoneEdit(zone)}
           disabled={savingZoneEdit || !editZoneName.trim() || !editZonePrice}
-          className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+          className="px-4 py-1.5 text-sm bg-brand text-neutral-950 rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-40"
         >
           {savingZoneEdit ? '...' : 'Сохранить'}
         </button>
@@ -912,7 +912,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               type="button"
               onClick={save}
               disabled={saving}
-              className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="px-4 py-1.5 text-sm bg-brand text-neutral-950 rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-50"
             >
               {saving ? 'Сохранение...' : 'Сохранить и заблокировать'}
             </button>
@@ -928,7 +928,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               type="text"
               value={templateName}
               onChange={e => setTemplateName(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
               placeholder="Кирхе — основной зал"
               autoFocus
             />
@@ -938,7 +938,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
               type="button"
               onClick={saveAsTemplate}
               disabled={savingTemplate || !templateName.trim()}
-              className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+              className="px-4 py-1.5 text-sm bg-brand text-neutral-950 rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-40"
             >
               {savingTemplate ? '...' : 'Сохранить'}
             </button>
@@ -980,7 +980,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             max={100}
             value={pendingRows}
             onChange={e => setPendingRows(Number(e.target.value))}
-            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <span className="text-gray-400 text-sm">строк ×</span>
           <input
@@ -989,7 +989,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             max={100}
             value={pendingCols}
             onChange={e => setPendingCols(Number(e.target.value))}
-            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+            className="w-16 border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
           />
           <span className="text-gray-400 text-sm">столбцов</span>
           <button
@@ -1081,7 +1081,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   <button
                     type="button"
                     onClick={() => startEditZone(zone)}
-                    className="text-gray-300 hover:text-emerald-600 px-1 py-1.5 text-xs transition-colors"
+                    className="text-gray-300 hover:text-brand px-1 py-1.5 text-xs transition-colors"
                     title="Редактировать зону"
                   >
                     ✎
@@ -1102,7 +1102,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
             <button
               type="button"
               onClick={() => setShowZoneForm(s => !s)}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm text-emerald-700 border-2 border-dashed border-emerald-300 rounded-lg hover:bg-emerald-50 transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 text-sm text-brand border-2 border-dashed border-brand rounded-lg hover:bg-brand/10 transition-colors"
             >
               + Зона
             </button>
@@ -1117,7 +1117,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   type="text"
                   value={newZoneName}
                   onChange={e => setNewZoneName(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                   placeholder="VIP"
                   autoFocus
                 />
@@ -1128,7 +1128,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                   type="number"
                   value={newZonePrice}
                   onChange={e => setNewZonePrice(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                   placeholder="5000"
                   min="0"
                 />
@@ -1138,7 +1138,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                 <select
                   value={newZoneType}
                   onChange={e => setNewZoneType(e.target.value as ZoneType)}
-                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                  className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 >
                   <option value="SEATED">Места на сетке</option>
                   <option value="GENERAL">Без конкретных мест</option>
@@ -1149,7 +1149,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     type="number"
                     value={newZoneCapacity}
                     onChange={e => setNewZoneCapacity(e.target.value)}
-                    className="mt-1.5 border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                    className="mt-1.5 border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                     placeholder="Вместимость"
                     min="1"
                   />
@@ -1160,14 +1160,14 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                       type="number"
                       value={newZoneTableChairs}
                       onChange={e => setNewZoneTableChairs(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                       placeholder="Мест за столом"
                       min="1"
                     />
                     <select
                       value={newZoneTableShape}
                       onChange={e => setNewZoneTableShape(e.target.value as TableShape)}
-                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400"
+                      className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                     >
                       <option value="ROUND">Круглый</option>
                       <option value="RECT">Прямоугольный</option>
@@ -1201,7 +1201,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
                     (newZoneType === 'GENERAL' && !newZoneCapacity) ||
                     (newZoneType === 'TABLE' && !newZoneTableChairs)
                   }
-                  className="px-4 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-40"
+                  className="px-4 py-1.5 text-sm bg-brand text-neutral-950 rounded-lg hover:bg-brand-hover transition-colors disabled:opacity-40"
                 >
                   {addingZone ? '...' : 'Добавить'}
                 </button>
@@ -1404,7 +1404,7 @@ export function GridMapEditor({ venue, onVenueUpdated }: Props) {
           </div>
           <div className="flex justify-between items-center border-t border-gray-100 pt-2">
             <span className="font-semibold text-gray-700">Итого</span>
-            <span className="font-bold text-emerald-700 text-lg">{formatPrice(revenue.total, currency)}</span>
+            <span className="font-bold text-brand text-lg">{formatPrice(revenue.total, currency)}</span>
           </div>
         </div>
       )}

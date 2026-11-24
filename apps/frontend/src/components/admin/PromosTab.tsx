@@ -16,7 +16,7 @@ interface Props {
 const GLOBAL_SCOPE = 'global';
 
 const inputClass =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 
 function localDateInput(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -316,7 +316,7 @@ export function PromosTab({ venues, canEdit, canDelete, canManageGlobal }: Props
               type="button"
               onClick={save}
               disabled={saving}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+              className="px-4 py-2 bg-brand text-neutral-950 rounded-lg text-sm font-medium hover:bg-brand-hover disabled:opacity-50"
             >
               {saving ? 'Сохранение...' : editingId ? 'Сохранить' : 'Создать'}
             </button>
@@ -366,7 +366,7 @@ export function PromosTab({ venues, canEdit, canDelete, canManageGlobal }: Props
               <div className="flex gap-3 shrink-0 text-xs">
                 {canEdit && (
                   <>
-                    <button type="button" onClick={() => startEdit(promo)} className="text-emerald-700 hover:underline">
+                    <button type="button" onClick={() => startEdit(promo)} className="text-brand hover:underline">
                       Изменить
                     </button>
                     <button type="button" onClick={() => toggleActive(promo)} className="text-gray-500 hover:underline">

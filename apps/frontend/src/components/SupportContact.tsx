@@ -12,7 +12,7 @@ export function SupportContact({ className = '', tone = 'page' }: Props) {
   const textClass = tone === 'map' ? 'text-xs seat-map-muted' : 'text-sm text-gray-500';
   const linkClass = tone === 'map'
     ? 'text-[var(--map-chip-fg)] underline underline-offset-2 break-all'
-    : 'text-emerald-700 hover:underline break-all';
+    : 'text-brand hover:underline break-all';
 
   return (
     <p className={`${textClass} ${className}`.trim()}>

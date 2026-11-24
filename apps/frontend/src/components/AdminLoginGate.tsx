@@ -5,7 +5,7 @@ import { PasswordInput } from './PasswordInput';
 import type { AdminAuth } from '../lib/adminAuth';
 
 const INPUT_CLASS =
-  'w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 
 /**
  * Shared login screen for /manage and /admin. Both pages used to carry their
@@ -86,7 +86,7 @@ export function AdminLoginGate({
             type="submit"
             data-testid="admin-login-submit"
             disabled={submitting}
-            className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60"
+            className="w-full py-2 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors disabled:opacity-60"
           >
             {submitting ? 'Вход...' : 'Войти'}
           </button>

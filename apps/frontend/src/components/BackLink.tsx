@@ -6,7 +6,7 @@ interface Props {
 
 /**
  * Subdued "up one level" link for public pages below the poster list.
- * Grey rather than emerald on purpose: this is navigation chrome and must not
+ * Grey rather than brand-gold on purpose: this is navigation chrome and must not
  * compete with the buy button. Both the base and hover colours already have
  * dark-theme overrides under `.dark .app-bg` in main.css.
  */

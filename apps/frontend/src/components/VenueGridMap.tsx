@@ -304,7 +304,7 @@ export function VenueGridMap({
               <span>{t('register.promoSubtotal')}</span>
               <span className="line-through tabular-nums">{formatPrice(pricedQuote.subtotal, currency)}</span>
             </div>
-            <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+            <div className="flex justify-between text-brand dark:text-brand">
               <span>{t('register.promoDiscount', { code: pricedQuote.code })}</span>
               <span className="tabular-nums">−{formatPrice(pricedQuote.discount, currency)}</span>
             </div>

@@ -10,7 +10,7 @@ import type { AdminRole, AdminUser } from '../../types';
 const PASSWORD_MIN_LENGTH = 10;
 
 const INPUT_CLASS =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -191,7 +191,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
           <button
             type="submit"
             disabled={creating}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60"
+            className="px-4 py-2 bg-brand text-neutral-950 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors disabled:opacity-60"
           >
             {creating ? 'Создание...' : 'Создать'}
           </button>
@@ -242,7 +242,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
                     <div className="flex gap-2">
                       <button
                         onClick={() => void saveEdit(user)}
-                        className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 transition-colors"
+                        className="px-3 py-1.5 bg-brand text-neutral-950 rounded-lg text-sm hover:bg-brand-hover transition-colors"
                       >
                         Сохранить
                       </button>
@@ -260,7 +260,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-gray-800">{user.name}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-brand/10 text-brand">
                             {user.role.name}
                           </span>
                           {!user.active && (
@@ -332,7 +332,7 @@ export function UsersTab({ auth }: { auth: AdminAuth }) {
                         <button
                           onClick={() => void resetPassword(user)}
                           disabled={newPassword.length < PASSWORD_MIN_LENGTH}
-                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm whitespace-nowrap hover:bg-emerald-700 transition-colors disabled:opacity-60"
+                          className="px-3 py-1.5 bg-brand text-neutral-950 rounded-lg text-sm whitespace-nowrap hover:bg-brand-hover transition-colors disabled:opacity-60"
                         >
                           Сохранить
                         </button>

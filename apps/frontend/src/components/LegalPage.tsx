@@ -65,7 +65,7 @@ function AboutContent({ lang }: { lang: Lang }) {
 
   return (
     <div className="space-y-10 text-[15px] leading-relaxed text-gray-700">
-      <h1 className="text-2xl sm:text-3xl font-bold text-emerald-800 tracking-tight text-center">
+      <h1 className="text-2xl sm:text-3xl font-bold text-brand tracking-tight text-center">
         {copy.title}
       </h1>
       <div className="space-y-4">
@@ -91,12 +91,12 @@ function AboutContent({ lang }: { lang: Lang }) {
       <div>
         <p className="font-semibold text-gray-800">{copy.bookingTitle}</p>
         <p className="mt-1">
-          <a href={`mailto:${EMAIL}`} className="text-emerald-700 hover:underline">
+          <a href={`mailto:${EMAIL}`} className="text-brand hover:underline">
             {EMAIL}
           </a>
         </p>
         <p>
-          <a href={PHONE_HREF} className="text-emerald-700 hover:underline">
+          <a href={PHONE_HREF} className="text-brand hover:underline">
             {PHONE_DISPLAY}
           </a>
         </p>
@@ -105,7 +105,7 @@ function AboutContent({ lang }: { lang: Lang }) {
             href={BAND_WEBSITE_URL}
             target="_blank"
             rel="noreferrer"
-            className="text-emerald-700 hover:underline"
+            className="text-brand hover:underline"
           >
             birmanat.band
           </a>

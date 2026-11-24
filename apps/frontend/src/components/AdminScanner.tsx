@@ -178,7 +178,7 @@ export function AdminScanner() {
           <div
             data-testid={messageType === 'success' ? 'scanner-success' : 'scanner-error'}
             className={`p-3 rounded-xl text-center font-semibold transition-all ${
-              messageType === 'success' ? 'bg-green-600' : 'bg-red-600'
+              messageType === 'success' ? 'bg-brand text-neutral-950' : 'bg-red-600 text-white'
             }`}
           >
             {message}
@@ -191,7 +191,7 @@ export function AdminScanner() {
         <button
           onClick={scanning ? stopScanning : startScanning}
           className={`w-full py-3 rounded-xl font-semibold transition-colors ${
-            scanning ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
+            scanning ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-brand hover:bg-brand-hover text-neutral-950'
           }`}
         >
           {scanning ? 'Остановить сканер' : 'Сканировать'}
@@ -256,7 +256,7 @@ export function AdminScanner() {
                           className="rounded border-gray-500"
                         />
                         <span className="flex-1 truncate">{m.name}</span>
-                        {m.checkedIn && <span className="text-xs text-green-400">вошёл</span>}
+                        {m.checkedIn && <span className="text-xs text-brand">вошёл</span>}
                       </label>
                     ))}
                   </div>
@@ -265,7 +265,7 @@ export function AdminScanner() {
                   data-testid="checkin-submit"
                   onClick={confirmEntry}
                   disabled={confirming || (isGroup && selectedMemberIds.size === 0)}
-                  className="w-full py-2.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 rounded-xl font-semibold transition-colors"
+                  className="w-full py-2.5 bg-brand text-neutral-950 hover:bg-brand-hover disabled:opacity-50 rounded-xl font-semibold transition-colors"
                 >
                   {confirming
                     ? '...'

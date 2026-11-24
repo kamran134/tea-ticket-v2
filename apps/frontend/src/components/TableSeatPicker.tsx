@@ -79,10 +79,10 @@ export function TableSeatPicker({
                   className={[
                     'min-h-[44px] rounded-xl text-sm font-bold border-2 transition-colors',
                     isSelected
-                      ? 'bg-emerald-600 border-emerald-700 text-white'
+                      ? 'bg-brand border-brand text-neutral-950'
                       : isOccupied
                         ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
-                        : 'bg-white border-gray-300 text-gray-700 hover:bg-emerald-50 hover:border-emerald-400',
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-brand/10 hover:border-brand',
                   ].join(' ')}
                 >
                   {seat.number}
@@ -98,7 +98,7 @@ export function TableSeatPicker({
             {t('seatPicker.free')}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3.5 h-3.5 rounded border border-emerald-700 bg-emerald-600 inline-block" />
+            <span className="w-3.5 h-3.5 rounded border border-brand bg-brand inline-block" />
             {t('seatPicker.inCart')}
           </span>
           <span className="flex items-center gap-1.5">
@@ -111,7 +111,7 @@ export function TableSeatPicker({
           type="button"
           data-testid="table-picker-done"
           onClick={onClose}
-          className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+          className="w-full py-2.5 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors"
         >
           {t('common.done')}
         </button>

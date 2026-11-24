@@ -16,7 +16,7 @@ const RESOURCE_LABELS: Record<string, string> = {
 };
 
 const INPUT_CLASS =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 
 function errMsg(err: unknown, fallback: string): string {
   if (err instanceof ApiError) return err.message;
@@ -210,7 +210,7 @@ export function RolesTab({ auth }: { auth: AdminAuth }) {
         <button
           onClick={onSave}
           disabled={!draft.name.trim()}
-          className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 transition-colors disabled:opacity-60"
+          className="px-3 py-1.5 bg-brand text-neutral-950 rounded-lg text-sm hover:bg-brand-hover transition-colors disabled:opacity-60"
         >
           Сохранить
         </button>
@@ -229,7 +229,7 @@ export function RolesTab({ auth }: { auth: AdminAuth }) {
       {canCreate && !showCreate && (
         <button
           onClick={startCreate}
-          className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:bg-emerald-700 transition-colors"
+          className="px-4 py-2 bg-brand text-neutral-950 rounded-xl text-sm font-semibold hover:bg-brand-hover transition-colors"
         >
           Новая роль
         </button>

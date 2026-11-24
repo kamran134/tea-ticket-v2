@@ -8,7 +8,7 @@
     background-color: #fff;
   }
   .PhoneInput--focus {
-    @apply ring-2 ring-emerald-200 border-emerald-500;
+    @apply ring-2 ring-brand/40 border-brand;
   }
   .PhoneInputCountry {
     @apply flex items-center gap-1.5 shrink-0;
@@ -114,7 +114,7 @@
 
 .app-bg {
   min-height: 100vh;
-  background-image: linear-gradient(to bottom right, #ecfdf5, #fffbeb);
+  background-image: linear-gradient(to bottom right, #fbf7ec, #f5ecd0);
   color: #1f2937;
 }
 
@@ -207,7 +207,7 @@
 }
 
 .dark .app-bg .PhoneInput--focus {
-  --tw-ring-color: rgb(6 78 59 / 0.8);
+  --tw-ring-color: rgb(212 175 55 / 0.6);
 }
 
 .dark .app-bg .PhoneInput *:not(img):not(svg) {
@@ -223,26 +223,16 @@
   box-shadow: none;
 }
 
-.dark .app-bg .bg-emerald-50,
-.dark .app-bg .bg-emerald-100 {
-  background-color: rgb(6 78 59 / 0.45);
-}
-
-.dark .app-bg .border-emerald-100,
-.dark .app-bg .border-emerald-200 {
-  border-color: rgb(16 185 129 / 0.35);
-}
-
-.dark .app-bg .text-emerald-800 {
-  color: #a7f3d0;
-}
-
-.dark .app-bg .text-emerald-700 {
-  color: #6ee7b7;
-}
-
 .dark .app-bg .bg-red-50 {
   background-color: rgb(127 29 29 / 0.4);
+}
+
+.dark .app-bg .bg-brand\/10 {
+  background-color: rgb(212 175 55 / 0.12);
+}
+
+.dark .app-bg .border-brand\/30 {
+  border-color: rgb(212 175 55 / 0.3);
 }
 
 .dark .app-bg .text-red-700,
@@ -270,15 +260,6 @@
   color: #fde68a;
 }
 
-.dark .app-bg .bg-green-100 {
-  background-color: rgb(6 78 59 / 0.45);
-}
-
-.dark .app-bg .text-green-800,
-.dark .app-bg .text-green-700 {
-  color: #6ee7b7;
-}
-
 .dark .app-bg .bg-red-100 {
   background-color: rgb(127 29 29 / 0.4);
 }
@@ -289,10 +270,6 @@
 
 .dark .app-bg .text-red-800 {
   color: #fca5a5;
-}
-
-.dark .app-bg .from-emerald-100 {
-  --tw-gradient-from: #064e3b var(--tw-gradient-from-position);
 }
 
 .dark .app-bg .to-amber-100 {
@@ -312,14 +289,14 @@
   --map-muted: #6b7280;
   --map-border: #e5e7eb;
   --map-aside: #f9fafb;
-  --map-chip-bg: #ecfdf5;
-  --map-chip-fg: #065f46;
-  --map-chip-border: #a7f3d0;
+  --map-chip-bg: rgb(212 175 55 / 0.12);
+  --map-chip-fg: #a17c2a;
+  --map-chip-border: rgb(212 175 55 / 0.45);
   --seat-available-fill: #ffffff;
   --seat-available-text: #374151;
-  --seat-selected-fill: #059669;
-  --seat-selected-stroke: #047857;
-  --seat-selected-text: #ffffff;
+  --seat-selected-fill: #d4af37;
+  --seat-selected-stroke: #a17c2a;
+  --seat-selected-text: #0a0a0a;
   --seat-occupied-fill: #e5e7eb;
   --seat-occupied-stroke: #d1d5db;
   --seat-occupied-text: #9ca3af;
@@ -339,13 +316,13 @@
   --map-muted: #a1a1aa;
   --map-border: rgba(255, 255, 255, 0.1);
   --map-aside: #0e0e10;
-  --map-chip-bg: rgb(5 150 105 / 0.15);
-  --map-chip-fg: #d1fae5;
-  --map-chip-border: rgb(52 211 153 / 0.3);
+  --map-chip-bg: rgb(212 175 55 / 0.15);
+  --map-chip-fg: #f5e6b8;
+  --map-chip-border: rgb(212 175 55 / 0.35);
   --seat-available-fill: #1c1c20;
   --seat-available-text: #e7e5e4;
-  --seat-selected-fill: #059669;
-  --seat-selected-stroke: #34d399;
+  --seat-selected-fill: #d4af37;
+  --seat-selected-stroke: #e7c766;
   --seat-occupied-fill: #2a2a2e;
   --seat-occupied-stroke: #52525b;
   --seat-occupied-text: #71717a;
@@ -560,7 +537,7 @@
 .seat-marker:not([aria-disabled='true']):hover .seat-marker-disc,
 .seat-marker:not([aria-disabled='true']):focus-visible .seat-marker-disc {
   transform: scale(1.08);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seat-accent, #059669) 35%, transparent), 0 6px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--seat-accent, #d4af37) 35%, transparent), 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
 .seat-marker:focus,
@@ -776,8 +753,8 @@
 }
 
 .rich-text-frame:focus-within {
-  border-color: #10b981;
-  box-shadow: 0 0 0 2px rgb(167 243 208);
+  border-color: #d4af37;
+  box-shadow: 0 0 0 2px rgb(212 175 55 / 0.35);
 }
 
 .formatted-description p {
@@ -819,9 +796,9 @@
 }
 
 .dark .app-bg .rich-text-frame:focus-within {
-  --tw-ring-color: rgb(6 78 59 / 0.8);
+  --tw-ring-color: rgb(212 175 55 / 0.6);
   box-shadow: 0 0 0 2px var(--tw-ring-color);
-  border-color: #059669;
+  border-color: #d4af37;
 }
 
 @media (prefers-reduced-motion: reduce) {

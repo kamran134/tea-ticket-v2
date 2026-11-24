@@ -19,8 +19,8 @@ export function Toaster() {
           <div
             key={t.id}
             style={{ animation: '_toast-in 0.18s ease-out' }}
-            className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white max-w-xs ${
-              t.type === 'success' ? 'bg-emerald-600' : 'bg-red-500'
+            className={`pointer-events-auto px-4 py-3 rounded-xl shadow-lg text-sm font-medium max-w-xs ${
+              t.type === 'success' ? 'bg-brand text-neutral-950' : 'bg-red-500 text-white'
             }`}
           >
             {t.message}

@@ -54,7 +54,7 @@ async function reloadTicket(id: string): Promise<{
 const STATUS_COLORS: Record<TicketStatus, string> = {
   BOOKED: 'bg-yellow-100 text-yellow-800',
   PENDING: 'bg-amber-100 text-amber-800',
-  CONFIRMED: 'bg-green-100 text-green-800',
+  CONFIRMED: 'bg-brand/10 text-brand',
   REJECTED: 'bg-red-100 text-red-800',
   EXPIRED: 'bg-gray-100 text-gray-700',
   REFUNDED: 'bg-purple-100 text-purple-800',
@@ -63,8 +63,8 @@ const STATUS_COLORS: Record<TicketStatus, string> = {
 const EMAIL_STATUS_COLORS: Record<TicketEmailDeliveryStatus, string> = {
   PENDING: 'text-amber-700',
   PROCESSING: 'text-amber-700',
-  ACCEPTED: 'text-emerald-700',
-  DELIVERED: 'text-emerald-700',
+  ACCEPTED: 'text-brand',
+  DELIVERED: 'text-brand',
   BOUNCED: 'text-red-700',
   COMPLAINED: 'text-red-700',
   FAILED: 'text-red-700',
@@ -360,7 +360,7 @@ export function TicketView() {
               <h1 className="text-xl font-semibold text-gray-700">{t('ticket.notFoundTitle')}</h1>
               <p className="text-gray-500 mt-1">{t('ticket.notFoundHint')}</p>
               <SupportContact className="mt-4" />
-              <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
+              <a href="/" className="inline-block mt-4 text-brand hover:underline">{t('common.toAfisha')}</a>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center text-gray-400">
@@ -399,7 +399,7 @@ export function TicketView() {
           <div>
             <a
               href={`/e/${encodeURIComponent(event.slug)}`}
-              className="text-lg font-bold text-emerald-800 hover:underline"
+              className="text-lg font-bold text-brand hover:underline"
             >
               🍵 {event.name}
             </a>
@@ -448,7 +448,7 @@ export function TicketView() {
                   <span>{t('ticket.promoSubtotal')}</span>
                   <span className="line-through">{formatPrice(listTotal, currency)}</span>
                 </div>
-                <div className="flex justify-between text-sm text-emerald-700">
+                <div className="flex justify-between text-sm text-brand">
                   <span>{t('ticket.promoDiscount', { code: promoCode ?? '' })}</span>
                   <span>−{formatPrice(listTotal - payTotal, currency)}</span>
                 </div>
@@ -458,7 +458,7 @@ export function TicketView() {
               <span className="text-sm text-gray-500">
                 {members.length > 1 ? `${t('common.total')} · ${t('common.people', { count: members.length })}` : t('common.cost')}
               </span>
-              <span data-testid="ticket-total" className="text-xl font-bold text-emerald-700">
+              <span data-testid="ticket-total" className="text-xl font-bold text-brand">
                 {formatPrice(payTotal, currency)}
               </span>
             </div>
@@ -478,7 +478,7 @@ export function TicketView() {
                 className="p-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
               >
                 {copied ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-brand">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                 ) : (
@@ -541,7 +541,7 @@ export function TicketView() {
                 data-testid="payment-button"
                 onClick={() => { void handlePay(); }}
                 disabled={paying || pollingPayment}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                className="w-full py-3 px-4 rounded-xl bg-brand text-neutral-950 font-semibold hover:bg-brand-hover disabled:opacity-50 transition-colors"
               >
                 {paying ? t('ticket.paying') : t('ticket.pay')}
               </button>
@@ -590,7 +590,7 @@ export function TicketView() {
             ) : (
               <>
                 <div className="text-2xl">✅</div>
-                <h2 className="font-semibold text-green-800">{t('ticket.confirmed')}</h2>
+                <h2 className="font-semibold text-brand">{t('ticket.confirmed')}</h2>
               </>
             )}
             <div data-testid="ticket-qr" className="p-3 bg-white keep-white rounded-xl">
@@ -645,7 +645,7 @@ export function TicketView() {
                       m.status === 'REFUNDED'
                         ? 'bg-purple-100 text-purple-700'
                         : m.checkedIn
-                          ? 'bg-green-100 text-green-700'
+                          ? 'bg-brand/10 text-brand'
                           : 'bg-gray-100 text-gray-500'
                     }`}
                   >

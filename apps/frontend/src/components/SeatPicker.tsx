@@ -76,10 +76,10 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
                         className={[
                           'w-7 h-7 rounded text-xs font-bold transition-colors border relative',
                           isSelected
-                            ? 'bg-emerald-600 border-emerald-700 text-white'
+                            ? 'bg-brand border-brand text-neutral-950'
                             : isOccupied
                               ? 'bg-gray-100 border-gray-200 text-gray-300 cursor-not-allowed'
-                              : 'bg-white border-gray-300 text-gray-700 hover:bg-emerald-50 hover:border-emerald-400',
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-brand/10 hover:border-brand',
                         ].join(' ')}
                       >
                         {seat.number}
@@ -98,7 +98,7 @@ export function SeatPicker({ seats, selectedSeatIds, onToggle }: Props) {
             {t('seatPicker.free')}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-4 rounded border border-emerald-700 bg-emerald-600 inline-block" />
+            <span className="w-4 h-4 rounded border border-brand bg-brand inline-block" />
             {t('seatPicker.inCart')}
           </span>
           <span className="flex items-center gap-1.5">

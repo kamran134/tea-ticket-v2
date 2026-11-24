@@ -81,7 +81,7 @@ export function AuditTab({ auth }: { auth: AdminAuth }) {
   return (
     <div className="space-y-3">
       <select
-        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
         value={action}
         onChange={e => {
           setOffset(0);

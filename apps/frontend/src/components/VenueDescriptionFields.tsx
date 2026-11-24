@@ -54,14 +54,14 @@ export function VenueDescriptionFields({ value, onChange, compact = false }: Pro
               onClick={() => setLang(item.id)}
               className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium tracking-wide transition-colors ${
                 active
-                  ? 'bg-emerald-600 text-white'
+                  ? 'bg-brand text-neutral-950'
                   : 'bg-gray-100 text-gray-500 hover:text-gray-700'
               }`}
             >
               {item.label}
               {filled && (
                 <span
-                  className={`inline-block w-1.5 h-1.5 rounded-full ${active ? 'bg-white' : 'bg-emerald-500'}`}
+                  className={`inline-block w-1.5 h-1.5 rounded-full ${active ? 'bg-white' : 'bg-brand'}`}
                   aria-hidden
                 />
               )}

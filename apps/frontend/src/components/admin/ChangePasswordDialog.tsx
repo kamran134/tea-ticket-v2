@@ -7,7 +7,7 @@ import { PasswordInput } from '../PasswordInput';
 const PASSWORD_MIN_LENGTH = 10;
 
 const INPUT_CLASS =
-  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 
 export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -80,7 +80,7 @@ export function ChangePasswordDialog({ onClose }: { onClose: () => void }) {
           <button
             type="submit"
             disabled={submitting}
-            className="px-4 py-2 text-sm text-white bg-emerald-600 rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-60"
+            className="px-4 py-2 text-sm bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors disabled:opacity-60"
           >
             {submitting ? 'Сохранение...' : 'Сохранить'}
           </button>

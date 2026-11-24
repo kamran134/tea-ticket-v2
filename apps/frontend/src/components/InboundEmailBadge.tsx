@@ -30,7 +30,7 @@ export function InboundEmailBadge({ authenticated, variant = 'light' }: Props) {
       <MailIcon />
       <span
         className={`absolute -top-1 -right-1 min-w-[1.125rem] h-[1.125rem] px-1 rounded-full text-[10px] font-bold leading-[1.125rem] text-center ${
-          isDark ? 'bg-emerald-500 text-gray-900' : 'bg-emerald-600 text-white'
+          isDark ? 'bg-brand text-gray-900' : 'bg-brand text-neutral-950'
         }`}
       >
         {unreadCount > 99 ? '99+' : unreadCount}

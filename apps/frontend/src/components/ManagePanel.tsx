@@ -56,7 +56,7 @@ const TICKET_FILTERS: { value: TicketFilter; label: string }[] = [
 const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> = {
   BOOKED:    { label: 'Забронирован', className: 'bg-blue-100 text-blue-700' },
   PENDING:   { label: 'Ожидает',      className: 'bg-amber-100 text-amber-700' },
-  CONFIRMED: { label: 'Подтверждён',  className: 'bg-green-100 text-green-700' },
+  CONFIRMED: { label: 'Подтверждён',  className: 'bg-brand/10 text-brand' },
   REFUNDED:  { label: 'Возвращён',    className: 'bg-purple-100 text-purple-700' },
   REJECTED:  { label: 'Отклонён',     className: 'bg-red-100 text-red-600' },
   EXPIRED:   { label: 'Истёк',        className: 'bg-gray-100 text-gray-600' },
@@ -65,8 +65,8 @@ const STATUS_STYLE: Record<TicketStatus, { label: string; className: string }> =
 const EMAIL_STATUS_STYLE: Record<TicketEmailDeliveryStatus, { label: string; className: string }> = {
   PENDING:    { label: 'Email в очереди',     className: 'text-amber-700' },
   PROCESSING: { label: 'Email отправляется',  className: 'text-amber-700' },
-  ACCEPTED:   { label: 'Email отправлен',     className: 'text-emerald-700' },
-  DELIVERED:  { label: 'Email доставлен',     className: 'text-emerald-700' },
+  ACCEPTED:   { label: 'Email отправлен',     className: 'text-brand' },
+  DELIVERED:  { label: 'Email доставлен',     className: 'text-brand' },
   BOUNCED:    { label: 'Email не доставлен',  className: 'text-red-700' },
   COMPLAINED: { label: 'Email — жалоба',      className: 'text-red-700' },
   FAILED:     { label: 'Ошибка email',        className: 'text-red-700' },
@@ -141,9 +141,9 @@ function toIsoFromDateAndTime(date: string, time: string): string {
 }
 
 const DATE_TIME_INPUT_CLASS =
-  'w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500';
+  'w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand';
 const DATE_TIME_INPUT_CLASS_COMPACT =
-  'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-emerald-300';
+  'w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-brand/40';
 
 function VenueDateTimeFields({
   date,
@@ -569,7 +569,7 @@ export function ManagePanel() {
             <InboundEmailBadge authenticated={authenticated} />
             <ThemeToggle />
             {canCheckin && (
-              <a href="/admin.html" className="text-sm text-emerald-700 hover:underline">
+              <a href="/admin.html" className="text-sm text-brand hover:underline">
                 Сканер
               </a>
             )}
@@ -600,7 +600,7 @@ export function ManagePanel() {
               onClick={() => setTab(t.id)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === t.id
-                  ? 'border-emerald-600 text-emerald-600'
+                  ? 'border-brand text-brand'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -623,7 +623,7 @@ export function ManagePanel() {
               <input
                 type="text"
                 placeholder="Название"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 value={newVenueName}
                 onChange={e => setNewVenueName(e.target.value)}
                 required
@@ -643,7 +643,7 @@ export function ManagePanel() {
               <div>
                 <label className="block text-xs text-gray-400 mb-1">Возрастной ценз</label>
                 <select
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500 bg-white"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand bg-white"
                   value={newVenueAgeRating}
                   onChange={e => setNewVenueAgeRating(e.target.value)}
                 >
@@ -662,7 +662,7 @@ export function ManagePanel() {
                 <input
                   type="text"
                   placeholder="letnyaya-vecherinka-2026-08-15"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                   value={newVenueSlug}
                   onChange={e => { setSlugManuallyEdited(true); setNewVenueSlug(slugify(e.target.value)); }}
                   required
@@ -671,7 +671,7 @@ export function ManagePanel() {
                   <p className="text-xs text-gray-400 mt-1">Проверка...</p>
                 )}
                 {slugStatus === 'available' && (
-                  <p className="text-xs text-emerald-600 mt-1">✓ свободен</p>
+                  <p className="text-xs text-brand mt-1">✓ свободен</p>
                 )}
                 {slugStatus === 'taken' && (
                   <p className="text-xs text-red-600 mt-1">Уже занят, выберите другой</p>
@@ -680,7 +680,7 @@ export function ManagePanel() {
               <button
                 type="submit"
                 disabled={slugStatus === 'taken'}
-                className="w-full py-2 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="w-full py-2 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors disabled:opacity-50"
               >
                 Создать
               </button>
@@ -709,7 +709,7 @@ export function ManagePanel() {
                             <input
                               type="text"
                               autoFocus
-                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-brand/40"
                               value={editVenueName}
                               onChange={e => setEditVenueName(e.target.value)}
                             />
@@ -727,7 +727,7 @@ export function ManagePanel() {
                               compact
                             />
                             <select
-                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-emerald-300 bg-white"
+                              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm w-full focus:outline-none focus:ring-1 focus:ring-brand/40 bg-white"
                               value={editVenueAgeRating}
                               onChange={e => setEditVenueAgeRating(e.target.value)}
                               aria-label="Возрастной ценз"
@@ -743,7 +743,7 @@ export function ManagePanel() {
                                 type="button"
                                 onClick={() => saveVenueEdit(v.id)}
                                 disabled={savingVenueEdit}
-                                className="flex-1 py-2 px-3 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                                className="flex-1 py-2 px-3 bg-brand text-neutral-950 rounded-lg text-sm font-semibold hover:bg-brand-hover transition-colors disabled:opacity-50"
                               >
                                 Сохранить
                               </button>
@@ -762,7 +762,7 @@ export function ManagePanel() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <div className="font-semibold text-gray-800">{v.name}</div>
                               <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                v.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                                v.active ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-500'
                               }`}>
                                 {v.active ? 'Активно' : 'Скрыто'}
                               </span>
@@ -780,14 +780,14 @@ export function ManagePanel() {
                             <input
                               type="text"
                               autoFocus
-                              className="border border-gray-300 rounded px-2 py-1 text-xs font-mono w-40 focus:outline-none focus:ring-1 focus:ring-emerald-300"
+                              className="border border-gray-300 rounded px-2 py-1 text-xs font-mono w-40 focus:outline-none focus:ring-1 focus:ring-brand/40"
                               value={editingSlugValue}
                               onChange={e => setEditingSlugValue(e.target.value)}
                               onKeyDown={e => e.key === 'Enter' && saveVenueSlug(v.id)}
                             />
                             <button
                               onClick={() => saveVenueSlug(v.id)}
-                              className="text-xs text-emerald-700 hover:underline shrink-0"
+                              className="text-xs text-brand hover:underline shrink-0"
                             >
                               Сохранить
                             </button>
@@ -802,7 +802,7 @@ export function ManagePanel() {
                           canEditEvents ? (
                           <button
                             onClick={() => { setEditingSlugId(v.id); setEditingSlugValue(v.slug); }}
-                            className="text-xs text-gray-400 hover:text-emerald-700 font-mono mt-1.5 truncate block"
+                            className="text-xs text-gray-400 hover:text-brand font-mono mt-1.5 truncate block"
                             title="Изменить слаг"
                           >
                             /e/{v.slug}
@@ -819,7 +819,7 @@ export function ManagePanel() {
                       {v.active && (
                         <button
                           onClick={() => copyRegistrationLink(v.slug)}
-                          className="text-xs text-emerald-700 hover:underline"
+                          className="text-xs text-brand hover:underline"
                         >
                           Скопировать ссылку
                         </button>
@@ -828,11 +828,11 @@ export function ManagePanel() {
                         <>
                       <button
                         onClick={() => startEditVenue(v)}
-                        className="text-xs text-gray-400 hover:text-emerald-700"
+                        className="text-xs text-gray-400 hover:text-brand"
                       >
                         Редактировать
                       </button>
-                      <label className="text-xs text-gray-400 hover:text-emerald-700 cursor-pointer">
+                      <label className="text-xs text-gray-400 hover:text-brand cursor-pointer">
                         {uploadingPosterId === v.id ? 'Загрузка...' : v.posterImage ? 'Сменить постер' : 'Загрузить постер'}
                         <input
                           type="file"
@@ -849,7 +849,7 @@ export function ManagePanel() {
                       <button
                         onClick={() => toggleVenueActive(v.id, !v.active)}
                         className={`text-xs hover:underline ${
-                          v.active ? 'text-gray-400 hover:text-red-500' : 'text-emerald-600'
+                          v.active ? 'text-gray-400 hover:text-red-500' : 'text-brand'
                         }`}
                       >
                         {v.active ? 'Скрыть' : 'Активировать'}
@@ -877,7 +877,7 @@ export function ManagePanel() {
           <div className="space-y-4">
             <div className="flex gap-2">
               <select
-                className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 value={filterVenueId}
                 onChange={e => setFilterVenueId(e.target.value)}
               >
@@ -906,12 +906,12 @@ export function ManagePanel() {
                     onClick={() => setTicketFilter(value)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       isActive
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-brand text-neutral-950'
                         : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm'
                     }`}
                   >
                     {label}
-                    <span className={`ml-1.5 text-xs ${isActive ? 'text-emerald-100' : 'text-gray-400'}`}>
+                    <span className={`ml-1.5 text-xs ${isActive ? 'text-brand' : 'text-gray-400'}`}>
                       {count}
                     </span>
                   </button>
@@ -962,7 +962,7 @@ export function ManagePanel() {
                         <button
                           type="button"
                           onClick={() => openReceipt(t.id)}
-                          className="text-sm text-emerald-700 hover:underline block text-left"
+                          className="text-sm text-brand hover:underline block text-left"
                         >
                           Открыть чек →
                         </button>
@@ -970,7 +970,7 @@ export function ManagePanel() {
 
                       <button
                         onClick={() => copyTicketLink(t.id)}
-                        className="text-sm text-emerald-700 hover:underline block"
+                        className="text-sm text-brand hover:underline block"
                       >
                         Скопировать ссылку на билет
                       </button>
@@ -980,7 +980,7 @@ export function ManagePanel() {
                           <>
                             <button
                               onClick={() => handleTicketStatus(t.id, 'CONFIRMED')}
-                              className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                              className="flex-1 py-2 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors text-sm"
                             >
                               Подтвердить
                             </button>
@@ -1084,7 +1084,7 @@ export function ManagePanel() {
                                 <button
                                   type="button"
                                   onClick={() => openReceipt(t.id)}
-                                  className="text-emerald-700 hover:underline text-xs"
+                                  className="text-brand hover:underline text-xs"
                                 >
                                   Чек
                                 </button>
@@ -1106,7 +1106,7 @@ export function ManagePanel() {
 
                     <button
                       onClick={() => copyTicketLink(group.key)}
-                      className="text-sm text-emerald-700 hover:underline block"
+                      className="text-sm text-brand hover:underline block"
                     >
                       Скопировать ссылку на билет
                     </button>
@@ -1115,7 +1115,7 @@ export function ManagePanel() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleTicketStatus(primary.id, 'CONFIRMED')}
-                          className="flex-1 py-2 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors text-sm"
+                          className="flex-1 py-2 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors text-sm"
                         >
                           Подтвердить группу
                         </button>
@@ -1147,7 +1147,7 @@ export function ManagePanel() {
         {tab === 'gridmap' && (
           <div className="space-y-4">
             <select
-              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+              className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
               value={selectedVenueId}
               onChange={e => setSelectedVenueId(e.target.value)}
             >

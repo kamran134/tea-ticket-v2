@@ -40,7 +40,7 @@ export function EventPoster({
         : formatPrice(minPrice, currency);
 
   return (
-    <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-emerald-100 to-amber-100">
+    <div className="relative aspect-[16/9] rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-brand/25 to-amber-100">
       {posterImage ? (
         <img
           src={posterImage}
@@ -53,7 +53,7 @@ export function EventPoster({
         </div>
       )}
 
-      {/* keep-white: dark-theme CSS remaps gray/emerald text; overlay stays light */}
+      {/* keep-white: dark-theme CSS remaps gray/brand text; overlay stays light */}
       <div className="keep-white absolute inset-0 bg-gradient-to-t from-black/75 via-black/35 to-black/10" />
 
       <div className="keep-white absolute inset-0 flex flex-col justify-end p-4 sm:p-5 text-white">

@@ -49,21 +49,21 @@ export function PromoCodeField({
         <div
           className={map
             ? 'flex items-center justify-between gap-2 rounded-lg px-3 py-2'
-            : 'flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2'}
+            : 'flex items-center justify-between gap-2 rounded-lg border border-brand/30 bg-brand/10 px-3 py-2'}
           style={map ? {
             border: '1px solid var(--map-chip-border)',
             background: 'var(--map-chip-bg)',
             color: 'var(--map-chip-fg)',
           } : undefined}
         >
-          <span className={map ? 'text-sm font-medium' : 'text-sm font-medium text-emerald-800'}>
+          <span className={map ? 'text-sm font-medium' : 'text-sm font-medium text-brand'}>
             {shownCode ?? appliedCode}
             {loading ? '…' : ''}
           </span>
           <button
             type="button"
             onClick={onClear}
-            className={map ? 'text-xs hover:underline' : 'text-xs text-emerald-700 hover:underline'}
+            className={map ? 'text-xs hover:underline' : 'text-xs text-brand hover:underline'}
           >
             {t('register.promoRemove')}
           </button>
@@ -83,8 +83,8 @@ export function PromoCodeField({
             placeholder={t('register.promoPlaceholder')}
             autoCapitalize="characters"
             className={map
-              ? 'flex-1 min-w-0 rounded-lg px-3 py-2 text-sm uppercase bg-transparent border focus:outline-none focus:ring-2 focus:ring-emerald-500/40'
-              : 'flex-1 border border-gray-300 rounded-lg px-4 py-2.5 uppercase focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500'}
+              ? 'flex-1 min-w-0 rounded-lg px-3 py-2 text-sm uppercase bg-transparent border focus:outline-none focus:ring-2 focus:ring-brand/40'
+              : 'flex-1 border border-gray-300 rounded-lg px-4 py-2.5 uppercase focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand'}
             style={map ? { borderColor: 'var(--map-border)', color: 'var(--map-fg)' } : undefined}
           />
           <button
@@ -93,7 +93,7 @@ export function PromoCodeField({
             disabled={loading || !input.trim()}
             onClick={apply}
             className={map
-              ? 'px-3 rounded-lg bg-emerald-600 text-white text-sm font-medium disabled:opacity-50'
+              ? 'px-3 rounded-lg bg-brand text-neutral-950 text-sm font-medium disabled:opacity-50'
               : 'px-4 rounded-lg bg-gray-900 text-white text-sm font-medium disabled:opacity-50'}
           >
             {t('register.promoApply')}

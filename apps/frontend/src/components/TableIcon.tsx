@@ -31,7 +31,7 @@ const PALETTE = {
   table: { fill: '#d4a76a', stroke: '#7c5230' },
   chair: { fill: '#9c6b3f', stroke: '#5c3d21' },
   sofa: { fill: '#7a4a30', stroke: '#4a2e1c' },
-  selected: { fill: '#059669', stroke: '#047857' },
+  selected: { fill: '#d4af37', stroke: '#a17c2a' },
   mutedFill: '#3f3f46',
   mutedStroke: '#71717a',
 };

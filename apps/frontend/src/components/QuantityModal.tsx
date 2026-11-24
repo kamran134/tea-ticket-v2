@@ -74,7 +74,7 @@ export function QuantityModal({ title, price, currency, quantity, max, onChange,
           type="button"
           data-testid="quantity-confirm"
           onClick={onClose}
-          className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+          className="w-full py-2.5 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover transition-colors"
         >
           {t('common.done')}
         </button>

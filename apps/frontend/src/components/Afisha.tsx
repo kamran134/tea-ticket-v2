@@ -26,7 +26,7 @@ export function Afisha() {
       <div className="flex-1 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-8 pt-6">
-            <h1 className="inline-flex items-center justify-center gap-3 text-xl sm:text-2xl font-bold text-emerald-800">
+            <h1 className="inline-flex items-center justify-center gap-3 text-xl sm:text-2xl font-bold text-brand">
               <TicketMark className="h-8 w-8 shrink-0" />
               {t('afisha.title')}
             </h1>
@@ -55,7 +55,7 @@ export function Afisha() {
                   data-testid={`event-card-${v.id}`}
                   className="group bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
                 >
-                  <div className="relative aspect-[4/3] bg-gradient-to-br from-emerald-100 to-amber-100">
+                  <div className="relative aspect-[4/3] bg-gradient-to-br from-brand/25 to-amber-100">
                     <a href={`/e/${v.slug}`} className="absolute inset-0 overflow-hidden" tabIndex={-1} aria-hidden>
                       {v.posterImage ? (
                         <img
@@ -64,7 +64,7 @@ export function Afisha() {
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-emerald-800/35">
+                        <div className="w-full h-full flex items-center justify-center text-brand/35">
                           <TicketMark className="h-16 w-16" />
                         </div>
                       )}

@@ -61,7 +61,7 @@ export function SelectionPanel({
           <button
             type="button"
             onClick={onContinue}
-            className="h-11 px-4 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors"
+            className="h-11 px-4 rounded-xl bg-brand text-neutral-950 text-sm font-semibold hover:bg-brand-hover transition-colors"
           >
             {continueLabel}
           </button>
@@ -115,7 +115,7 @@ export function SelectionPanel({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full h-11 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-500 transition-colors"
+          className="w-full h-11 rounded-xl bg-brand text-neutral-950 font-semibold hover:bg-brand-hover transition-colors"
         >
           {continueLabel}
         </button>

@@ -293,7 +293,7 @@ export function RegisterForm({ slug }: Props) {
             <h1 className="text-xl font-semibold text-gray-700">{t('register.notFoundTitle')}</h1>
             <p className="text-gray-500 mt-1">{t('register.notFoundHint')}</p>
             <SupportContact className="mt-4" />
-            <a href="/" className="inline-block mt-4 text-emerald-700 hover:underline">{t('common.toAfisha')}</a>
+            <a href="/" className="inline-block mt-4 text-brand hover:underline">{t('common.toAfisha')}</a>
           </div>
         </div>
       </PublicLayout>
@@ -356,14 +356,14 @@ export function RegisterForm({ slug }: Props) {
                   onClick={openGridMap}
                   className={[
                     'w-full flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
-                    gridCartCount > 0 ? 'border-emerald-600 bg-emerald-50' : 'border-gray-200 bg-gray-50 hover:border-emerald-300',
+                    gridCartCount > 0 ? 'border-brand bg-brand/10' : 'border-gray-200 bg-gray-50 hover:border-brand',
                   ].join(' ')}
                 >
                   <span className="font-medium text-gray-800">
                     {gridCartCount > 0 ? t('register.changeSeats') : t('register.chooseSeats')}
                   </span>
                   {gridCartCount > 0 && (
-                    <span className="text-emerald-700 font-semibold text-sm shrink-0">× {gridCartCount}</span>
+                    <span className="text-brand font-semibold text-sm shrink-0">× {gridCartCount}</span>
                   )}
                 </button>
               </div>
@@ -415,10 +415,10 @@ export function RegisterForm({ slug }: Props) {
                         className={[
                           'flex justify-between items-center rounded-xl border-2 px-4 py-3 text-left transition-colors',
                           inCartQty > 0 || legacySeatZoneId === z.id
-                            ? 'border-emerald-600 bg-emerald-50'
+                            ? 'border-brand bg-brand/10'
                             : isEmpty
                               ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                              : 'border-gray-200 hover:border-emerald-300',
+                              : 'border-gray-200 hover:border-brand',
                         ].join(' ')}
                       >
                         <div>
@@ -438,7 +438,7 @@ export function RegisterForm({ slug }: Props) {
                           </div>
                         </div>
                         {inCartQty > 0 && (
-                          <span className="text-emerald-700 font-semibold text-sm shrink-0">× {inCartQty}</span>
+                          <span className="text-brand font-semibold text-sm shrink-0">× {inCartQty}</span>
                         )}
                       </button>
                     );
@@ -546,7 +546,7 @@ export function RegisterForm({ slug }: Props) {
                         <span>{t('register.promoSubtotal')}</span>
                         <span>{formatPrice(quote.subtotal, currency)}</span>
                       </div>
-                      <div data-testid="cart-discount" className="flex justify-between text-emerald-700">
+                      <div data-testid="cart-discount" className="flex justify-between text-brand">
                         <span>{t('register.promoDiscount', { code: quote.code })}</span>
                         <span>−{formatPrice(quote.discount, currency)}</span>
                       </div>
@@ -566,7 +566,7 @@ export function RegisterForm({ slug }: Props) {
                 id="register-name"
                 data-testid="register-name"
                 type="text"
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -597,7 +597,7 @@ export function RegisterForm({ slug }: Props) {
                 data-testid="register-email"
                 type="email"
                 placeholder={t('register.emailPlaceholder')}
-                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
@@ -629,7 +629,7 @@ export function RegisterForm({ slug }: Props) {
                         key={i}
                         type="text"
                         placeholder={t('register.guestPlaceholder', { number: i + 1 })}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
                         value={val}
                         onChange={e => setGuestNameInputs(g => g.map((x, idx) => (idx === i ? e.target.value : x)))}
                         required
@@ -658,24 +658,24 @@ export function RegisterForm({ slug }: Props) {
             )}
 
             {cartTotal > 0 && (
-              <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl space-y-1">
+              <div className="p-4 bg-brand/10 border border-brand/30 rounded-xl space-y-1">
                 {quote && (
                   <>
-                    <div className="flex justify-between text-sm text-emerald-700">
+                    <div className="flex justify-between text-sm text-brand">
                       <span>{t('register.promoSubtotal')}</span>
                       <span>{formatPrice(quote.subtotal, currency)}</span>
                     </div>
-                    <div className="flex justify-between text-sm text-emerald-700">
+                    <div className="flex justify-between text-sm text-brand">
                       <span>{t('register.promoDiscount', { code: quote.code })}</span>
                       <span>−{formatPrice(quote.discount, currency)}</span>
                     </div>
                   </>
                 )}
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-emerald-700">
+                  <span className="text-sm text-brand">
                     {ticketsLabel(cartCount)}
                   </span>
-                  <span className="text-2xl font-bold text-emerald-800">{formatPrice(payable, currency)}</span>
+                  <span className="text-2xl font-bold text-brand">{formatPrice(payable, currency)}</span>
                 </div>
               </div>
             )}
@@ -684,7 +684,7 @@ export function RegisterForm({ slug }: Props) {
               type="submit"
               data-testid="register-submit"
               disabled={loading || promoLoading || !canSubmit}
-              className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+              className="w-full py-3 bg-brand text-neutral-950 rounded-xl font-semibold hover:bg-brand-hover disabled:opacity-50 transition-colors"
             >
               <span data-testid="cart-checkout">
                 {loading ? t('register.buying') : t('register.buy')}

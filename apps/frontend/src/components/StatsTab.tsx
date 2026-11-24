@@ -72,7 +72,7 @@ export function StatsTab({ venues }: Props) {
   return (
     <div className="space-y-4">
       <select
-        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-500"
+        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand"
         value={venueId}
         onChange={e => setVenueId(e.target.value)}
       >
@@ -103,9 +103,9 @@ export function StatsTab({ venues }: Props) {
               <div className="text-2xl font-bold text-amber-600">{totals.pending}</div>
               <div className="text-xs text-gray-400">чеков</div>
             </div>
-            <div className="bg-emerald-50 rounded-xl shadow-sm p-4 border border-emerald-100">
-              <div className="text-xs text-emerald-600 mb-1">Подтверждённая выручка</div>
-              <div className="text-lg font-bold text-emerald-700">{formatPrice(totals.confirmedRevenue, currency)}</div>
+            <div className="bg-brand/10 rounded-xl shadow-sm p-4 border border-brand/30">
+              <div className="text-xs text-brand mb-1">Подтверждённая выручка</div>
+              <div className="text-lg font-bold text-brand">{formatPrice(totals.confirmedRevenue, currency)}</div>
             </div>
             <div className="bg-amber-50 rounded-xl shadow-sm p-4 border border-amber-100">
               <div className="text-xs text-amber-600 mb-1">Ожидаемая выручка</div>
@@ -133,7 +133,7 @@ export function StatsTab({ venues }: Props) {
                   <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
                     <div className="h-full flex">
                       <div
-                        className="bg-emerald-500 h-full transition-all duration-300"
+                        className="bg-brand h-full transition-all duration-300"
                         style={{ width: `${confirmedPct}%` }}
                       />
                       <div
@@ -145,7 +145,7 @@ export function StatsTab({ venues }: Props) {
 
                   <div className="flex items-center gap-4 text-xs text-gray-500">
                     <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="w-2 h-2 rounded-full bg-brand shrink-0" />
                       {confirmed} подтв. · {formatPrice(confirmedRevenue, currency)}
                     </span>
                     <span className="flex items-center gap-1.5">

@@ -36,14 +36,14 @@ export function TablePicker({ tables, selectedSeatIds, onOpen }: Props) {
             className={[
               'relative flex flex-col items-center justify-center rounded-xl border-2 p-3 transition-colors',
               inCart > 0
-                ? 'border-emerald-600 bg-emerald-50'
+                ? 'border-brand bg-brand/10'
                 : isDisabled
                   ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                  : 'border-gray-200 bg-white hover:border-emerald-300 hover:bg-emerald-50',
+                  : 'border-gray-200 bg-white hover:border-brand hover:bg-brand/10',
             ].join(' ')}
           >
             {inCart > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 bg-brand text-neutral-950 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                 {inCart}
               </span>
             )}
@@ -51,7 +51,7 @@ export function TablePicker({ tables, selectedSeatIds, onOpen }: Props) {
               className={[
                 'mb-1.5 flex items-center justify-center border-2',
                 table.shape === 'ROUND' ? 'rounded-full w-8 h-8' : 'rounded w-10 h-7',
-                inCart > 0 ? 'border-emerald-600' : 'border-gray-300',
+                inCart > 0 ? 'border-brand' : 'border-gray-300',
               ].join(' ')}
             >
               <span className="text-xs text-gray-500">{table.number}</span>

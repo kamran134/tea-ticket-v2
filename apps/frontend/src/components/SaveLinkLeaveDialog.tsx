@@ -36,7 +36,7 @@ export function SaveLinkLeaveDialog({
           <button
             type="button"
             onClick={onCopy}
-            className="w-full py-2.5 text-sm text-white rounded-xl bg-emerald-600 hover:bg-emerald-700 transition-colors font-semibold"
+            className="w-full py-2.5 text-sm text-neutral-950 rounded-xl bg-brand hover:bg-brand-hover transition-colors font-semibold"
           >
             {copyLabel}
           </button>
