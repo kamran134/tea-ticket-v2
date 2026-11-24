@@ -117,12 +117,12 @@ jobs:
             # compose defaults to the :latest tag; pin it to the tag this workflow pushes.
             export BACKEND_TAG='${{ env.IMAGE_TAG }}'
             export FRONTEND_TAG='${{ env.IMAGE_TAG }}'
-            # Used only when the database has no admin yet (see bootstrap-admin.ts).
-            export ADMIN_EMAIL='${{ secrets.ADMIN_EMAIL }}'
-            export ADMIN_PASSWORD_HASH='${{ secrets.ADMIN_PASSWORD_HASH }}'
 
-            # All app config (DB, JWT, bank tokens, Resend, Telegram, UPLOADS_PATH...)
-            # comes from the .env file already present in BMB_DEPLOY_PATH on the server.
+            # All app config (DB, JWT, ADMIN_EMAIL/ADMIN_PASSWORD_HASH, bank tokens,
+            # Resend, Telegram, UPLOADS_PATH...) comes from the .env file already present
+            # in BMB_DEPLOY_PATH on the server. Do not export app variables here: shell
+            # variables override .env, so a deploy would run with a different config
+            # than a manual `docker compose up -d` on the server.
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -af
