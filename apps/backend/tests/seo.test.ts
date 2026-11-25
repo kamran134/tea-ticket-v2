@@ -31,9 +31,13 @@ function makeEvent(overrides: Partial<SeoEvent> = {}): SeoEvent {
     slug: 'legendy',
     date: new Date('2027-01-08T16:00:00.000Z'),
     description: '<p><strong>Хиты</strong> KINO &amp; DDT</p><p>Ждём всех!</p>',
+    descriptionAz: null,
+    descriptionEn: '<p>Rock hits</p>',
     posterImage: '/uploads/posters/x/poster.jpg',
     ageRating: '16+',
     currency: '₼',
+    venueName: null,
+    venueAddress: null,
     prices: [
       { zoneName: 'Танцпол', price: 20, soldOut: false },
       { zoneName: 'VIP', price: 50, soldOut: true },
@@ -73,7 +77,7 @@ describe('normalizePagePath', () => {
 
 describe('structured data', () => {
   it('builds a MusicEvent with an aggregate offer and the band as performer', () => {
-    const ld = buildMusicEventJsonLd(makeEvent(), ORIGIN);
+    const ld = buildMusicEventJsonLd(makeEvent(), ORIGIN, 'ru');
     expect(ld).toMatchObject({
       '@type': 'MusicEvent',
       name: 'Легенды русского рока',
@@ -94,15 +98,15 @@ describe('structured data', () => {
 
   it('marks the event sold out only when every zone is', () => {
     const event = makeEvent({ prices: [{ zoneName: 'A', price: 10, soldOut: true }] });
-    expect(buildMusicEventJsonLd(event, ORIGIN).offers).toMatchObject({
+    expect(buildMusicEventJsonLd(event, ORIGIN, 'ru').offers).toMatchObject({
       availability: 'https://schema.org/SoldOut',
     });
   });
 
   it('omits availability when it is unknown and offers when there are no zones', () => {
     const unknown = makeEvent({ prices: [{ zoneName: 'A', price: 10, soldOut: null }] });
-    expect(buildMusicEventJsonLd(unknown, ORIGIN).offers).not.toHaveProperty('availability');
-    expect(buildMusicEventJsonLd(makeEvent({ prices: [] }), ORIGIN)).not.toHaveProperty('offers');
+    expect(buildMusicEventJsonLd(unknown, ORIGIN, 'ru').offers).not.toHaveProperty('availability');
+    expect(buildMusicEventJsonLd(makeEvent({ prices: [] }), ORIGIN, 'ru')).not.toHaveProperty('offers');
   });
 
   it('maps currency symbols and age ratings', () => {
@@ -121,7 +125,7 @@ describe('rendered fragments', () => {
   const eventPage: SeoPage = { kind: 'event', path: '/e/legendy', event: makeEvent() };
 
   it('renders an indexable event head with canonical, OG and JSON-LD', () => {
-    const head = renderSeoHead(eventPage, ORIGIN);
+    const head = renderSeoHead(eventPage, ORIGIN, 'ru');
     expect(head).toContain('<title>Легенды русского рока, 8 января — билеты | BIR MANAT BAND</title>');
     expect(head).toContain(`<link rel="canonical" href="${ORIGIN}/e/legendy">`);
     expect(head).toContain(`<meta property="og:image" content="${ORIGIN}/uploads/posters/x/poster.jpg">`);
@@ -145,23 +149,66 @@ describe('rendered fragments', () => {
   });
 
   it('lists prices with sold-out zones', () => {
-    const body = renderSeoBody(eventPage, ORIGIN);
+    const body = renderSeoBody(eventPage, ORIGIN, 'ru');
     expect(body).toContain('<li>Танцпол — 20 ₼</li>');
     expect(body).toContain('<li>VIP — 50 ₼ — мест нет</li>');
   });
 
   it('links every upcoming event from the home page', () => {
-    const body = renderSeoBody({ kind: 'home', path: '/', events: [makeEvent()] }, ORIGIN);
+    const body = renderSeoBody({ kind: 'home', path: '/', events: [makeEvent()] }, ORIGIN, 'ru');
     expect(body).toContain('<a href="/e/legendy">Легенды русского рока</a>');
     expect(body).toContain('от 20 ₼');
     expect(body).toContain('<h1>Билеты на концерты BIR MANAT BAND в Баку</h1>');
   });
 
   it('marks unknown pages noindex without a canonical', () => {
-    const head = renderSeoHead({ kind: 'not-found', path: '/e/missing' }, ORIGIN);
+    const head = renderSeoHead({ kind: 'not-found', path: '/e/missing' }, ORIGIN, 'ru');
     expect(head).toContain('content="noindex, follow"');
     expect(head).not.toContain('rel="canonical"');
-    expect(renderSeoBody({ kind: 'not-found', path: '/e/missing' }, ORIGIN)).toBe('');
+    expect(renderSeoBody({ kind: 'not-found', path: '/e/missing' }, ORIGIN, 'ru')).toContain(
+      '<a href="/">Все концерты BIR MANAT BAND</a>',
+    );
+  });
+
+  it('renders a past concert as a noindex "has passed" page without offers', () => {
+    const page: SeoPage = { kind: 'past-event', path: '/e/legendy', event: makeEvent({ prices: [] }) };
+    const head = renderSeoHead(page, ORIGIN, 'ru');
+    expect(head).toContain('<title>Легенды русского рока, 8 января — концерт прошёл | BIR MANAT BAND</title>');
+    expect(head).toContain('content="noindex, follow"');
+    expect(head).not.toContain('application/ld+json');
+    expect(renderSeoBody(page, ORIGIN, 'ru')).toContain('Этот концерт прошёл 8 января 2027 г., 20:00.');
+  });
+
+  it('uses the hall and street address when they are known', () => {
+    const event = makeEvent({ venueName: 'Jazz Center', venueAddress: 'ул. Рашида Бейбутова, 19' });
+    expect(buildMusicEventJsonLd(event, ORIGIN, 'ru').location).toEqual({
+      '@type': 'Place',
+      name: 'Jazz Center',
+      address: {
+        '@type': 'PostalAddress',
+        streetAddress: 'ул. Рашида Бейбутова, 19',
+        addressLocality: 'Баку',
+        addressCountry: 'AZ',
+      },
+    });
+    expect(renderSeoBody({ kind: 'event', path: '/e/legendy', event }, ORIGIN, 'ru')).toContain(
+      'Jazz Center, ул. Рашида Бейбутова, 19, Баку',
+    );
+  });
+
+  it('renders language versions with hreflang alternates and localized copy', () => {
+    const head = renderSeoHead(eventPage, ORIGIN, 'en');
+    expect(head).toContain('<title>Легенды русского рока, 8 January — tickets | BIR MANAT BAND</title>');
+    expect(head).toContain(`<link rel="canonical" href="${ORIGIN}/e/legendy?lang=en">`);
+    expect(head).toContain(`<link rel="alternate" hreflang="az" href="${ORIGIN}/e/legendy?lang=az">`);
+    expect(head).toContain(`<link rel="alternate" hreflang="x-default" href="${ORIGIN}/e/legendy">`);
+    expect(head).toContain('<meta property="og:locale" content="en_GB">');
+    expect(head).toContain('"inLanguage":"en"');
+    const body = renderSeoBody(eventPage, ORIGIN, 'en');
+    expect(body).toContain('<p>Rock hits</p>');
+    expect(body).toContain('<a href="/?lang=en">');
+    // No Azerbaijani translation: the Russian description is the fallback.
+    expect(renderSeoBody(eventPage, ORIGIN, 'az')).toContain('Ждём всех!');
   });
 
   it('renders a sitemap with absolute URLs', () => {
@@ -173,7 +220,8 @@ describe('rendered fragments', () => {
       ORIGIN,
     );
     expect(xml).toContain(`<loc>${ORIGIN}/</loc>`);
-    expect(xml).toContain(`<loc>${ORIGIN}/e/a&amp;b</loc>`);
+    expect(xml).toContain(`<loc>${ORIGIN}/e/a&amp;b?lang=az</loc>`);
+    expect(xml).toContain(`<xhtml:link rel="alternate" hreflang="x-default" href="${ORIGIN}/e/a&amp;b"/>`);
   });
 });
 
@@ -223,6 +271,8 @@ describe('GET /api/seo', () => {
       posterImage: null,
       ageRating: null,
       currency: '₼',
+      venueName: null,
+      venueAddress: null,
     });
     db.zone.findMany.mockResolvedValue([
       { id: 'z1', name: 'Зал', price: 30, capacity: 100, type: 'GENERAL', sortOrder: 0 },
@@ -242,6 +292,20 @@ describe('GET /api/seo', () => {
     expect(body.text).toContain('<h1>Route Event</h1>');
     // head and body of one page view share a single load
     expect(db.venue.findFirst).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the language from the page query', async () => {
+    db.venue.findMany.mockResolvedValue([]);
+    const res = await request(app).get('/api/seo/head/?lang=az&utm=1').set('Host', 'tickets.birmanat.band').expect(200);
+    expect(res.text).toContain('<title>Bakıda BIR MANAT BAND konsertlərinə biletlər | Tickets Bir Manat</title>');
+    expect(res.text).toContain('href="https://tickets.birmanat.band/?lang=az"');
+  });
+
+  it('serves a past concert as a "has passed" page', async () => {
+    db.venue.findFirst.mockResolvedValue({ ...makeEvent({ slug: 'old', date: new Date('2020-01-01') }), id: 'v0' });
+    const res = await request(app).get('/api/seo/body/e/old').expect(200);
+    expect(res.text).toContain('Этот концерт прошёл');
+    expect(db.zone.findMany).not.toHaveBeenCalled();
   });
 
   it('serves a noindex head for an unknown event', async () => {
@@ -265,15 +329,14 @@ describe('GET /api/seo', () => {
   });
 
   it('serves the sitemap', async () => {
-    db.venue.findMany.mockResolvedValue([{ slug: 'past', date: new Date('2020-01-01') }]);
+    db.venue.findMany.mockResolvedValue([{ slug: 'soon' }]);
     const res = await request(app)
       .get('/api/seo/sitemap.xml')
       .set('Host', 'tickets.birmanat.band')
       .expect(200);
     expect(res.headers['content-type']).toMatch(/application\/xml/);
-    expect(res.text).toContain(
-      '<loc>https://tickets.birmanat.band/e/past</loc><priority>0.3</priority>',
-    );
+    expect(res.text).toContain('<loc>https://tickets.birmanat.band/e/soon</loc>');
+    expect(db.venue.findMany.mock.calls[0][0].where).toMatchObject({ active: true, date: { gte: expect.any(Date) } });
     expect(res.text).toContain('/refund-policy');
   });
 });

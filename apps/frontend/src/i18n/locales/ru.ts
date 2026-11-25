@@ -1,5 +1,6 @@
 const ru = {
   common: {
+    city: 'Баку',
     loading: 'Загрузка...',
     done: 'Готово',
     close: 'Закрыть',
@@ -17,6 +18,7 @@ const ru = {
   titles: {
     afisha: 'Билеты на концерты BIR MANAT BAND в Баку | Tickets Bir Manat',
     event: '{{name}}, {{day}} — билеты | BIR MANAT BAND',
+    eventPast: '{{name}}, {{day}} — концерт прошёл | BIR MANAT BAND',
     register: 'Tickets Bir Manat — Регистрация',
     ticket: 'Tickets Bir Manat — Мой билет',
     privacyPolicy: 'Политика конфиденциальности — Tickets Bir Manat',
@@ -62,6 +64,8 @@ const ru = {
     linkCopied: 'Ссылка скопирована',
   },
   register: {
+    pastTitle: 'Концерт прошёл',
+    pastHint: 'Этот концерт уже состоялся. Билеты на ближайшие концерты — на афише.',
     notFoundTitle: 'Мероприятие не найдено',
     notFoundHint: 'Возможно, ссылка устарела или мероприятие уже прошло.',
     seats: 'Места',

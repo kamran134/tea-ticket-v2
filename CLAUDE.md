@@ -41,7 +41,11 @@
 | `/admin` | `admin.html` | `AdminScanner` | админ на входе |
 
 Публичный `index.html` собирается nginx'ом через SSI: `<head>` и содержимое `#root` приходят
-с бэкенда (`/api/seo/...`), поэтому боты без JS видят реальный текст. React при монтировании
+с бэкенда (`/api/seo/...`), поэтому боты без JS видят реальный текст. Языковые версии —
+тот же URL с `?lang=az|en` (ru — без параметра): его читают фронтовый i18n (приоритет над
+localStorage, при смене языка параметр переписывается), SEO-фрагменты (hreflang, canonical) и
+nginx `map` для `<html lang>`. Прошедший концерт (`date < now`) — страница «концерт прошёл»,
+noindex, вне sitemap. React при монтировании
 заменяет этот HTML своим.
 
 `main.tsx` разводит `/`, `/e/:slug` и юридические URL по `window.location.pathname`. Nginx фронта отдаёт
@@ -68,6 +72,8 @@ AdminAuditLog                    (кто что сделал в админке)
     штук «в зону».
   - `TABLE` — связная прямоугольная область = один `ZoneTable`
     (`row/col` — якорь, `rows/cols` — размер footprint). Мест за столом — `Zone.tableChairs`.
+- `Venue.venueName` / `venueAddress` — площадка и адрес (город всегда Баку), идут в
+  JSON-LD `location` и на страницу концерта.
 - `Ticket` — одна строка на человека. Группа = общий `groupId`, равный id первого билета
   («главного»). QR кодирует `groupId ?? id`.
 - Активные статусы (занимают место): `BOOKED`, `PENDING`, `CONFIRMED`.

@@ -120,6 +120,9 @@ model Venue {
   descriptionAz  String?
   descriptionEn  String?
   ageRating      String?
+  // Where the concert happens: hall/club name and street address (city is always Baku).
+  venueName      String?
+  venueAddress   String?
   gridLayout     Json?
   createdAt      DateTime   @default(now())
   createdById    String?

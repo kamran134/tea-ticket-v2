@@ -241,6 +241,8 @@ export const api = {
     descriptionAz?: string | null;
     descriptionEn?: string | null;
     ageRating?: string | null;
+    venueName?: string | null;
+    venueAddress?: string | null;
   }): Promise<Venue> {
     return request(`/api/venues/${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -458,6 +460,8 @@ export const api = {
     descriptionAz?: string | null;
     descriptionEn?: string | null;
     ageRating?: string | null;
+    venueName?: string | null;
+    venueAddress?: string | null;
   }): Promise<Venue> {
     const ageRating = data.ageRating?.trim() || null;
     return request('/api/venues', {
@@ -471,6 +475,8 @@ export const api = {
         descriptionAz: data.descriptionAz ?? null,
         descriptionEn: data.descriptionEn ?? null,
         ...(ageRating ? { ageRating } : {}),
+        venueName: data.venueName ?? null,
+        venueAddress: data.venueAddress ?? null,
       }),
     });
   },

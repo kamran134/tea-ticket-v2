@@ -1,6 +1,6 @@
 import type { PrismaClient, Venue } from '@prisma/client';
 import { loadZonesWithAvailability } from '../zone-availability';
-import { STATIC_PAGES, type StaticPageCopy } from './site';
+import { STATIC_PAGE_PATHS } from './site';
 
 export interface EventPrice {
   zoneName: string;
@@ -11,7 +11,17 @@ export interface EventPrice {
 
 export type SeoEvent = Pick<
   Venue,
-  'name' | 'slug' | 'date' | 'description' | 'posterImage' | 'ageRating' | 'currency'
+  | 'name'
+  | 'slug'
+  | 'date'
+  | 'description'
+  | 'descriptionAz'
+  | 'descriptionEn'
+  | 'posterImage'
+  | 'ageRating'
+  | 'currency'
+  | 'venueName'
+  | 'venueAddress'
 > & {
   prices: EventPrice[];
 };
@@ -19,7 +29,11 @@ export type SeoEvent = Pick<
 export type SeoPage =
   | { kind: 'home'; path: '/'; events: SeoEvent[] }
   | { kind: 'event'; path: string; event: SeoEvent }
-  | { kind: 'static'; path: string; copy: StaticPageCopy }
+  /** Still active, but the date has passed: no longer sold, kept for old links. */
+  | { kind: 'past-event'; path: string; event: SeoEvent }
+  | { kind: 'static'; path: string }
+  /** Data could not be loaded: site-level copy only, never a wrong "no concerts". */
+  | { kind: 'unavailable'; path: string }
   | { kind: 'not-found'; path: string };
 
 const EVENT_PATH = /^\/e\/([^/]+)$/;
@@ -46,17 +60,24 @@ const VENUE_SELECT = {
   slug: true,
   date: true,
   description: true,
+  descriptionAz: true,
+  descriptionEn: true,
   posterImage: true,
   ageRating: true,
   currency: true,
+  venueName: true,
+  venueAddress: true,
 } as const;
 
-async function loadEventPage(prisma: PrismaClient, path: string, slug: string): Promise<SeoPage> {
+async function loadEventPage(prisma: PrismaClient, path: string, slug: string, now: Date): Promise<SeoPage> {
   const venue = await prisma.venue.findFirst({ where: { slug, active: true }, select: VENUE_SELECT });
   if (!venue) return { kind: 'not-found', path };
 
-  const zones = await loadZonesWithAvailability(prisma, venue.id);
   const { id: _id, ...fields } = venue;
+  // Same cut-off as ticket registration (routes/tickets.ts): sales stop at the start time.
+  if (venue.date < now) return { kind: 'past-event', path, event: { ...fields, prices: [] } };
+
+  const zones = await loadZonesWithAvailability(prisma, venue.id);
   return {
     kind: 'event',
     path,
@@ -87,10 +108,9 @@ export async function loadSeoPage(prisma: PrismaClient, path: string, now = new 
   if (path === '/') return loadHomePage(prisma, now);
 
   const eventMatch = path.match(EVENT_PATH);
-  if (eventMatch) return loadEventPage(prisma, path, eventMatch[1]);
+  if (eventMatch) return loadEventPage(prisma, path, eventMatch[1], now);
 
-  const copy = STATIC_PAGES[path];
-  return copy ? { kind: 'static', path, copy } : { kind: 'not-found', path };
+  return STATIC_PAGE_PATHS.includes(path) ? { kind: 'static', path } : { kind: 'not-found', path };
 }
 
 /**

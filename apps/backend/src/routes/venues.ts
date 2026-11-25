@@ -103,6 +103,13 @@ function normalizeAgeRating(value: string | null | undefined): string | null | u
 
 const descriptionSchema = z.string().max(DESCRIPTION_MAX).nullish();
 
+/** Hall name / street address: trimmed, blank clears the field, undefined leaves it unchanged. */
+const placeFieldSchema = z
+  .string()
+  .max(200)
+  .nullish()
+  .transform(v => (v == null ? v : v.trim() || null));
+
 const createVenueSchema = z.object({
   name: z.string().min(1).max(200),
   date: z.string().datetime(),
@@ -111,6 +118,8 @@ const createVenueSchema = z.object({
   descriptionAz: descriptionSchema,
   descriptionEn: descriptionSchema,
   ageRating: ageRatingSchema,
+  venueName: placeFieldSchema,
+  venueAddress: placeFieldSchema,
 });
 
 venuesRouter.post('/', requireAuth, requirePermission('events.create'), async (req, res) => {
@@ -134,6 +143,8 @@ venuesRouter.post('/', requireAuth, requirePermission('events.create'), async (r
         descriptionAz: normalizeDescription(parsed.data.descriptionAz) ?? null,
         descriptionEn: normalizeDescription(parsed.data.descriptionEn) ?? null,
         ageRating: normalizeAgeRating(parsed.data.ageRating) ?? null,
+        venueName: parsed.data.venueName ?? null,
+        venueAddress: parsed.data.venueAddress ?? null,
         createdById: actorOf(req).id,
       },
     });
@@ -165,8 +176,10 @@ const patchVenueSchema = z.object({
   descriptionAz: descriptionSchema,
   descriptionEn: descriptionSchema,
   ageRating: ageRatingSchema,
+  venueName: placeFieldSchema,
+  venueAddress: placeFieldSchema,
 }).refine(d => Object.values(d).some(v => v !== undefined), {
-  message: 'Provide name, date, active, floorPlanImage, posterImage, slug, description, descriptionAz, descriptionEn, or ageRating',
+  message: 'Provide name, date, active, floorPlanImage, posterImage, slug, description, descriptionAz, descriptionEn, ageRating, venueName, or venueAddress',
 });
 
 venuesRouter.patch('/:id', requireAuth, requirePermission('events.edit'), async (req, res) => {

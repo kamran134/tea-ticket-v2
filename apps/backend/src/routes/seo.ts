@@ -2,16 +2,14 @@ import { Router, type Request } from 'express';
 import { prisma } from '../db';
 import { resolvePublicOrigin } from '../services/open-graph';
 import { loadSeoPage, normalizePagePath, SeoPageCache, type SeoPage } from '../services/seo/pages';
+import { DEFAULT_SEO_LANG, isSeoLang } from '../services/seo/locale';
 import { renderSeoBody, renderSeoHead } from '../services/seo/render';
-import { HOME_DESCRIPTION, HOME_TITLE } from '../services/seo/site';
 import { loadSitemapEntries, renderSitemapXml } from '../services/seo/sitemap';
 
 // Fragments for nginx SSI: the frontend's index.html includes
 //   /api/seo/head<page uri>  inside <head>
 //   /api/seo/body<page uri>  inside #root
 // so every client — browser, search engine or AI crawler — gets the same real HTML.
-
-const FALLBACK_COPY = { title: HOME_TITLE, description: HOME_DESCRIPTION };
 
 const pageCache = new SeoPageCache(path => loadSeoPage(prisma, path));
 
@@ -35,7 +33,9 @@ seoRouter.get('/sitemap.xml', async (req, res) => {
 
 seoRouter.get(/^\/(head|body)(\/.*)?$/, async (req, res) => {
   const fragment = req.params[0] as 'head' | 'body';
+  // nginx passes the page's own $request_uri, so its query (and `lang`) is ours too.
   const path = normalizePagePath(req.params[1] ?? '/');
+  const lang = isSeoLang(req.query.lang) ? req.query.lang : DEFAULT_SEO_LANG;
   const origin = originOf(req);
 
   res.type('text/html; charset=utf-8');
@@ -48,9 +48,9 @@ seoRouter.get(/^\/(head|body)(\/.*)?$/, async (req, res) => {
     // The page itself still works without the fragment; only log and degrade.
     console.error(`[seo] ${fragment} fragment failed for ${path}`, err);
     // Site-level copy only: an empty event list would wrongly tell crawlers there are no concerts.
-    page = { kind: 'static', path, copy: FALLBACK_COPY };
+    page = { kind: 'unavailable', path };
   }
 
-  res.send(fragment === 'head' ? renderSeoHead(page, origin) : renderSeoBody(page, origin));
+  res.send(fragment === 'head' ? renderSeoHead(page, origin, lang) : renderSeoBody(page, origin, lang));
 });
 

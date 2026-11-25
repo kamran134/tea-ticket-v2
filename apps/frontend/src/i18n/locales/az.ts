@@ -1,5 +1,6 @@
 const az = {
   common: {
+    city: 'Bakı',
     loading: 'Yüklənir...',
     done: 'Hazırdır',
     close: 'Bağla',
@@ -17,6 +18,7 @@ const az = {
   titles: {
     afisha: 'Bakıda BIR MANAT BAND konsertlərinə biletlər | Tickets Bir Manat',
     event: '{{name}}, {{day}} — biletlər | BIR MANAT BAND',
+    eventPast: '{{name}}, {{day}} — konsert keçib | BIR MANAT BAND',
     register: 'Tickets Bir Manat — Qeydiyyat',
     ticket: 'Tickets Bir Manat — Biletim',
     privacyPolicy: 'Məxfilik Siyasəti — Tickets Bir Manat',
@@ -62,6 +64,8 @@ const az = {
     linkCopied: 'Link kopyalandı',
   },
   register: {
+    pastTitle: 'Konsert keçib',
+    pastHint: 'Bu konsert artıq keçirilib. Yaxın konsertlərin biletləri — afişada.',
     notFoundTitle: 'Tədbir tapılmadı',
     notFoundHint: 'Link köhnəlmiş ola bilər və ya tədbir artıq keçib.',
     seats: 'Yerlər',

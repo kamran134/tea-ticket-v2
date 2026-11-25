@@ -1,6 +1,7 @@
 import { absoluteUrl, stripHtmlToPlainText, truncateForOg } from '../open-graph';
+import { localizedUrl, type SeoLang } from './locale';
 import type { SeoEvent } from './pages';
-import { EVENT_CITY, EVENT_COUNTRY_CODE, PERFORMER, SITE_LANG, SITE_NAME } from './site';
+import { EVENT_COUNTRY_CODE, PERFORMER, SITE_COPY, SITE_NAME } from './site';
 
 type JsonLd = Record<string, unknown>;
 
@@ -48,9 +49,32 @@ function offersJsonLd(event: SeoEvent, pageUrl: string): JsonLd | undefined {
   };
 }
 
-export function buildMusicEventJsonLd(event: SeoEvent, origin: string): JsonLd {
-  const pageUrl = `${origin}/e/${event.slug}`;
-  const description = event.description ? stripHtmlToPlainText(event.description) : '';
+/** Description in the page language; Russian is the source text and the fallback. */
+export function localizedDescription(event: SeoEvent, lang: SeoLang): string | null {
+  const translated = lang === 'az' ? event.descriptionAz : lang === 'en' ? event.descriptionEn : null;
+  return translated?.trim() ? translated : event.description;
+}
+
+function locationJsonLd(event: SeoEvent, lang: SeoLang): JsonLd {
+  const city = SITE_COPY[lang].city;
+  const hall = event.venueName?.trim();
+  const street = event.venueAddress?.trim();
+  return {
+    '@type': 'Place',
+    name: hall || city,
+    address: {
+      '@type': 'PostalAddress',
+      ...(street && { streetAddress: street }),
+      addressLocality: city,
+      addressCountry: EVENT_COUNTRY_CODE,
+    },
+  };
+}
+
+export function buildMusicEventJsonLd(event: SeoEvent, origin: string, lang: SeoLang): JsonLd {
+  const pageUrl = localizedUrl(origin, `/e/${event.slug}`, lang);
+  const source = localizedDescription(event, lang);
+  const description = source ? stripHtmlToPlainText(source) : '';
   const offers = offersJsonLd(event, pageUrl);
   const typicalAgeRange = toTypicalAgeRange(event.ageRating);
 
@@ -61,19 +85,10 @@ export function buildMusicEventJsonLd(event: SeoEvent, origin: string): JsonLd {
     startDate: event.date.toISOString(),
     eventStatus: `${SCHEMA}/EventScheduled`,
     eventAttendanceMode: `${SCHEMA}/OfflineEventAttendanceMode`,
-    inLanguage: SITE_LANG,
+    inLanguage: lang,
     image: [absoluteUrl(origin, event.posterImage)],
     ...(description && { description: truncateForOg(description, 500) }),
-    // The exact hall is not a structured field yet, so the city is the most precise truth.
-    location: {
-      '@type': 'Place',
-      name: EVENT_CITY,
-      address: {
-        '@type': 'PostalAddress',
-        addressLocality: EVENT_CITY,
-        addressCountry: EVENT_COUNTRY_CODE,
-      },
-    },
+    location: locationJsonLd(event, lang),
     performer: performerJsonLd(),
     organizer: { '@type': 'Organization', name: PERFORMER.name, url: PERFORMER.url },
     ...(offers && { offers }),
@@ -81,11 +96,11 @@ export function buildMusicEventJsonLd(event: SeoEvent, origin: string): JsonLd {
   };
 }
 
-export function buildEventPageJsonLd(event: SeoEvent, origin: string): JsonLd {
-  return { '@context': SCHEMA, ...buildMusicEventJsonLd(event, origin) };
+export function buildEventPageJsonLd(event: SeoEvent, origin: string, lang: SeoLang): JsonLd {
+  return { '@context': SCHEMA, ...buildMusicEventJsonLd(event, origin, lang) };
 }
 
-export function buildHomePageJsonLd(events: SeoEvent[], origin: string): JsonLd {
+export function buildHomePageJsonLd(events: SeoEvent[], origin: string, lang: SeoLang): JsonLd {
   const homeUrl = `${origin}/`;
   return {
     '@context': SCHEMA,
@@ -95,16 +110,16 @@ export function buildHomePageJsonLd(events: SeoEvent[], origin: string): JsonLd 
         '@id': `${homeUrl}#website`,
         name: SITE_NAME,
         url: homeUrl,
-        inLanguage: SITE_LANG,
+        inLanguage: lang,
         about: performerJsonLd(),
       },
       {
         '@type': 'ItemList',
-        name: `Концерты ${PERFORMER.name}`,
+        name: SITE_COPY[lang].concertsListName,
         itemListElement: events.map((event, index) => ({
           '@type': 'ListItem',
           position: index + 1,
-          item: buildMusicEventJsonLd(event, origin),
+          item: buildMusicEventJsonLd(event, origin, lang),
         })),
       },
     ],

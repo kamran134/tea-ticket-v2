@@ -15,6 +15,13 @@ import {
   venueDescriptionsPayload,
   type VenueDescriptions,
 } from './VenueDescriptionFields';
+import {
+  emptyVenuePlace,
+  VenuePlaceFields,
+  venuePlaceFromVenue,
+  venuePlacePayload,
+  type VenuePlace,
+} from './VenuePlaceFields';
 import { AdminLoginGate, NoAccess } from './AdminLoginGate';
 import { UsersTab } from './admin/UsersTab';
 import { RolesTab } from './admin/RolesTab';
@@ -231,6 +238,7 @@ export function ManagePanel() {
   const [newVenueTime, setNewVenueTime] = useState('');
   const [newVenueDescriptions, setNewVenueDescriptions] = useState<VenueDescriptions>(() => emptyVenueDescriptions());
   const [newVenueAgeRating, setNewVenueAgeRating] = useState('');
+  const [newVenuePlace, setNewVenuePlace] = useState<VenuePlace>(() => emptyVenuePlace());
   const [newVenueSlug, setNewVenueSlug] = useState('');
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
@@ -243,6 +251,7 @@ export function ManagePanel() {
   const [editVenueTime, setEditVenueTime] = useState('');
   const [editVenueDescriptions, setEditVenueDescriptions] = useState<VenueDescriptions>(() => emptyVenueDescriptions());
   const [editVenueAgeRating, setEditVenueAgeRating] = useState('');
+  const [editVenuePlace, setEditVenuePlace] = useState<VenuePlace>(() => emptyVenuePlace());
   const [savingVenueEdit, setSavingVenueEdit] = useState(false);
 
   // Schema (grid map) — which venue is selected for editing
@@ -314,6 +323,7 @@ export function ManagePanel() {
         slug: newVenueSlug || undefined,
         ...venueDescriptionsPayload(newVenueDescriptions),
         ageRating: newVenueAgeRating || null,
+        ...venuePlacePayload(newVenuePlace),
       });
       setVenues(v => [venue, ...v]);
       setNewVenueName('');
@@ -321,6 +331,7 @@ export function ManagePanel() {
       setNewVenueTime('');
       setNewVenueDescriptions(emptyVenueDescriptions());
       setNewVenueAgeRating('');
+      setNewVenuePlace(emptyVenuePlace());
       setNewVenueSlug('');
       setSlugManuallyEdited(false);
       setSlugStatus('idle');
@@ -341,6 +352,7 @@ export function ManagePanel() {
       en: v.descriptionEn ?? '',
     });
     setEditVenueAgeRating(v.ageRating ?? '');
+    setEditVenuePlace(venuePlaceFromVenue(v));
   };
 
   const saveVenueEdit = async (id: string) => {
@@ -360,6 +372,7 @@ export function ManagePanel() {
         date: toIsoFromDateAndTime(editVenueDate, editVenueTime),
         ...venueDescriptionsPayload(editVenueDescriptions),
         ageRating: editVenueAgeRating || null,
+        ...venuePlacePayload(editVenuePlace),
       });
       setVenues(v => v.map(venue => (venue.id === updated.id ? updated : venue)));
       setEditingVenueId(null);
@@ -636,6 +649,7 @@ export function ManagePanel() {
                 className={DATE_TIME_INPUT_CLASS}
                 required
               />
+              <VenuePlaceFields value={newVenuePlace} onChange={setNewVenuePlace} />
               <VenueDescriptionFields
                 value={newVenueDescriptions}
                 onChange={setNewVenueDescriptions}
@@ -721,6 +735,7 @@ export function ManagePanel() {
                               className={DATE_TIME_INPUT_CLASS_COMPACT}
                               required
                             />
+                            <VenuePlaceFields value={editVenuePlace} onChange={setEditVenuePlace} compact />
                             <VenueDescriptionFields
                               value={editVenueDescriptions}
                               onChange={setEditVenueDescriptions}
@@ -770,6 +785,7 @@ export function ManagePanel() {
                             <div className="text-sm text-gray-500 mt-0.5">
                               {new Date(v.date).toLocaleString('ru-RU')}
                               {v.ageRating ? ` · ${v.ageRating}` : ''}
+                              {v.venueName ? ` · ${v.venueName}` : ''}
                             </div>
                           </>
                         )}

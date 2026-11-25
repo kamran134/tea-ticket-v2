@@ -35,6 +35,11 @@ interface Props {
   slug: string;
 }
 
+
+function isPastEvent(venue: Venue): boolean {
+  return new Date(venue.date).getTime() < Date.now();
+}
+
 export function RegisterForm({ slug }: Props) {
   const { t, i18n } = useTranslation();
   const [venue, setVenue] = useState<Venue | null>(null);
@@ -70,7 +75,10 @@ export function RegisterForm({ slug }: Props) {
   // Matches the server-rendered <title> (backend services/seo) once the event is known.
   useEffect(() => {
     document.title = venue
-      ? t('titles.event', { name: venue.name, day: formatEventDay(venue.date) })
+      ? t(isPastEvent(venue) ? 'titles.eventPast' : 'titles.event', {
+          name: venue.name,
+          day: formatEventDay(venue.date),
+        })
       : t('titles.register');
   }, [t, venue]);
 
@@ -325,25 +333,50 @@ export function RegisterForm({ slug }: Props) {
   const minPrice = zonePrices.length > 0 ? Math.min(...zonePrices) : null;
   const maxPrice = zonePrices.length > 0 ? Math.max(...zonePrices) : null;
   const hasPriceRange = minPrice != null && maxPrice != null && minPrice !== maxPrice;
+  const place = [venue.venueName, venue.venueAddress, t('common.city')].filter(Boolean).join(', ');
+
+  const poster = (
+    <div className="mb-6 space-y-4">
+      <EventPoster
+        name={venue.name}
+        slug={venue.slug}
+        date={venue.date}
+        place={place}
+        posterImage={venue.posterImage}
+        ageRating={venue.ageRating}
+        currency={currency}
+        minPrice={isPastEvent(venue) ? null : minPrice}
+        hasPriceRange={hasPriceRange}
+      />
+      <FormattedDescription html={localizedVenueDescription(venue, i18n.language)} className="text-sm text-gray-600 text-left" />
+    </div>
+  );
+
+  // Sales stop at the start time (the backend rejects later registrations too).
+  if (isPastEvent(venue)) {
+    return (
+      <PublicLayout>
+        <div className="flex-1 flex items-start justify-center p-4">
+          <div className="w-full max-w-md">
+            <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
+            {poster}
+            <div className="bg-white rounded-2xl shadow-lg p-6 text-center">
+              <h2 className="text-lg font-semibold text-gray-800">{t('register.pastTitle')}</h2>
+              <p className="text-gray-500 mt-1">{t('register.pastHint')}</p>
+              <a href="/" className="inline-block mt-4 text-brand hover:underline">{t('common.toAfisha')}</a>
+            </div>
+          </div>
+        </div>
+      </PublicLayout>
+    );
+  }
 
   return (
     <PublicLayout>
       <div className="flex-1 flex items-start justify-center p-4">
       <div className="w-full max-w-md">
         <BackLink href="/" label={t('common.toAfisha')} className="mb-4" />
-        <div className="mb-6 space-y-4">
-          <EventPoster
-            name={venue.name}
-            slug={venue.slug}
-            date={venue.date}
-            posterImage={venue.posterImage}
-            ageRating={venue.ageRating}
-            currency={currency}
-            minPrice={minPrice}
-            hasPriceRange={hasPriceRange}
-          />
-          <FormattedDescription html={localizedVenueDescription(venue, i18n.language)} className="text-sm text-gray-600 text-left" />
-        </div>
+        {poster}
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
           {error && (

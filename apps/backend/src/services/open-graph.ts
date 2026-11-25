@@ -68,23 +68,21 @@ export function truncateForOg(text: string, max = OG_DESCRIPTION_MAX): string {
   return `${base}…`;
 }
 
-/** "8 января 2027 г. в 20:00" in Baku time (matches the public RU copy). */
-export function formatEventDateRu(iso: string | Date): string {
-  const d = typeof iso === 'string' ? new Date(iso) : iso;
-  return d.toLocaleString('ru-RU', {
-    timeZone: EVENT_TIME_ZONE,
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function toDate(iso: string | Date): Date {
+  return typeof iso === 'string' ? new Date(iso) : iso;
 }
 
-/** "8 января" in Baku time — short form for titles. */
-export function formatEventDayRu(iso: string | Date): string {
-  const d = typeof iso === 'string' ? new Date(iso) : iso;
-  return d.toLocaleDateString('ru-RU', { timeZone: EVENT_TIME_ZONE, day: 'numeric', month: 'long' });
+/** "8 декабря 2026 г., 20:00" in Baku time, in the given Intl locale. */
+export function formatEventDate(iso: string | Date, locale: string): string {
+  const d = toDate(iso);
+  const day = d.toLocaleDateString(locale, { timeZone: EVENT_TIME_ZONE, day: 'numeric', month: 'long', year: 'numeric' });
+  const time = d.toLocaleTimeString(locale, { timeZone: EVENT_TIME_ZONE, hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${day}, ${time}`;
+}
+
+/** "8 декабря" in Baku time — short form for titles. */
+export function formatEventDay(iso: string | Date, locale: string): string {
+  return toDate(iso).toLocaleDateString(locale, { timeZone: EVENT_TIME_ZONE, day: 'numeric', month: 'long' });
 }
 
 export function resolvePublicOrigin(forwardedProto: string | undefined, host: string | undefined): string {

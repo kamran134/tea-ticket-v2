@@ -7,6 +7,8 @@ interface Props {
   name: string;
   slug: string;
   date: string;
+  /** "Hall, address, city" — whatever is known. */
+  place?: string;
   posterImage: string | null;
   ageRating: string | null;
   currency: Currency | string;
@@ -24,6 +26,7 @@ export function EventPoster({
   name,
   slug,
   date,
+  place,
   posterImage,
   ageRating,
   currency,
@@ -70,6 +73,9 @@ export function EventPoster({
         <p className="mt-1.5 text-sm sm:text-base text-white/90">
           {formatEventDateTime(date)}
         </p>
+        {place && (
+          <p className="mt-0.5 text-sm text-white/85">{place}</p>
+        )}
         {priceLabel && (
           <p className="mt-1 text-sm sm:text-base font-semibold text-white/95">
             {priceLabel}

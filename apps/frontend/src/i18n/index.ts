@@ -3,7 +3,7 @@ import { initReactI18next } from 'react-i18next';
 import ru from './locales/ru';
 import az from './locales/az';
 import en from './locales/en';
-import { DEFAULT_LANG, LANG_STORAGE_KEY, readStoredLang, type Lang } from './types';
+import { DEFAULT_LANG, LANG_STORAGE_KEY, readInitialLang, syncUrlLang, type Lang } from './types';
 
 const resources = {
   ru: { translation: ru },
@@ -21,15 +21,13 @@ void i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: readStoredLang(),
+    lng: readInitialLang(),
     fallbackLng: DEFAULT_LANG,
     interpolation: { escapeValue: false },
     pluralSeparator: '_',
   });
 
-syncDocumentLang(i18n.language as Lang);
-
-i18n.on('languageChanged', (lang: string) => {
+function persistLang(lang: Lang): void {
   try {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(LANG_STORAGE_KEY, lang);
@@ -37,8 +35,18 @@ i18n.on('languageChanged', (lang: string) => {
   } catch {
     // ignore storage errors
   }
-  syncDocumentLang(lang as Lang);
-});
+}
+
+function applyLang(lang: Lang): void {
+  // Remembered, so internal links (which carry no ?lang) keep a language that came from the URL.
+  persistLang(lang);
+  syncDocumentLang(lang);
+  syncUrlLang(lang);
+}
+
+applyLang(i18n.language as Lang);
+
+i18n.on('languageChanged', (lang: string) => applyLang(lang as Lang));
 
 export function changeLanguage(lang: Lang): Promise<unknown> {
   return i18n.changeLanguage(lang);

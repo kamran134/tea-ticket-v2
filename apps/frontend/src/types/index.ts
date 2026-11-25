@@ -51,6 +51,9 @@ export interface Venue {
   descriptionAz: string | null;
   descriptionEn: string | null;
   ageRating: string | null;
+  /** Hall / club name and street address; the city is always Baku. */
+  venueName: string | null;
+  venueAddress: string | null;
   gridLayout: GridLayout | null;
 }
 

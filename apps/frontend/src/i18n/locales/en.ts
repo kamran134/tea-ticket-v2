@@ -1,5 +1,6 @@
 const en = {
   common: {
+    city: 'Baku',
     loading: 'Loading...',
     done: 'Done',
     close: 'Close',
@@ -17,6 +18,7 @@ const en = {
   titles: {
     afisha: 'BIR MANAT BAND concert tickets in Baku | Tickets Bir Manat',
     event: '{{name}}, {{day}} — tickets | BIR MANAT BAND',
+    eventPast: '{{name}}, {{day}} — concert has passed | BIR MANAT BAND',
     register: 'Tickets Bir Manat — Registration',
     ticket: 'Tickets Bir Manat — My ticket',
     privacyPolicy: 'Privacy Policy — Tickets Bir Manat',
@@ -62,6 +64,8 @@ const en = {
     linkCopied: 'Link copied',
   },
   register: {
+    pastTitle: 'This concert has passed',
+    pastHint: 'This concert has already taken place. Tickets for upcoming concerts are on the events page.',
     notFoundTitle: 'Event not found',
     notFoundHint: 'The link may be outdated or the event has already passed.',
     seats: 'Seats',
