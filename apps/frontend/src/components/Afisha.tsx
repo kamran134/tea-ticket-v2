@@ -60,7 +60,7 @@ export function Afisha() {
                       {v.posterImage ? (
                         <img
                           src={v.posterImage}
-                          alt=""
+                          alt={t('afisha.posterAlt', { name: v.name })}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       ) : (

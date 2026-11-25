@@ -14,6 +14,11 @@ export function formatEventDate(iso: string): string {
   return `${date} · ${time}`;
 }
 
+/** Day and month only ("8 января"), for page titles. */
+export function formatEventDay(iso: string): string {
+  return new Date(iso).toLocaleDateString(getCurrentLocale(), { day: 'numeric', month: 'long' });
+}
+
 export function formatEventDateTime(iso: string): string {
   return new Date(iso).toLocaleString(getCurrentLocale(), {
     day: 'numeric',

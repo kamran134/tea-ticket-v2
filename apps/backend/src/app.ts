@@ -18,7 +18,7 @@ import { createWebhookHandler } from './routes/webhooks';
 import { createResendWebhookHandler } from './routes/resend-webhooks';
 import { createResendInboundWebhookHandler } from './routes/resend-inbound';
 import { inboundEmailsRouter } from './routes/inbound-emails';
-import { eventPreviewRouter } from './routes/event-preview';
+import { seoRouter } from './routes/seo';
 import { mockPaymentsRouter } from './routes/mock-payments';
 import { testRouter } from './routes/test';
 import { isTestMode } from './errors';
@@ -108,8 +108,6 @@ export function createApp(options?: {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  app.use('/e', eventPreviewRouter);
-
   app.use('/api/auth', authRouter);
   app.use('/api/admin-users', adminUsersRouter);
   app.use('/api/roles', rolesRouter);
@@ -122,6 +120,7 @@ export function createApp(options?: {
   app.use('/api/grid-templates', gridTemplatesRouter);
   app.use('/api/promo-codes', promoCodesRouter);
   app.use('/api/payments', paymentsRouter(paymentService));
+  app.use('/api/seo', seoRouter);
 
   // /api/test seeds and wipes data, so it is gated twice: the router itself 404s unless
   // TEST_MODE is on, and outside TEST_MODE it is never mounted in the first place. The

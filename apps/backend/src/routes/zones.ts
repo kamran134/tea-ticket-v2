@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { AppError, ErrorCodes, fail, failApp, failZod } from '../errors';
 import { tableFootprint } from '../services/tableFootprint';
 import { syncTableSeats, toSeatDto } from '../services/tableSeats';
+import { loadZonesWithAvailability } from '../services/zone-availability';
 
 export const zonesRouter = Router();
 
@@ -21,53 +22,7 @@ zonesRouter.get('/', async (req, res) => {
   try {
     await expireStaleBookings(prisma);
 
-    const zones = await prisma.zone.findMany({
-      where: { venueId },
-      orderBy: { sortOrder: 'asc' },
-    });
-
-    const activeStatuses: TicketStatus[] = ['BOOKED', 'PENDING', 'CONFIRMED'];
-    const activeWhere = { venueId, status: { in: activeStatuses } };
-
-    const ticketCounts = await prisma.ticket.groupBy({
-      by: ['zoneId'],
-      where: activeWhere,
-      _count: { _all: true },
-    });
-    const ticketCountMap = Object.fromEntries(ticketCounts.map(c => [c.zoneId, c._count._all]));
-
-    const tableSums = await prisma.zoneTable.groupBy({
-      by: ['zoneId'],
-      where: { zoneId: { in: zones.map(z => z.id) } },
-      _sum: { chairCount: true },
-      _count: { id: true },
-    });
-    const tableCapMap = Object.fromEntries(tableSums.map(t => [t.zoneId, t._sum.chairCount ?? 0]));
-
-    const seatCounts = await prisma.seat.groupBy({
-      by: ['zoneId'],
-      where: { zoneId: { in: zones.map(z => z.id) } },
-      _count: { id: true },
-    });
-    const seatTotalMap = Object.fromEntries(seatCounts.map(s => [s.zoneId, s._count.id]));
-
-    const zonesWithAvailability = zones.map(z => {
-      let available: number;
-      let totalCapacity: number;
-      if (z.type === 'SEATED') {
-        const occupied = ticketCountMap[z.id] ?? 0;
-        totalCapacity = seatTotalMap[z.id] ?? 0;
-        available = totalCapacity - occupied;
-      } else if (z.type === 'TABLE') {
-        const occupied = ticketCountMap[z.id] ?? 0;
-        totalCapacity = tableCapMap[z.id] ?? 0;
-        available = totalCapacity - occupied;
-      } else {
-        totalCapacity = z.capacity;
-        available = z.capacity - (ticketCountMap[z.id] ?? 0);
-      }
-      return { ...z, available, totalCapacity };
-    });
+    const zonesWithAvailability = await loadZonesWithAvailability(prisma, venueId);
 
     return res.json({ success: true, data: zonesWithAvailability });
   } catch {

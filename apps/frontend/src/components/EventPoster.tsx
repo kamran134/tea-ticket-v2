@@ -44,7 +44,7 @@ export function EventPoster({
       {posterImage ? (
         <img
           src={posterImage}
-          alt=""
+          alt={t('afisha.posterAlt', { name })}
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : (

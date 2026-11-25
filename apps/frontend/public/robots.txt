@@ -1,2 +1,8 @@
 User-agent: *
+Allow: /
 Disallow: /ticket
+Disallow: /manage
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://tickets.birmanat.band/sitemap.xml

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import PhoneInput, { isValidPhoneNumber } from 'react-phone-number-input';
 import 'react-phone-number-input/style.css';
 import { translateApiError } from '../i18n/apiErrors';
+import { formatEventDay } from '../i18n/format';
 import { api } from '../services/api';
 import type { PromoQuote, Venue, Zone, Seat, ZoneTable } from '../types';
 import { formatPrice } from '../types';
@@ -66,9 +67,12 @@ export function RegisterForm({ slug }: Props) {
   const [promoLoading, setPromoLoading] = useState(false);
   const [quoteNonce, setQuoteNonce] = useState(0);
 
+  // Matches the server-rendered <title> (backend services/seo) once the event is known.
   useEffect(() => {
-    document.title = t('titles.register');
-  }, [t]);
+    document.title = venue
+      ? t('titles.event', { name: venue.name, day: formatEventDay(venue.date) })
+      : t('titles.register');
+  }, [t, venue]);
 
   useEffect(() => {
     api.getVenueBySlug(slug)

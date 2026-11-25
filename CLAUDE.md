@@ -40,6 +40,10 @@
 | `/manage` | `manage.html` | `ManagePanel` | админ |
 | `/admin` | `admin.html` | `AdminScanner` | админ на входе |
 
+Публичный `index.html` собирается nginx'ом через SSI: `<head>` и содержимое `#root` приходят
+с бэкенда (`/api/seo/...`), поэтому боты без JS видят реальный текст. React при монтировании
+заменяет этот HTML своим.
+
 `main.tsx` разводит `/`, `/e/:slug` и юридические URL по `window.location.pathname`. Nginx фронта отдаёт
 `index.html` для `/e/` и `/privacy-policy` `/terms` `/refund-policy` `/about`.
 
@@ -107,6 +111,7 @@ AdminAuditLog                    (кто что сделал в админке)
 | POST | `/api/tickets/:id/checkin`, `/group/:groupId/checkin` | `tickets.checkin` | Super Admin — любой билет, остальные — только свои события |
 | DELETE | `/api/tickets/:id` | `tickets.delete` | только билеты своих мероприятий |
 | GET/POST/DELETE | `/api/grid-templates` | `events.view` / `events.create` / `events.delete` | шаблоны схем залов |
+| GET | `/api/seo/{head,body}/<uri>`, `/api/seo/sitemap.xml` | — | SSI-фрагменты для `index.html`: title/meta/canonical/OG/JSON-LD и текст страницы (`services/seo`) |
 
 ## Ключевые компоненты фронта
 

@@ -3,28 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tickets Bir Manat — Афиша</title>
-    <meta
-      name="description"
-      content="Организация культурных событий в Баку и Азербайджане. Ближайшие мероприятия и онлайн-регистрация на Bir Manat Band."
-    />
-    <meta property="og:title" content="Tickets Bir Manat — Афиша" />
-    <meta
-      property="og:description"
-      content="Организация культурных событий в Баку и Азербайджане. Ближайшие мероприятия и онлайн-регистрация на Bir Manat Band."
-    />
-    <meta property="og:image" content="https://tickets.birmanat.band/og-image.jpg" />
-    <meta property="og:image:alt" content="Tickets Bir Manat — Афиша" />
-    <meta property="og:url" content="https://tickets.birmanat.band/" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Tickets Bir Manat" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Tickets Bir Manat — Афиша" />
-    <meta
-      name="twitter:description"
-      content="Организация культурных событий в Баку и Азербайджане. Ближайшие мероприятия и онлайн-регистрация на Bir Manat Band."
-    />
-    <meta name="twitter:image" content="https://tickets.birmanat.band/og-image.jpg" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- Page title, meta, canonical, Open Graph and JSON-LD come from the backend via
+         nginx SSI (nginx.conf, backend routes/seo.ts). The Vite dev server leaves these
+         comments inert; the React app sets document.title itself. -->
+    <!--# config errmsg="" -->
+    <!--# include virtual="/__seo/head$request_uri" -->
     <script>
       // Runs before React so a first visit never flashes the light theme.
       // Mirrors readStoredTheme(): an explicit light choice wins, otherwise dark.
@@ -38,7 +22,7 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--# include virtual="/__seo/body$request_uri" --></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
