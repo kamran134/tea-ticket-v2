@@ -19,7 +19,7 @@
 - [x] robots.txt: Disallow служебных путей + Sitemap
 - [x] index.html: SSI-директивы вместо статичных мета; favicon во всех html
 - [x] Тексты: title главной/страницы концерта (ru/az/en), alt постеров
-- [x] Проверка: typecheck/test бэкенда, build фронта (nginx в docker не прогнан — Docker Desktop не стартует; проверить curl'ом после деплоя)
+- [x] Проверка: typecheck/test бэкенда, build фронта + nginx 1.27 в docker с бэкендом-заглушкой: все пути, Host в подзапросе, медленный/упавший бэкенд
 - [x] Коммит
 
 ## Блок 2 (не в этой задаче)
