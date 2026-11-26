@@ -54,7 +54,7 @@ async function reloadTicket(id: string): Promise<{
 const STATUS_COLORS: Record<TicketStatus, string> = {
   BOOKED: 'bg-yellow-100 text-yellow-800',
   PENDING: 'bg-amber-100 text-amber-800',
-  CONFIRMED: 'bg-brand/10 text-brand',
+  CONFIRMED: 'bg-green-500/10 text-green-600 dark:text-green-400',
   REJECTED: 'bg-red-100 text-red-800',
   EXPIRED: 'bg-gray-100 text-gray-700',
   REFUNDED: 'bg-purple-100 text-purple-800',
@@ -64,7 +64,7 @@ const EMAIL_STATUS_COLORS: Record<TicketEmailDeliveryStatus, string> = {
   PENDING: 'text-amber-700',
   PROCESSING: 'text-amber-700',
   ACCEPTED: 'text-brand',
-  DELIVERED: 'text-brand',
+  DELIVERED: 'text-green-600 dark:text-green-400',
   BOUNCED: 'text-red-700',
   COMPLAINED: 'text-red-700',
   FAILED: 'text-red-700',
