@@ -713,9 +713,7 @@ export function ManagePanel() {
                           className="w-14 h-14 rounded-lg object-cover shrink-0 border border-gray-100"
                         />
                       ) : (
-                        <div className="w-14 h-14 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-xl shrink-0">
-                          🍵
-                        </div>
+                        <div className="w-14 h-14 rounded-lg bg-gray-50 border border-gray-100 shrink-0" />
                       )}
                       <div className="min-w-0">
                         {editingVenueId === v.id ? (

@@ -401,7 +401,7 @@ export function TicketView() {
               href={`/e/${encodeURIComponent(event.slug)}`}
               className="text-lg font-bold text-brand hover:underline"
             >
-              🍵 {event.name}
+              {event.name}
             </a>
             <p className="text-sm text-gray-500">{formatEventDateTime(event.date)}</p>
           </div>
