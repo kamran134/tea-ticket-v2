@@ -9,6 +9,17 @@
          comments inert; the React app sets document.title itself. -->
     <!--# config errmsg="" -->
     <!--# include virtual="/__seo/head$request_uri" -->
+    <!-- The SSI copy in #root is for crawlers that do not run JavaScript. Keep it out of
+         the first paint for people: renderApp() adds html.app-ready once React has replaced it.
+         Without JavaScript the noscript block shows it. -->
+    <style>
+      html:not(.app-ready) #root { visibility: hidden; }
+    </style>
+    <noscript>
+      <style>
+        html:not(.app-ready) #root { visibility: visible; }
+      </style>
+    </noscript>
     <script>
       // Runs before React so a first visit never flashes the light theme.
       // Mirrors readStoredTheme(): an explicit light choice wins, otherwise dark.
